@@ -880,22 +880,49 @@ async function loadPropOfDay(){
   var mount=$("potgMount");
   var eid=ST.eventId;
   if(!mount||!eid) return;
-  if(_potgCache[eid]){renderPropOfDay(_potgCache[eid].prop,_potgCache[eid].mkt);return;}
-  mount.innerHTML='<div class="card card-potg" style="opacity:.5"><div class="card-h"><span class="tag tag-g">Prop of the Day</span><span class="market">Scanning all markets...</span></div><div class="pname" style="color:#555">Analyzing every prop across all markets for this game...</div></div>';
-  try{
-    var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;});
-    var data=await fetchOdds(eid,allMkts.join(","));
-    var bestProp=null,bestScore=-1,bestMkt=null;
-    allMkts.forEach(function(mk){
-      var props=parseProps(data,mk);
-      props.forEach(function(p){if(p.value>bestScore){bestScore=p.value;bestProp=p;bestMkt=mk;}});
-    });
-    if(!bestProp||!bestMkt){mount.innerHTML="";return;}
-    _potgCache[eid]={prop:bestProp,mkt:bestMkt};
-    renderPropOfDay(bestProp,bestMkt);
-  }catch(e){
-    if(ST.props.length) renderPropOfDay(ST.props[0],ST.market);
-    else mount.innerHTML="";
+
+  // Already cached for this game
+  if(_potgCache[eid]){ renderPropOfDay(_potgCache[eid].prop,_potgCache[eid].mkt); return; }
+
+  // Show loading placeholder
+  mount.innerHTML=
+    '<div class="card card-potg" style="opacity:.45"><div class="card-h">'+
+    '<span class="tag tag-g">Prop of the Day</span>'+
+    '<span class="market">Scanning all markets...</span></div>'+
+    '<div class="pname" style="color:#555;font-weight:400">Finding the best prop across every market for this game</div></div>';
+
+  var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;});
+  var bestProp=null, bestScore=-1, bestMkt=null;
+
+  // Fetch in batches of 5   Odds API handles comma-separated markets but smaller batches are safer
+  var BATCH=5;
+  for(var i=0; i<allMkts.length; i+=BATCH){
+    if(ST.eventId!==eid) return; // game changed while fetching   abort
+    var batch=allMkts.slice(i, Math.min(i+BATCH, allMkts.length));
+    try{
+      var data=await fetchOdds(eid, batch.join(","));
+      batch.forEach(function(mk){
+        parseProps(data,mk).forEach(function(p){
+          if(p.value>bestScore){ bestScore=p.value; bestProp=p; bestMkt=mk; }
+        });
+      });
+    }catch(e){ /* skip failed batch, try next */ }
+  }
+
+  if(ST.eventId!==eid) return; // stale   game changed
+
+  if(bestProp && bestMkt){
+    _potgCache[eid]={prop:bestProp, mkt:bestMkt};
+    renderPropOfDay(bestProp, bestMkt);
+  } else {
+    // All batches failed   wait for loadBoard to finish then use its top result
+    setTimeout(function(){
+      if(ST.eventId===eid && ST.props && ST.props.length){
+        var p=ST.props[0];
+        _potgCache[eid]={prop:p, mkt:ST.market};
+        renderPropOfDay(p, ST.market);
+      }
+    }, 2500);
   }
 }
 
