@@ -810,13 +810,13 @@ function renderGames(){
     var when=dt.toLocaleDateString([], {month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
     var b=el("button","game"+(ev.id===ST.eventId?" active":""));
     b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
-    b.onclick=function(){ ST.eventId=ev.id; renderGames(); if(ST.market) loadBoard(); };
+    b.onclick=function(){ ST.eventId=ev.id; renderGames(); if(ST.market) loadBoard(); loadPropOfDay(); };
     c.appendChild(b);
   });
 }
 
 /* ============ CLEAR BOARD ============ */
-function clearBoard(){
+function clearBoard(){_potgCache={};
   destroyCharts();
   $("filterBar").style.display="none";
   $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
@@ -845,7 +845,7 @@ async function loadBoard(){
   if(!getKey()){ toast("Connect your API key first"); return; }
   destroyCharts();
   $("tableMount").innerHTML=skeletonTable();
-  $("potgMount").innerHTML="";
+  // Do NOT clear potgMount here   POTG is per-game, not per-market
   $("filterBar").style.display="none";
   try{
     var data=await fetchOdds(ST.eventId, ST.market);
@@ -858,7 +858,6 @@ async function loadBoard(){
     $("filterBar").style.display="flex";
     renderTable(false);
     lazyLoadPlayerMeta();
-    loadPropOfDay(); // async - scans all markets, updates card when done
     loadLOTD();
   }catch(e){
     $("tableMount").innerHTML='<div class="empty">Could not load props. '+esc(e.message||"Error")+'</div>';
@@ -876,39 +875,26 @@ function populateBookSelect(){
 }
 
 /* ============ PROP OF THE DAY   scans ALL markets ============ */
+var _potgCache={};
 async function loadPropOfDay(){
   var mount=$("potgMount");
-  if(!mount||!ST.eventId) return;
-
-  // Show placeholder while scanning
-  mount.innerHTML='<div class="card card-potg" style="opacity:.5"><div class="card-h">'+
-    '<span class="tag tag-g">Prop of the Day</span>'+
-    '<span class="market">Scanning all markets...</span></div>'+
-    '<div class="pname" style="color:#555">Analyzing every prop for this game</div></div>';
-
+  var eid=ST.eventId;
+  if(!mount||!eid) return;
+  if(_potgCache[eid]){renderPropOfDay(_potgCache[eid].prop,_potgCache[eid].mkt);return;}
+  mount.innerHTML='<div class="card card-potg" style="opacity:.5"><div class="card-h"><span class="tag tag-g">Prop of the Day</span><span class="market">Scanning all markets...</span></div><div class="pname" style="color:#555">Analyzing every prop across all markets for this game...</div></div>';
   try{
-    // Fetch every market for this sport in one API call
     var allMkts=(SPORT_MARKETS[ST.sport]||[]).map(function(m){return m[0];});
-    var data=await fetchOdds(ST.eventId, allMkts.join(","));
-
-    // Parse + score every prop across every market
-    var bestProp=null, bestScore=-1, bestMkt=null;
+    var data=await fetchOdds(eid,allMkts.join(","));
+    var bestProp=null,bestScore=-1,bestMkt=null;
     allMkts.forEach(function(mk){
       var props=parseProps(data,mk);
-      props.forEach(function(p){
-        if(p.value>bestScore){
-          bestScore=p.value;
-          bestProp=p;
-          bestMkt=mk;
-        }
-      });
+      props.forEach(function(p){if(p.value>bestScore){bestScore=p.value;bestProp=p;bestMkt=mk;}});
     });
-
-    if(!bestProp||!bestMkt){ mount.innerHTML=""; return; }
-    renderPropOfDay(bestProp, bestMkt);
+    if(!bestProp||!bestMkt){mount.innerHTML="";return;}
+    _potgCache[eid]={prop:bestProp,mkt:bestMkt};
+    renderPropOfDay(bestProp,bestMkt);
   }catch(e){
-    // Fallback: use best from the currently loaded market
-    if(ST.props.length) renderPropOfDay(ST.props[0], ST.market);
+    if(ST.props.length) renderPropOfDay(ST.props[0],ST.market);
     else mount.innerHTML="";
   }
 }
