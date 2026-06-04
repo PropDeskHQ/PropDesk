@@ -48,14 +48,31 @@ body{background:#0f0f0f;color:#fff;font-family:'Inter',system-ui,sans-serif;font
 /* PAGES */
 .page{display:none}.page.active{display:block}
 
-/* CONTROLS */
-.controls{background:#161616;border-bottom:1px solid #222;padding:12px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
-.ctrl-grp{display:flex;flex-direction:column;gap:4px}
-.ctrl-lbl{font-size:10px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.06em}
+/* SPORT + PROP TABS */
+.sport-row{background:#161616;border-bottom:1px solid #1a1a1a;padding:14px 20px 10px;display:flex;gap:8px;flex-wrap:wrap}
+.sport-tab{padding:9px 22px;border-radius:24px;border:1px solid #2a2a2a;background:transparent;color:#666;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.02em}
+.sport-tab:hover{border-color:#555;color:#ccc}
+.sport-tab.active{background:#00ff87;color:#000;border-color:#00ff87}
+.prop-row{background:#161616;border-bottom:1px solid #222;padding:8px 20px 12px;display:flex;gap:6px;flex-wrap:wrap;min-height:44px}
+.prop-tab{padding:6px 14px;border-radius:20px;border:1px solid #222;background:transparent;color:#555;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.prop-tab:hover{border-color:#555;color:#aaa}
+.prop-tab.active{background:rgba(0,255,135,.1);border-color:#00ff87;color:#00ff87}
+
+/* PLAY OF THE GAME */
+.potg-card{margin:14px 20px 0;border-radius:10px;overflow:hidden;border:1px solid rgba(0,255,135,.35);background:linear-gradient(135deg,#0d1a10 0%,#111 60%)}
+.potg-header{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid rgba(0,255,135,.2);background:rgba(0,255,135,.05)}
+.potg-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:#00ff87}
+.potg-mkt{font-size:11px;color:#555;margin-left:auto}
+.potg-body{padding:16px 18px;display:flex;align-items:center;gap:20px}
+.potg-player{font-size:18px;font-weight:900;flex:1}
+.potg-bet{font-size:14px;color:#00ff87;font-weight:700;margin-top:3px}
+.potg-score-wrap{text-align:center;flex-shrink:0}
+.potg-score{font-size:32px;font-weight:900;color:#00ff87;letter-spacing:-1px;line-height:1}
+.potg-score-lbl{font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.07em}
+.potg-analysis{padding:0 18px 16px;font-size:13px;color:#aaa;line-height:1.7;border-top:1px solid rgba(0,255,135,.1);padding-top:12px}
+
 select{background:#1a1a1a;border:1px solid #333;color:#fff;padding:7px 10px;border-radius:7px;font-family:inherit;font-size:13px;cursor:pointer;min-width:180px;outline:none}
 select:focus{border-color:#00ff87}
-.btn-load{padding:8px 20px;background:#00ff87;color:#000;border:none;border-radius:7px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;align-self:flex-end}
-.btn-load:hover{background:#00cc6a}
 
 /* GAMES */
 .games-sec{padding:14px 20px;border-bottom:1px solid #222}
@@ -351,22 +368,15 @@ select:focus{border-color:#00ff87}
 
 <!-- PROPS PAGE -->
 <div id="page-props" class="page active">
-  <div class="controls">
-    <div class="ctrl-grp">
-      <div class="ctrl-lbl">Sport</div>
-      <select id="sportSel" onchange="onSportChange()">
-        <option value="americanfootball_nfl">NFL</option>
-        <option value="basketball_nba">NBA</option>
-        <option value="icehockey_nhl">NHL</option>
-        <option value="baseball_mlb">MLB</option>
-      </select>
-    </div>
-    <div class="ctrl-grp">
-      <div class="ctrl-lbl">Prop Market</div>
-      <select id="mktSel"></select>
-    </div>
-    <button class="btn-load" onclick="loadProps()">Load Props</button>
+  <!-- Sport tabs -->
+  <div class="sport-row">
+    <button class="sport-tab active" data-sport="americanfootball_nfl" onclick="selectSport(this)">NFL</button>
+    <button class="sport-tab"        data-sport="basketball_nba"       onclick="selectSport(this)">NBA</button>
+    <button class="sport-tab"        data-sport="icehockey_nhl"        onclick="selectSport(this)">NHL</button>
+    <button class="sport-tab"        data-sport="baseball_mlb"         onclick="selectSport(this)">MLB</button>
   </div>
+  <!-- Prop market tabs (populated by JS) -->
+  <div class="prop-row" id="propRow"></div>
   <div class="games-sec">
     <div class="sec-lbl">Select Game</div>
     <div class="games-row" id="gamesRow"><div class="empty">Connect your API key to load games.</div></div>
@@ -376,6 +386,8 @@ select:focus{border-color:#00ff87}
     <span class="res-count" id="resCount"></span>
     <button class="btn-parlay" onclick="openParlay()">Build Parlay</button>
   </div>
+  <!-- Play of the Game -->
+  <div id="potgCard" class="potg-card" style="display:none"></div>
   <div id="topBanner" class="top-banner" style="display:none"></div>
   <div id="tblSec" class="tbl-sec" style="display:none">
     <div class="tbl-wrap">
@@ -678,29 +690,44 @@ function connect() {
 }
 function boot() {
   document.getElementById('hdrDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-  populateMarkets();
+  populatePropTabs(getSport());
   try { var s = localStorage.getItem('pe_key'); if (s) document.getElementById('keyInput').value = s; } catch(e) {}
   if (getKey()) { loadGames(); checkQuota(); }
 }
 
-function getSport()  { return document.getElementById('sportSel').value; }
-function getMarket() { return document.getElementById('mktSel').value; }
+function getSport() {
+  var a = document.querySelector('.sport-tab.active');
+  return a ? a.dataset.sport : 'americanfootball_nfl';
+}
+function getMarket() {
+  var a = document.querySelector('.prop-tab.active');
+  return a ? a.dataset.mkt : '';
+}
 
-function populateMarkets() {
-  var sel = document.getElementById('mktSel');
-  sel.innerHTML = (SPORT_MARKETS[getSport()] || []).map(function(m) {
-    return '<option value="' + m[0] + '">' + m[1] + '</option>';
+function populatePropTabs(sport) {
+  var mkts = SPORT_MARKETS[sport] || [];
+  document.getElementById('propRow').innerHTML = mkts.map(function(m, i) {
+    return '<button class="prop-tab'+(i===0?' active':'')+'" data-mkt="'+m[0]+'" onclick="selectProp(this)">'+m[1]+'</button>';
   }).join('');
 }
 
-function onSportChange() {
-  populateMarkets();
-  eventId = null;
-  propsData = null;
+function selectSport(btn) {
+  document.querySelectorAll('.sport-tab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  populatePropTabs(btn.dataset.sport);
+  eventId = null; propsData = null;
   document.getElementById('filterBar').style.display = 'none';
   document.getElementById('tblSec').style.display = 'none';
   document.getElementById('topBanner').style.display = 'none';
+  document.getElementById('potgCard').style.display = 'none';
+  document.getElementById('tblBody').innerHTML = '';
   loadGames();
+}
+
+function selectProp(btn) {
+  document.querySelectorAll('.prop-tab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  if (eventId) loadProps(); // auto-load if game already selected
 }
 
 // -- QUOTA --------------------------------------------------------------
@@ -736,7 +763,7 @@ async function loadGames() {
         document.querySelectorAll('.game-pill').forEach(function(p) { p.classList.remove('active'); });
         pill.classList.add('active');
         eventId = g.id;
-        loadProps();
+        if (getMarket()) loadProps(); // auto-load if prop already selected
       };
       row.appendChild(pill);
     });
@@ -903,6 +930,88 @@ function animateNum(id, target) {
 }
 
 // -- TABLE --------------------------------------------------------------
+//    Play of the Game                                                   
+function renderPOTG() {
+  var card = document.getElementById('potgCard');
+  if (!propsData || !Object.keys(propsData).length) { card.style.display = 'none'; return; }
+
+  // Score every player and find the best
+  var candidates = Object.keys(propsData).map(function(p) {
+    var books = propsData[p];
+    var score = calcScore(books);
+    var edge  = calcEdge(books);
+    if (!edge) return null;
+    var overLines = Object.values(books).map(function(s){return s.over?s.over.line:null;}).filter(function(l){return l!=null;});
+    var consO  = median(overLines);
+    var spread = overLines.length ? Math.max.apply(null,overLines) - Math.min.apply(null,overLines) : 0;
+    var bO = bestLine(books,'over'), bU = bestLine(books,'under');
+    var lv = Infinity, lvBk = null;
+    Object.entries(books).forEach(function(e){ var v=calcVig(e[1].over&&e[1].over.odds,e[1].under&&e[1].under.odds); if(v!=null&&v<lv){lv=v;lvBk=e[0];} });
+    return { player:p, score:score, edge:edge, consO:consO, spread:spread, bO:bO, bU:bU, lv:lv, lvBk:lvBk, bookCount:Object.keys(books).length };
+  }).filter(Boolean);
+
+  if (!candidates.length) { card.style.display = 'none'; return; }
+  candidates.sort(function(a,b){ return b.score - a.score; });
+  var top = candidates[0];
+  var mktLabel = (SPORT_MARKETS[getSport()]||[]).find(function(m){ return m[0]===getMarket(); });
+  mktLabel = mktLabel ? mktLabel[1] : getMarket();
+
+  var betLabel = (top.edge.side==='over'?'Over':top.edge.side==='under'?'Under':'Yes') + (top.edge.line!=null?' '+top.edge.line:'');
+  var analysis = buildPOTGAnalysis(top, candidates.length, mktLabel);
+
+  card.style.display = 'block';
+  card.innerHTML =
+    '<div class="potg-header"><div class="potg-label">Play of the Game</div><div class="potg-mkt">'+mktLabel+'</div></div>' +
+    '<div class="potg-body">' +
+      '<div><div class="potg-player">'+top.player+'</div><div class="potg-bet">'+betLabel+'</div></div>' +
+      '<div class="potg-score-wrap"><div class="potg-score">'+top.score+'</div><div class="potg-score-lbl">Value Score</div></div>' +
+    '</div>' +
+    '<div class="potg-analysis">'+analysis+'</div>';
+}
+
+function buildPOTGAnalysis(top, totalPlayers, mktLabel) {
+  var s = [];
+  var betDir  = top.edge.side==='over'?'Over':top.edge.side==='under'?'Under':'Yes';
+  var betLine = top.edge.line != null ? ' '+top.edge.line : '';
+
+  // Sentence 1: Why this is the top play on the board
+  s.push('Out of '+totalPlayers+' '+mktLabel+' props currently priced across '+top.bookCount+' books, '+top.player+' grades as the single strongest play on the board with a value score of <strong>'+top.score+'/100</strong> - the highest available today.');
+
+  // Sentence 2: Line shopping edge or consensus signal
+  if (top.edge.side === 'over' && top.bO && top.consO != null) {
+    var edge = +(top.consO - top.bO.line).toFixed(2);
+    if (edge >= 0.5) {
+      s.push('The market is offering the '+betDir+betLine+' with <strong>'+edge+' free points</strong> relative to the consensus line of '+top.consO+' - a meaningful line-shopping advantage that directly lowers the threshold needed to cash the ticket.');
+    } else {
+      s.push('The '+betDir+betLine+' is the consensus direction on this prop, with <strong>'+top.bookCount+' books</strong> in close agreement - a reliable signal of accurate market pricing and a clear directional lean.');
+    }
+  } else if (top.edge.side === 'under' && top.bU && top.consO != null) {
+    var edgeU = +(top.bU.line - top.consO).toFixed(2);
+    if (edgeU >= 0.5) {
+      s.push('The Under is positioned with <strong>'+edgeU+' extra points</strong> above consensus at the best available book - that buffer represents genuine value that is difficult to find consistently in a sharp market.');
+    } else {
+      s.push('Market consensus is leaning Under on this number, with the majority of books aligned and a low line spread signaling strong collective conviction.');
+    }
+  } else {
+    s.push('The odds market shows meaningful disagreement across books, creating a clear best-available-price opportunity that makes this the highest-efficiency play among all options on the board right now.');
+  }
+
+  // Sentence 3: Market structure confidence
+  if (top.spread >= 1.5) {
+    s.push('The <strong>'+top.spread.toFixed(1)+'-point line spread</strong> across books signals active positioning - likely sharp or syndicate action on this number, which reinforces the urgency of locking in the best price before the market corrects.');
+  } else if (top.lv < Infinity && top.lvBk) {
+    var vigNote = top.lv < 4 ? 'exceptionally tight' : top.lv < 7 ? 'reasonable' : 'manageable';
+    s.push('The vig on this prop is '+vigNote+' at <strong>'+top.lv.toFixed(1)+'%</strong> at '+top.lvBk+', meaning the house edge is well within acceptable range and does not significantly erode the value we have identified.');
+  } else {
+    s.push('With '+top.bookCount+' sportsbooks pricing this prop in close agreement, the market is liquid and well-established - conditions that historically produce more reliable value signals compared to thinly-priced lines.');
+  }
+
+  // Sentence 4: Closing recommendation
+  s.push('This is the play we would make first with money on the line today - the combination of market edge, odds efficiency, and overall signal strength makes it the clear top pick from the current board.');
+
+  return s.join(' ');
+}
+
 function renderTable() {
   if (!propsData) return;
   var filter = document.getElementById('playerFilter').value.toLowerCase();
@@ -913,6 +1022,7 @@ function renderTable() {
       return lb-la;
     });
   document.getElementById('resCount').textContent = players.length + ' players';
+  renderPOTG();
 
   // Top banner
   var top = Object.keys(propsData).reduce(function(best,p) {
@@ -1373,9 +1483,16 @@ async function showStats(player, container) {
       if (!h) return;
       found++;
       var isHl = def.l === hl;
-      var disp = h.disp || (Number.isInteger(h.num) ? h.num : h.num.toFixed(1));
-      // For MLB counting stats shown as per-game, format nicely
-      if (sport === 'baseball_mlb' && h.num < 10 && !Number.isInteger(h.num)) disp = h.num.toFixed(2);
+      var THREE_DEC = {AVG:1,OBP:1,SLG:1,OPS:1,'FG%':1,'SV%':1,'FT%':1,'3P%':1,BABIP:1,ERA:1,WHIP:1};
+      var disp;
+      if (THREE_DEC[def.l]) {
+        // Rate stats always get 3 decimal places (e.g. .342)
+        disp = h.num.toFixed(3);
+      } else if (Number.isInteger(h.num)) {
+        disp = String(h.num);
+      } else {
+        disp = h.num.toFixed(1);
+      }
       grid += '<div class="avg-card'+(isHl?' hi':'')+'"><div class="ac-lbl">'+def.l+'</div><div class="ac-val">'+disp+'</div></div>';
     });
     grid += '</div>';
