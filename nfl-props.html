@@ -1981,13 +1981,18 @@ async function generateLOTD() {
       return { player:c.player, mkt:c.mkt, score:score, edge:edge, odds:oddsVal, books:c.books };
     }).filter(Boolean);
 
-    // Sort by score, pick best leg per player (no duplicate players) up to 4 legs
+    // Sort by score. Prefer legs with reasonable individual odds (not wild longshots).
+    // Filter out legs with individual odds above +150 to keep the parlay grounded.
     scored.sort(function(a, b) { return b.score - a.score; });
+    var MAX_PARLAY_AMERICAN = 500; // cap combined at +500
+    var MAX_LEG_ODDS = 150;        // don't include legs priced above +150
+
     var legs = [];
     scored.forEach(function(c) {
-      if (legs.length >= 4) return;
-      if (usedPlayers[c.player]) return; // one leg per player
-      // Also try to keep markets varied for MLB
+      if (legs.length >= 3) return;
+      if (c.odds > MAX_LEG_ODDS) return;      // skip longshot individual props
+      if (usedPlayers[c.player]) return;
+      // Keep MLB markets varied
       if (sport === 'baseball_mlb' && legs.length > 0) {
         var mktsUsed = legs.map(function(l){ return l.mkt; });
         if (mktsUsed.filter(function(m){ return m === c.mkt; }).length >= 1) return;
@@ -1996,13 +2001,29 @@ async function generateLOTD() {
       legs.push(c);
     });
 
+    // If we still don't have 2 legs from reasonable odds, relax the filter
+    if (legs.length < 2) {
+      legs = []; usedPlayers = {};
+      scored.forEach(function(c) {
+        if (legs.length >= 2) return;
+        if (usedPlayers[c.player]) return;
+        usedPlayers[c.player] = true;
+        legs.push(c);
+      });
+    }
+
     if (legs.length < 2) { card.style.display = 'none'; return; }
 
-    // Calculate parlay odds
+    // Calculate parlay odds   if over +500, drop to 2 legs
     var parlayDec = legs.reduce(function(acc, l) { return acc * aToDec(l.odds); }, 1);
     var parlayA   = decToA(parlayDec);
-    var imp       = (1 / parlayDec * 100).toFixed(1);
-    var payout    = Math.round(parlayDec * 100 - 100);
+    if (parlayA > MAX_PARLAY_AMERICAN && legs.length > 2) {
+      legs = legs.slice(0, 2);
+      parlayDec = legs.reduce(function(acc, l) { return acc * aToDec(l.odds); }, 1);
+      parlayA   = decToA(parlayDec);
+    }
+    var imp    = (1 / parlayDec * 100).toFixed(1);
+    var payout = Math.round(parlayDec * 100 - 100);
 
     renderLOTD(legs, parlayA, imp, payout);
   } catch(e) {
