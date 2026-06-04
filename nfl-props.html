@@ -321,9 +321,7 @@ tbody tr.prow:hover{background:var(--surf2)}
       <span class="count" id="resCount"></span>
     </div>
 
-    <div id="potgMount"></div>
     <div id="lotdMount"></div>
-    <div id="topvalMount"></div>
 
     <div id="tableMount"></div>
   </div>
@@ -781,13 +779,13 @@ function renderGames(){
 function clearBoard(){
   destroyCharts();
   $("filterBar").style.display="none";
-  $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("topvalMount").innerHTML=""; $("tableMount").innerHTML="";
+  $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
   $("gamesRow").innerHTML='<div class="empty" style="padding:18px">Loading games...</div>';
 }
 
 /* ============ LOAD BOARD ============ */
 function skeletonTable(){
-  var bookCols=ST.book?1:3;
+  var bookCols=ST.book?1:0;
   var h='<div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Best Bet</th><th>EV%</th><th>Value</th>';
   for(var i=0;i<bookCols;i++) h+='<th>Book</th>';
   h+='</tr></thead><tbody>';
@@ -807,7 +805,7 @@ async function loadBoard(){
   if(!getKey()){ toast("Connect your API key first"); return; }
   destroyCharts();
   $("tableMount").innerHTML=skeletonTable();
-  $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("topvalMount").innerHTML="";
+  $("lotdMount").innerHTML="";
   $("filterBar").style.display="none";
   try{
     var data=await fetchOdds(ST.eventId, ST.market);
@@ -818,8 +816,6 @@ async function loadBoard(){
     }
     populateBookSelect();
     $("filterBar").style.display="flex";
-    renderPOTG();
-    renderTopVal();
     renderTable(false);
     loadLOTD();
     lazyLoadPlayerMeta();
@@ -839,46 +835,6 @@ function populateBookSelect(){
 }
 
 /* ============ PLAY OF THE GAME ============ */
-function renderPOTG(){
-  if(!ST.props.length) return;
-  var p=ST.props[0];
-  var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"")+(p.bestOdds!=null?" ("+fmtOdds(p.bestOdds)+")":"");
-  var sidecls=p.side==="Under"?"under":"over";
-  var c=el("div","card card-potg");
-  c.innerHTML=
-    '<div class="card-h"><span class="tag tag-g">Top Pick</span><span class="market">'+esc(marketName(ST.market))+'</span>'+
-      '<div class="vscore"><b>'+p.value+'</b><span>VALUE</span></div></div>'+
-    '<div class="pname">'+esc(p.player)+'</div>'+
-    '<div class="pbet '+sidecls+'">'+esc(bet)+'</div>'+
-    '<div class="analysis">'+potgAnalysis(p)+'</div>';
-  $("potgMount").appendChild(c);
-}
-function potgAnalysis(p){
-  var t=tierOf(p.value).t;
-  var s1=esc(p.player)+" tops the "+esc(marketName(ST.market))+" board with a value score of "+p.value+" ("+t+"), the cleanest edge among the "+ST.props.length+" players priced for this game.";
-  var s2;
-  if(p.yesNo){ s2="The best available price is "+fmtOdds(p.bestOdds)+", a meaningful step up from the field on this Yes market."; }
-  else { s2="The best number is "+p.side+" "+p.bestLine+" at "+fmtOdds(p.bestOdds)+", roughly "+(p.edge||0).toFixed(1)+" point(s) of free value versus the "+(p.consensus!=null?p.consensus:"current")+" consensus."; }
-  var s3="Books are "+(p.lineSpread<=0.5?"tightly clustered":"split")+" here (spread "+(p.lineSpread||0).toFixed(1)+"), and the implied vig sits near "+(p.vig||0).toFixed(1)+"%, so the market structure is "+(p.vig<5?"efficient and trustworthy":"a touch wide, leaving room to shop")+".";
-  var s4="Closing call: take "+p.side+(p.bestLine!=null?" "+p.bestLine:"")+" at "+(p.bestBook?esc(p.bestBook.book):"the best book")+" before the line corrects toward consensus.";
-  return s1+" "+s2+" "+s3+" "+s4;
-}
-
-/* ============ TOP VALUE BANNER ============ */
-function renderTopVal(){
-  if(!ST.props.length) return;
-  var p=ST.props[0];
-  var sharp=(p.lineSpread>=1.5);
-  var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"")+(p.bestOdds!=null?" ("+fmtOdds(p.bestOdds)+")":"");
-  var c=el("div","topval");
-  c.innerHTML=
-    '<div class="tv-l"><div class="tv-tag">Top Value '+(sharp?'<span class="badge-sharp">Sharp Action</span>':'')+'</div>'+
-      '<div class="tv-name">'+esc(p.player)+'</div>'+
-      '<div class="tv-bet">'+esc(marketName(ST.market))+' - '+esc(bet)+'</div></div>'+
-    '<div class="tv-score"><b id="tvCount">0</b><span>SCORE</span></div>';
-  $("topvalMount").appendChild(c);
-  countUp($("tvCount"),p.value,0);
-}
 
 /* ============ LAY OF THE DAY ============ */
 async function loadLOTD(){
@@ -942,13 +898,11 @@ function filteredProps(){
   return ST.props.filter(function(p){ return !q || p.player.toLowerCase().indexOf(q)>=0; });
 }
 function bookColumns(){
-  if(ST.book){
-    var has=false; ST.props.forEach(function(p){ p.books.forEach(function(b){ if(b.book===ST.book) has=true; }); });
-    if(has) return [ST.book];
-  }
-  var counts={};
-  ST.props.forEach(function(p){ p.books.forEach(function(b){ counts[b.book]=(counts[b.book]||0)+1; }); });
-  return Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).slice(0,3);
+  // Only show book columns when the user has explicitly selected their book
+  if(!ST.book) return [];
+  var has=false;
+  ST.props.forEach(function(p){ p.books.forEach(function(b){ if(b.book===ST.book) has=true; }); });
+  return has ? [ST.book] : [];
 }
 
 function renderTable(silent){
@@ -1481,7 +1435,8 @@ function espnSeasonGrid(d,wantPlayoff){
       }
     }
   }
-  var cats=(d.categories)||(d.splits && d.splits.categories)||[];
+  // ESPN nests categories inside splits   check that first, fall back to top-level
+  var cats=(d.splits && d.splits.categories)||(d.categories)||[];
   cats.forEach(function(cat){
     var nm=String(cat.name||cat.displayName||"").toLowerCase();
     var isPost=nm.indexOf("post")>=0 || nm.indexOf("playoff")>=0;
@@ -1503,26 +1458,51 @@ function espnSeasonGrid(d,wantPlayoff){
 }
 function espnGameLogGrid(d){
   if(!d) return null;
-  var labels=d.labels||d.names||[];
-  if(!labels.length) return null;
+  // ESPN gamelog nests column headers inside seasonTypes[n].categories[n].names/labels
+  // We need to find the first category that has BOTH column headers and events
+  var bestCat=null;
+  var types=d.seasonTypes||[];
+  // Prefer regular season (id "2") first
+  types=types.slice().sort(function(a,b){ return (a.id==="2"?0:1)-(b.id==="2"?0:1); });
+  for(var ti=0;ti<types.length&&!bestCat;ti++){
+    var cats=types[ti].categories||[];
+    for(var ci=0;ci<cats.length&&!bestCat;ci++){
+      var cat=cats[ci];
+      var hdrs=cat.names||cat.labels||[];
+      var evts=cat.events||[];
+      if(hdrs.length && evts.length) bestCat={hdrs:hdrs,events:evts};
+    }
+  }
+  // Fallback: top-level labels
+  if(!bestCat){
+    var topHdrs=d.labels||d.names||[];
+    var topEvts=[];
+    if(d.seasonTypes) topEvts=collectEspnEvents(d.seasonTypes);
+    if(!topEvts.length && d.events) topEvts=collectEspnEvents(d.events);
+    if(topHdrs.length && topEvts.length) bestCat={hdrs:topHdrs,events:topEvts};
+  }
+  if(!bestCat) return null;
+  var labels=bestCat.hdrs;
+  var events=bestCat.events||[];
+  // Pick up to 7 stat columns (skip the first 0 if it's "MIN" for readability, keep it)
   var chosen=[];
-  for(var i=0;i<labels.length && chosen.length<7;i++){ chosen.push({idx:i,label:String(labels[i])}); }
+  for(var i=0;i<labels.length && chosen.length<7;i++){
+    chosen.push({idx:i,label:String(labels[i])});
+  }
   var cols=["Date","Opp"].concat(chosen.map(function(c){return c.label;}));
-  var meta=d.events||{};
-  var events=[];
-  if(d.seasonTypes) events=collectEspnEvents(d.seasonTypes);
-  if(!events.length && d.events) events=collectEspnEvents(d.events);
   var rows=[];
   events.slice(0,10).forEach(function(ev){
     if(!ev || !ev.stats) return;
     var date="-", opp="-";
-    var info = ev.eventId && meta[ev.eventId]? meta[ev.eventId]:ev;
-    if(info){
-      if(info.gameDate) date=String(info.gameDate).slice(5,10);
-      if(info.opponent && (info.opponent.abbreviation||info.opponent.displayName)) opp=(info.atVs?info.atVs+" ":"")+(info.opponent.abbreviation||info.opponent.displayName);
+    if(ev.gameDate) date=String(ev.gameDate).slice(5,10);
+    if(ev.opponent){
+      opp=(ev.atVs?ev.atVs+" ":"")+(ev.opponent.abbreviation||ev.opponent.displayName||"-");
     }
     var row=[date,opp];
-    chosen.forEach(function(c){ row.push(ev.stats[c.idx]!=null? ev.stats[c.idx]:"-"); });
+    chosen.forEach(function(c){
+      var v=ev.stats[c.idx];
+      row.push(v!=null? v:"-");
+    });
     rows.push(row);
   });
   if(!rows.length) return null;
@@ -1670,8 +1650,6 @@ async function silentRefresh(){
     applyMovement();
     populateBookSelect();
     renderTable(true);
-    $("potgMount").innerHTML=""; renderPOTG();
-    $("topvalMount").innerHTML=""; renderTopVal();
     lazyLoadPlayerMeta();
   }catch(e){}
 }
