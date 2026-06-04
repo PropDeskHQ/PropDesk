@@ -1538,14 +1538,17 @@ function buildEspnGrid(raw,sport){
 async function espnFullStats(id){
   var path=ESPN_PATH[ST.sport];
   var out={season:{},playoff:{},gamelog:[],glCols:[]};
-  // Try seasontype=2 first (regular season), fall back to no param
-  var urls=[
-    "https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/stats?seasontype=2",
-    "https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/stats"
-  ];
-  for(var ui=0;ui<urls.length;ui++){
+  var yr=new Date().getFullYear();
+  var years=[yr,yr-1]; // current season first, fall back to previous
+
+  // Season stats: try current year then previous year, always with seasontype=2
+  for(var yi=0;yi<years.length;yi++){
     try{
-      var r=await fetch(urls[ui],{signal:AbortSignal.timeout(8000)});
+      var r=await fetch(
+        "https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+
+        "/stats?seasontype=2&season="+years[yi],
+        {signal:AbortSignal.timeout(8000)}
+      );
       if(!r.ok) continue;
       var d=await r.json();
       var raw=espnCollectStats(d);
@@ -1553,18 +1556,28 @@ async function espnFullStats(id){
       if(Object.keys(g).length){ out.season=g; break; }
     }catch(e){ continue; }
   }
-  // Playoff stats (seasontype=3)
+
+  // Playoff/postseason stats for current year
   try{
-    var rp=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/stats?seasontype=3",{signal:AbortSignal.timeout(7000)});
+    var rp=await fetch(
+      "https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+
+      "/stats?seasontype=3&season="+years[0],
+      {signal:AbortSignal.timeout(7000)}
+    );
     if(rp.ok){
       var dp=await rp.json();
       var rawp=espnCollectStats(dp);
       out.playoff=buildEspnGrid(rawp,ST.sport);
     }
   }catch(e){}
-  // Gamelog
+
+  // Gamelog for current season
   try{
-    var rg=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/gamelog",{signal:AbortSignal.timeout(9000)});
+    var rg=await fetch(
+      "https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+
+      "/gamelog?season="+years[0],
+      {signal:AbortSignal.timeout(9000)}
+    );
     if(rg.ok){
       var dg=await rg.json();
       var grid=espnGameLogGrid(dg);
