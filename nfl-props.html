@@ -321,7 +321,7 @@ tbody tr.prow:hover{background:var(--surf2)}
       <span class="count" id="resCount"></span>
     </div>
 
-    <div id="lotdMount"></div>
+    <div id="potgMount"></div>
 
     <div id="tableMount"></div>
   </div>
@@ -779,7 +779,7 @@ function renderGames(){
 function clearBoard(){
   destroyCharts();
   $("filterBar").style.display="none";
-  $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
+  $("potgMount").innerHTML=""; $("tableMount").innerHTML="";
   $("gamesRow").innerHTML='<div class="empty" style="padding:18px">Loading games...</div>';
 }
 
@@ -805,7 +805,7 @@ async function loadBoard(){
   if(!getKey()){ toast("Connect your API key first"); return; }
   destroyCharts();
   $("tableMount").innerHTML=skeletonTable();
-  $("lotdMount").innerHTML="";
+  $("potgMount").innerHTML="";
   $("filterBar").style.display="none";
   try{
     var data=await fetchOdds(ST.eventId, ST.market);
@@ -816,8 +816,8 @@ async function loadBoard(){
     }
     populateBookSelect();
     $("filterBar").style.display="flex";
+    renderPropOfDay();
     renderTable(false);
-    loadLOTD();
     lazyLoadPlayerMeta();
   }catch(e){
     $("tableMount").innerHTML='<div class="empty">Could not load props. '+esc(e.message||"Error")+'</div>';
@@ -837,59 +837,33 @@ function populateBookSelect(){
 /* ============ PLAY OF THE GAME ============ */
 
 /* ============ LAY OF THE DAY ============ */
-async function loadLOTD(){
-  var mount=$("lotdMount");
-  mount.innerHTML='<div class="card card-lotd"><div class="card-h"><span class="tag tag-p">Lay of the Day</span><span class="market">building parlay...</span></div></div>';
-  if(!ST.eventId){ mount.innerHTML=""; return; }
-  try{
-    var mks=LOTD_MARKETS[ST.sport].join(",");
-    var data=await fetchOdds(ST.eventId, mks);
-    var pool=[];
-    LOTD_MARKETS[ST.sport].forEach(function(mk){
-      parseProps(data, mk).forEach(function(p){ p._mk=mk; pool.push(p); });
-    });
-    pool=pool.filter(function(p){ return p.bestOdds!=null && p.bestOdds<=150 && p.value>=45; });
-    pool.sort(function(a,b){ return b.value-a.value; });
-    var seen={}, legs=[];
-    for(var i=0;i<pool.length && legs.length<3;i++){
-      var p=pool[i]; var nk=p.player.toLowerCase();
-      if(seen[nk]) continue; seen[nk]=1; legs.push(p);
-    }
-    if(legs.length<2){ mount.innerHTML=""; return; }
-    function combo(ls){ var d=1; ls.forEach(function(l){ d*=aToDec(l.bestOdds); }); return d; }
-    var dec=combo(legs);
-    if(decToA(dec)>500 && legs.length>2){ legs=legs.slice(0,2); dec=combo(legs); }
-    renderLOTD(legs,dec);
-  }catch(e){ mount.innerHTML=""; }
-}
-function renderLOTD(legs,dec){
-  var amOdds=decToA(dec);
-  var payout=(aToDec(amOdds)*100).toFixed(0);
-  var seen={}, corr=false;
-  legs.forEach(function(l){ var k=l.player.toLowerCase(); if(seen[k]) corr=true; seen[k]=1; });
-  var legHtml="";
-  legs.forEach(function(l){
-    var bet=l.side+(l.bestLine!=null?" "+l.bestLine:"")+" "+fmtOdds(l.bestOdds);
-    legHtml+='<div class="leg"><div><div class="ln">'+esc(l.player)+'</div><div class="lm">'+esc(marketName(l._mk))+'</div></div>'+
-      '<div class="lb">'+esc(bet)+'</div><div class="ls">'+l.value+'/100</div></div>';
-  });
-  var c=el("div","card card-lotd");
+/* ============ PROP OF THE DAY ============ */
+function renderPropOfDay(){
+  if(!ST.props.length) return;
+  var mount=$("potgMount");
+  if(!mount) return;
+  var p=ST.props[0];
+  var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"");
+  var sidecls=p.side==="Under"?"under":"over";
+  var t=tierOf(p.value).t;
+  var sharp=(p.lineSpread>=1.5);
+  var s1=esc(p.player)+" earns Prop of the Day honours with a value score of "+p.value+"/100 ("+t+") - the highest-rated play on the current board.";
+  var s2;
+  if(p.yesNo){ s2="The best available price is "+fmtOdds(p.bestOdds)+", a clear step above the rest of the field on this market."; }
+  else { s2="The "+p.side+" "+p.bestLine+" is the call, with roughly "+(p.edge||0).toFixed(1)+" point(s) of free value versus the "+(p.consensus!=null?p.consensus:"consensus")+" market line."; }
+  var s3="The line spread across books is "+(p.lineSpread||0).toFixed(1)+" points and vig runs near "+(p.vig||0).toFixed(1)+"%, meaning "+(sharp?"sharp positioning is already in play here - lock in the best number now.":"the market is clean and the number is stable.")+"";
+  var analysis=s1+" "+s2+" "+s3;
+  var c=el("div","card card-potg");
   c.innerHTML=
-    '<div class="card-h"><span class="tag tag-p">Lay of the Day</span><span class="market">'+legs.length+'-leg parlay</span>'+
-      '<div class="vscore" style="margin-left:auto"><b class="parlay-odds">'+fmtOdds(amOdds)+'</b></div></div>'+
-    '<div class="legs">'+legHtml+'</div>'+
-    '<div class="payout">A $100 stake returns about $'+payout+' total.</div>'+
-    (corr?'<div class="warn">Correlated legs detected (same player appears more than once). Many books will not allow this combination - treat as separate plays.</div>':'')+
-    '<div class="analysis">'+lotdAnalysis(legs,amOdds,payout)+'</div>';
-  $("lotdMount").appendChild(c);
-}
-function lotdAnalysis(legs,amOdds,payout){
-  var names=legs.map(function(l){return l.player;}).join(", ");
-  var s1="Today's Lay of the Day stacks "+legs.length+" of the highest-value legs on this slate - "+esc(names)+" - into a single "+fmtOdds(amOdds)+" ticket.";
-  var s2="Each leg cleared our screen at a value score of 45 or better and was priced no longer than +150 individually, so this is built from genuine edges rather than longshot dart throws.";
-  var s3="Combined, a $100 stake returns roughly $"+payout+", and we deliberately cap the total near +500 to keep variance and correlation in check.";
-  var s4="Treat this as a higher-risk swing: every leg must hit, so size it small and consider the legs individually if your book limits correlated props.";
-  return s1+" "+s2+" "+s3+" "+s4;
+    '<div class="card-h"><span class="tag tag-g">Prop of the Day</span><span class="market">'+esc(marketName(ST.market))+'</span>'+
+      (sharp?'<span class="badge-sharp" style="margin-left:8px">Sharp Action</span>':'')+
+      '<div class="vscore"><b id="potgScore">0</b><span>SCORE</span></div></div>'+
+    '<div class="pname">'+esc(p.player)+'</div>'+
+    '<div class="pbet '+sidecls+'">'+esc(bet)+'</div>'+
+    '<div class="analysis">'+analysis+'</div>';
+  mount.innerHTML="";
+  mount.appendChild(c);
+  countUp($("potgScore"),p.value,0);
 }
 
 /* ============ MAIN TABLE ============ */
