@@ -110,7 +110,9 @@ input:focus,select:focus{border-color:var(--accent)}
 .leg{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.03);border:1px solid var(--bd);border-radius:10px;padding:9px 12px}
 .leg .ln{font-weight:700;font-size:14px}
 .leg .lm{font-size:11px;color:var(--mut)}
+.leg-n{width:22px;height:22px;border-radius:50%;background:rgba(167,139,250,.15);color:var(--purple);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .leg .lb{font-size:13px;font-weight:600;color:var(--purple)}
+.leg .lb.over{color:var(--accent)}.leg .lb.under{color:var(--blue)}.leg .lb.yes{color:var(--yellow)}
 .leg .ls{margin-left:auto;font-size:12px;color:var(--mut);font-weight:700}
 .parlay-odds{font-size:28px;font-weight:800;color:var(--purple)}
 .payout{font-size:13px;color:var(--mut)}
@@ -131,7 +133,7 @@ input:focus,select:focus{border-color:var(--accent)}
 .tbl-wrap{border:1px solid var(--bd);border-radius:14px;overflow:hidden;background:var(--surf)}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);text-align:left;padding:11px 12px;border-bottom:1px solid var(--bd2);background:var(--surf2);position:sticky;top:52px;z-index:5}
-tbody td{padding:11px 12px;border-bottom:1px solid var(--bd);vertical-align:top;font-size:13px}
+tbody td{padding:11px 12px;border-bottom:1px solid var(--bd);vertical-align:top;font-size:13px;color:var(--text)}
 tbody tr.prow{transition:background .15s}
 tbody tr.prow:hover{background:var(--surf2)}
 .pl-name{font-weight:700;font-size:14px}
@@ -184,8 +186,8 @@ tbody tr.prow:hover{background:var(--surf2)}
 /* SKELETON */
 .skel{height:14px;border-radius:6px;background:linear-gradient(90deg,#1a1a1a 25%,#222 50%,#1a1a1a 75%);background-size:200% 100%;animation:shimmer 1.3s infinite}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-.rowin{animation:rowin .3s ease both}
-@keyframes rowin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.rowin{animation:rowin .25s ease-out both}
+@keyframes rowin{from{transform:translateY(5px);opacity:0}to{transform:none;opacity:1}}
 
 /* MODAL */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;padding:18px}
@@ -322,6 +324,7 @@ tbody tr.prow:hover{background:var(--surf2)}
     </div>
 
     <div id="potgMount"></div>
+    <div id="lotdMount"></div>
 
     <div id="tableMount"></div>
   </div>
@@ -779,7 +782,7 @@ function renderGames(){
 function clearBoard(){
   destroyCharts();
   $("filterBar").style.display="none";
-  $("potgMount").innerHTML=""; $("tableMount").innerHTML="";
+  $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
   $("gamesRow").innerHTML='<div class="empty" style="padding:18px">Loading games...</div>';
 }
 
@@ -819,6 +822,7 @@ async function loadBoard(){
     renderPropOfDay();
     renderTable(false);
     lazyLoadPlayerMeta();
+    loadLOTD();
   }catch(e){
     $("tableMount").innerHTML='<div class="empty">Could not load props. '+esc(e.message||"Error")+'</div>';
   }
@@ -864,6 +868,75 @@ function renderPropOfDay(){
   mount.innerHTML="";
   mount.appendChild(c);
   countUp($("potgScore"),p.value,0);
+}
+
+/* ============ LAY OF THE DAY ============ */
+var LOTD_MARKETS = {
+  americanfootball_nfl: ["player_pass_yds","player_rush_yds","player_reception_yds","player_receptions","player_sacks"],
+  basketball_nba:       ["player_points","player_rebounds","player_assists","player_threes"],
+  icehockey_nhl:        ["player_goals","player_assists","player_shots_on_goal","player_points"],
+  baseball_mlb:         ["batter_hits","batter_home_runs","pitcher_strikeouts","batter_rbis","batter_total_bases"]
+};
+
+async function loadLOTD(){
+  var mount=$("lotdMount"); if(!mount) return;
+  mount.innerHTML="";
+  if(!ST.eventId) return;
+  var mks=(LOTD_MARKETS[ST.sport]||[getMarket()]).join(",");
+  try{
+    var data=await fetchOdds(ST.eventId, mks);
+    var pool=[];
+    (LOTD_MARKETS[ST.sport]||[getMarket()]).forEach(function(mk){
+      parseProps(data,mk).forEach(function(p){ p._lotdMk=mk; pool.push(p); });
+    });
+    pool=pool.filter(function(p){ return p.bestOdds!=null && p.bestOdds<=140 && p.value>=42; });
+    pool.sort(function(a,b){ return b.value-a.value; });
+    var seen={}, legs=[];
+    for(var i=0;i<pool.length&&legs.length<3;i++){
+      var pp=pool[i];
+      if(seen[pp.player.toLowerCase()]) continue;
+      // For MLB: keep market variety
+      if(ST.sport==="baseball_mlb"&&legs.length>0){
+        var used=legs.map(function(l){return l._lotdMk;});
+        if(used.indexOf(pp._lotdMk)>=0) continue;
+      }
+      seen[pp.player.toLowerCase()]=1;
+      legs.push(pp);
+    }
+    if(legs.length<2){ return; }
+    var dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
+    if(decToA(dec)>500&&legs.length>2){ legs=legs.slice(0,2); dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1); }
+    var amOdds=decToA(dec);
+    var payout=Math.round(dec*100-100);
+    var legHtml=legs.map(function(l,i){
+      var bet=l.side+(l.bestLine!=null?" "+l.bestLine:"");
+      var bcls=l.side==="Under"?"under":(l.side==="Yes"?"yes":"over");
+      return '<div class="leg"><div class="leg-n">'+(i+1)+'</div>'+
+        '<div style="flex:1"><div class="ln">'+esc(l.player)+'</div>'+
+        '<div class="lm">'+esc(marketName(l._lotdMk))+'</div></div>'+
+        '<div class="lb '+bcls+'">'+esc(bet)+'</div>'+
+        '<div class="ls">'+l.value+'/100</div></div>';
+    }).join("");
+    var avgScore=Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length);
+    var c=el("div","card card-lotd");
+    c.innerHTML=
+      '<div class="card-h"><span class="tag tag-p">Lay of the Day</span>'+
+        '<span class="market">'+legs.length+'-leg parlay</span>'+
+        '<div class="vscore" style="margin-left:auto"><b style="color:var(--purple)">'+fmtOdds(amOdds)+'</b></div></div>'+
+      '<div class="legs">'+legHtml+'</div>'+
+      '<div class="payout">$100 wins ~$'+payout+' &nbsp;|&nbsp; Avg value score: '+avgScore+'/100</div>'+
+      '<div class="analysis">'+lotdText(legs,amOdds)+'</div>';
+    mount.innerHTML="";
+    mount.appendChild(c);
+  }catch(e){}
+}
+
+function lotdText(legs,amOdds){
+  var names=legs.map(function(l){return l.player;}).join(", ");
+  var diverse=ST.sport==="baseball_mlb"?" pulled from different stat categories so the legs are independent":"";
+  return "Today's Lay of the Day combines "+esc(names)+" into a "+fmtOdds(amOdds)+" parlay"+diverse+
+    ". Every leg scored 42 or better on our value model and was priced no longer than +140 individually - these are real edges stacked together, not longshot dart throws."+
+    " Size this as a swing bet: every leg must hit, so keep stakes modest and consider playing the legs individually if your book restricts correlated props.";
 }
 
 /* ============ MAIN TABLE ============ */
