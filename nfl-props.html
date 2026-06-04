@@ -530,10 +530,47 @@ var PITCHER_MARKETS = {pitcher_strikeouts:1,pitcher_hits_allowed:1,pitcher_earne
 var YESNO_MARKETS = {player_anytime_td:1,player_first_td:1,player_first_basket:1,player_anytime_goalscorer:1,player_first_goalscorer:1};
 
 /* show-stat preferences per sport for season grid (ESPN) */
+// Stat name fragments to match (normalized: lowercase, alphanum only).
+// Covers both ESPN long names (avgPoints) and short abbreviations (PTS, PPG).
 var SHOW_STATS = {
-  americanfootball_nfl:["passingyards","passingtouchdowns","interceptions","completionpct","completionpercentage","rushingyards","rushingtouchdowns","receptions","receivingyards","receivingtouchdowns","qbrating","completions","passingattempts","yardspergame"],
-  basketball_nba:["points","rebounds","assists","steals","blocks","fieldgoalpct","fieldgoalpercentage","threepointfieldgoalpct","freethrowpct","minutes","turnovers","avgpoints","avgrebounds","avgassists"],
-  icehockey_nhl:["goals","assists","points","shotstotal","shots","plusminus","saves","savepct","savepercentage","goalsagainstaverage","timeonicepergame"]
+  americanfootball_nfl:[
+    "passingyards","pyds","passyards","avgpassingyards",
+    "passingtouchdowns","passtd","ptd","avgpassingtouchdowns",
+    "interceptions","int","avginterceptions",
+    "completionpct","completionpercentage","cmppct",
+    "rushingyards","ryds","rushyards","avgrushingyards",
+    "rushingtouchdowns","rushtd","avgrushingtouchdowns",
+    "receptions","rec","avgreceptions",
+    "receivingyards","recyds","avgreceivinyards","avgreceiveyards","avgreceivingyard","avgreceivingYards".toLowerCase(),
+    "receivingtouchdowns","rectd","avgreceivinyardstouchdowns",
+    "sacks","avgsacks","totalsacks",
+    "tackles","totaltackles","avgtotaltackles","combinedtackles",
+    "qbrating","passerrating","avggames"
+  ],
+  basketball_nba:[
+    "avgpoints","ppg","pts","points",
+    "avgrebounds","rpg","reb","rebounds","totalrebounds","avgrebounds",
+    "avgassists","apg","ast","assists",
+    "avgsteals","spg","stl","steals",
+    "avgblocks","bpg","blk","blocks",
+    "fieldgoalpct","fieldgoalpercentage","fgpct","fgp","fg",
+    "threepointfieldgoalpct","threepointpct","3ppct","3p","tppct",
+    "freethrowpct","ftpct","ftp","ft",
+    "avgminutes","mpg","min","minutes",
+    "avgturnovers","tpg","to","turnovers"
+  ],
+  icehockey_nhl:[
+    "goals","g","avggoals",
+    "assists","a","avgassists",
+    "points","p","avgpoints",
+    "shots","sog","shotsTotal","shotstotal","avgshotsOnGoal","shotongoal","avgshots",
+    "plusminus","plusminus","pm",
+    "penaltyminutes","pim","avgpenaltyminutes",
+    "saves","sv","avgsaves",
+    "savepct","savepercentage","svpct",
+    "goalsagainstaverage","gaa","avggoalsagainst",
+    "timeonicepergame","toi","avgicetiepergame","avgtimeonice"
+  ]
 };
 
 /* ============ STATE ============ */
@@ -1450,58 +1487,91 @@ function mlbGameLogGrid(splits,group){
   });
   return {cols:cols, rows:rows};
 }
+// Walk entire ESPN JSON and collect every named numeric stat regardless of nesting
+function espnCollectStats(d){
+  var raw=[];
+  function walk(obj,depth){
+    if(depth>12||!obj||typeof obj!=="object") return;
+    if(Array.isArray(obj)){ obj.forEach(function(v){walk(v,depth+1);}); return; }
+    // Pattern A: individual stat object {name, value, displayValue}
+    if((obj.name||obj.abbreviation) && obj.value!=null){
+      var n=parseFloat(String(obj.value).replace(/[^0-9.\-]/g,""));
+      if(!isNaN(n)) raw.push({name:String(obj.name||""),abbr:String(obj.abbreviation||obj.name||""),label:String(obj.displayName||obj.abbreviation||obj.name||""),val:n,disp:String(obj.displayValue||obj.value)});
+    }
+    // Pattern B: parallel arrays {names[], values[]}
+    var names=obj.names||obj.labels||null;
+    var values=obj.values||obj.totals||null;
+    if(Array.isArray(names)&&Array.isArray(values)){
+      var dn=obj.displayNames||obj.labels||names;
+      for(var i=0;i<names.length&&i<values.length;i++){
+        if(values[i]==null||values[i]==="") continue;
+        var n2=parseFloat(String(values[i]).replace(/[^0-9.\-]/g,""));
+        if(!isNaN(n2)) raw.push({name:String(names[i]),abbr:String(dn[i]||names[i]),label:String(dn[i]||names[i]),val:n2,disp:String(values[i])});
+      }
+    }
+    var skip={athlete:1,competitions:1,records:1,logos:1,links:1};
+    Object.keys(obj).forEach(function(k){ if(!skip[k]) walk(obj[k],depth+1); });
+  }
+  walk(d,0);
+  return raw;
+}
+
+// Build a {label:displayValue} grid by matching raw stats against sport pick list
+function buildEspnGrid(raw,sport){
+  var picks=SHOW_STATS[sport]||[];
+  var grid={}, added={};
+  raw.forEach(function(s){
+    var nm=s.name.toLowerCase().replace(/[^a-z0-9]/g,"");
+    var ab=s.abbr.toLowerCase().replace(/[^a-z0-9]/g,"");
+    for(var j=0;j<picks.length;j++){
+      var pk=picks[j].replace(/[^a-z0-9]/g,"");
+      if((nm===pk||ab===pk)&&!added[pk]){
+        added[pk]=1;
+        grid[s.label]=s.disp;
+        break;
+      }
+    }
+  });
+  return grid;
+}
+
 async function espnFullStats(id){
   var path=ESPN_PATH[ST.sport];
   var out={season:{},playoff:{},gamelog:[],glCols:[]};
+  // Try seasontype=2 first (regular season), fall back to no param
+  var urls=[
+    "https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/stats?seasontype=2",
+    "https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/stats"
+  ];
+  for(var ui=0;ui<urls.length;ui++){
+    try{
+      var r=await fetch(urls[ui],{signal:AbortSignal.timeout(8000)});
+      if(!r.ok) continue;
+      var d=await r.json();
+      var raw=espnCollectStats(d);
+      var g=buildEspnGrid(raw,ST.sport);
+      if(Object.keys(g).length){ out.season=g; break; }
+    }catch(e){ continue; }
+  }
+  // Playoff stats (seasontype=3)
   try{
-    var r=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/stats");
-    var d=await r.json();
-    out.season=espnSeasonGrid(d,false);
-    out.playoff=espnSeasonGrid(d,true);
+    var rp=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/stats?seasontype=3",{signal:AbortSignal.timeout(7000)});
+    if(rp.ok){
+      var dp=await rp.json();
+      var rawp=espnCollectStats(dp);
+      out.playoff=buildEspnGrid(rawp,ST.sport);
+    }
   }catch(e){}
+  // Gamelog
   try{
-    var rg=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/gamelog");
-    var dg=await rg.json();
-    var grid=espnGameLogGrid(dg);
-    if(grid){ out.gamelog=grid.rows; out.glCols=grid.cols; }
+    var rg=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/gamelog",{signal:AbortSignal.timeout(9000)});
+    if(rg.ok){
+      var dg=await rg.json();
+      var grid=espnGameLogGrid(dg);
+      if(grid){ out.gamelog=grid.rows; out.glCols=grid.cols; }
+    }
   }catch(e){}
   return out;
-}
-function espnSeasonGrid(d,wantPlayoff){
-  var grid={};
-  if(!d) return grid;
-  var picks=SHOW_STATS[ST.sport]||[];
-  function harvest(names,values,disp){
-    for(var i=0;i<names.length;i++){
-      var nm=String(names[i]).toLowerCase().replace(/[^a-z0-9]/g,"");
-      for(var j=0;j<picks.length;j++){
-        if(nm===picks[j].replace(/[^a-z0-9]/g,"")){
-          var label=disp&&disp[i]?disp[i]:names[i];
-          if(grid[label]===undefined && values[i]!=null && values[i]!=="") grid[label]=values[i];
-        }
-      }
-    }
-  }
-  // ESPN nests categories inside splits   check that first, fall back to top-level
-  var cats=(d.splits && d.splits.categories)||(d.categories)||[];
-  cats.forEach(function(cat){
-    var nm=String(cat.name||cat.displayName||"").toLowerCase();
-    var isPost=nm.indexOf("post")>=0 || nm.indexOf("playoff")>=0;
-    var match = wantPlayoff? isPost : !isPost;
-    var names=cat.names||cat.labels||[];
-    var values=cat.values||[];
-    var disp=cat.displayNames||cat.labels||names;
-    if(match && names.length && values.length) harvest(names,values,disp);
-    if(cat.statistics){
-      cat.statistics.forEach(function(s){
-        if(match) harvest([s.name||s.abbreviation||""],[s.value!=null?s.value:s.displayValue],[s.displayName||s.name]);
-      });
-    }
-  });
-  if(!Object.keys(grid).length && !wantPlayoff && (d.labels||d.names) && d.stats){
-    harvest(d.names||d.labels, d.stats, d.labels);
-  }
-  return grid;
 }
 function espnGameLogGrid(d){
   if(!d) return null;
