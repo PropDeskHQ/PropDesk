@@ -883,7 +883,7 @@ async function loadPropOfDay(){
   if(_potgCache[eid]){renderPropOfDay(_potgCache[eid].prop,_potgCache[eid].mkt);return;}
   mount.innerHTML='<div class="card card-potg" style="opacity:.5"><div class="card-h"><span class="tag tag-g">Prop of the Day</span><span class="market">Scanning all markets...</span></div><div class="pname" style="color:#555">Analyzing every prop across all markets for this game...</div></div>';
   try{
-    var allMkts=(SPORT_MARKETS[ST.sport]||[]).map(function(m){return m[0];});
+    var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;});
     var data=await fetchOdds(eid,allMkts.join(","));
     var bestProp=null,bestScore=-1,bestMkt=null;
     allMkts.forEach(function(mk){
