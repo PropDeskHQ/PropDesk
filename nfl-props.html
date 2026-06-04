@@ -856,9 +856,9 @@ async function loadBoard(){
     }
     populateBookSelect();
     $("filterBar").style.display="flex";
-    renderPropOfDay();
     renderTable(false);
     lazyLoadPlayerMeta();
+    loadPropOfDay(); // async - scans all markets, updates card when done
     loadLOTD();
   }catch(e){
     $("tableMount").innerHTML='<div class="empty">Could not load props. '+esc(e.message||"Error")+'</div>';
@@ -875,33 +875,78 @@ function populateBookSelect(){
   if(ST.book && books[ST.book]) sel.value=ST.book; else if(ST.book && !books[ST.book]){ /* keep selection but no data */ sel.value=""; }
 }
 
-/* ============ PLAY OF THE GAME ============ */
-
-/* ============ LAY OF THE DAY ============ */
-/* ============ PROP OF THE DAY ============ */
-function renderPropOfDay(){
-  if(!ST.props.length) return;
+/* ============ PROP OF THE DAY   scans ALL markets ============ */
+async function loadPropOfDay(){
   var mount=$("potgMount");
-  if(!mount) return;
-  var p=ST.props[0];
+  if(!mount||!ST.eventId) return;
+
+  // Show placeholder while scanning
+  mount.innerHTML='<div class="card card-potg" style="opacity:.5"><div class="card-h">'+
+    '<span class="tag tag-g">Prop of the Day</span>'+
+    '<span class="market">Scanning all markets...</span></div>'+
+    '<div class="pname" style="color:#555">Analyzing every prop for this game</div></div>';
+
+  try{
+    // Fetch every market for this sport in one API call
+    var allMkts=(SPORT_MARKETS[ST.sport]||[]).map(function(m){return m[0];});
+    var data=await fetchOdds(ST.eventId, allMkts.join(","));
+
+    // Parse + score every prop across every market
+    var bestProp=null, bestScore=-1, bestMkt=null;
+    allMkts.forEach(function(mk){
+      var props=parseProps(data,mk);
+      props.forEach(function(p){
+        if(p.value>bestScore){
+          bestScore=p.value;
+          bestProp=p;
+          bestMkt=mk;
+        }
+      });
+    });
+
+    if(!bestProp||!bestMkt){ mount.innerHTML=""; return; }
+    renderPropOfDay(bestProp, bestMkt);
+  }catch(e){
+    // Fallback: use best from the currently loaded market
+    if(ST.props.length) renderPropOfDay(ST.props[0], ST.market);
+    else mount.innerHTML="";
+  }
+}
+
+function renderPropOfDay(p, mkt){
+  var mount=$("potgMount");
+  if(!mount||!p) return;
+  var mktLabel=marketName(mkt);
   var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"");
   var sidecls=p.side==="Under"?"under":"over";
   var t=tierOf(p.value).t;
   var sharp=(p.lineSpread>=1.5);
-  var s1=esc(p.player)+" earns Prop of the Day honours with a value score of "+p.value+"/100 ("+t+") - the highest-rated play on the current board.";
+
+  // Analysis: 3 sentences explaining why this is the best prop across all markets
+  var s1="Out of every prop available for this game across all markets, "+esc(p.player)+"'s "+esc(mktLabel)+" line earns Prop of the Day with a value score of "+p.value+"/100 ("+t+") - the highest edge found anywhere on the board.";
   var s2;
-  if(p.yesNo){ s2="The best available price is "+fmtOdds(p.bestOdds)+", a clear step above the rest of the field on this market."; }
-  else { s2="The "+p.side+" "+p.bestLine+" is the call, with roughly "+(p.edge||0).toFixed(1)+" point(s) of free value versus the "+(p.consensus!=null?p.consensus:"consensus")+" market line."; }
-  var s3="The line spread across books is "+(p.lineSpread||0).toFixed(1)+" points and vig runs near "+(p.vig||0).toFixed(1)+"%, meaning "+(sharp?"sharp positioning is already in play here - lock in the best number now.":"the market is clean and the number is stable.")+"";
-  var analysis=s1+" "+s2+" "+s3;
+  if(p.yesNo){
+    s2="The best available price is "+fmtOdds(p.bestOdds)+" on this Yes market - a standout number relative to the rest of the field.";
+  } else {
+    var edgePts=(p.edge||0).toFixed(1);
+    s2="The "+p.side+(p.bestLine!=null?" "+p.bestLine:"")+" is the call, with "+edgePts+" point(s) of free value versus the consensus line of "+(p.consensus!=null?p.consensus:"the market")+", giving you a mathematical edge before a single game plays out.";
+  }
+  var s3=(sharp?
+    "The "+( p.lineSpread||0).toFixed(1)+"-point spread across books signals sharp positioning is already in play - lock in the best available number before further movement narrows the gap.":
+    "Market consensus is tight and the vig runs near "+(p.vig||0).toFixed(1)+"%, so the pricing is clean - this edge is real, not a fluke of one outlier book."
+  );
+
   var c=el("div","card card-potg");
   c.innerHTML=
-    '<div class="card-h"><span class="tag tag-g">Prop of the Day</span><span class="market">'+esc(marketName(ST.market))+'</span>'+
+    '<div class="card-h">'+
+      '<span class="tag tag-g">Prop of the Day</span>'+
+      '<span class="market">'+esc(mktLabel)+'</span>'+
       (sharp?'<span class="badge-sharp" style="margin-left:8px">Sharp Action</span>':'')+
-      '<div class="vscore"><b id="potgScore">0</b><span>SCORE</span></div></div>'+
+      '<div class="vscore"><b id="potgScore">0</b><span>SCORE</span></div>'+
+    '</div>'+
     '<div class="pname">'+esc(p.player)+'</div>'+
     '<div class="pbet '+sidecls+'">'+esc(bet)+'</div>'+
-    '<div class="analysis">'+analysis+'</div>';
+    '<div class="analysis">'+s1+" "+s2+" "+s3+'</div>';
   mount.innerHTML="";
   mount.appendChild(c);
   countUp($("potgScore"),p.value,0);
