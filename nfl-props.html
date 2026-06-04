@@ -1585,13 +1585,41 @@ function buildEspnGrid(raw,sport){
   return grid;
 }
 
+// Strip career/all-time categories from ESPN response before collecting stats
+function stripCareerCats(d){
+  if(!d||typeof d!=="object") return d;
+  function isCareer(cat){
+    var nm=String(cat.name||cat.displayName||cat.type||cat.abbreviation||"").toLowerCase();
+    return nm.indexOf("career")>=0||nm.indexOf("all time")>=0||nm.indexOf("alltime")>=0||nm.indexOf("all-time")>=0||nm.indexOf("lifetime")>=0||cat.isCareer===true;
+  }
+  function clean(obj){
+    if(!obj||typeof obj!=="object") return obj;
+    if(Array.isArray(obj)) return obj.map(clean);
+    var res={};
+    for(var k in obj){
+      if(k==="categories"&&Array.isArray(obj[k])){
+        // Keep only non-career categories; if all are career, keep them (better than nothing)
+        var nonCareer=obj[k].filter(function(c){return !isCareer(c);});
+        res[k]=(nonCareer.length?nonCareer:obj[k]).map(clean);
+      } else if(k==="statistics"&&Array.isArray(obj[k])){
+        // Within statistics arrays, filter out objects flagged as career
+        res[k]=obj[k].filter(function(s){return !isCareer(s);}).map(clean);
+      } else {
+        res[k]=clean(obj[k]);
+      }
+    }
+    return res;
+  }
+  return clean(d);
+}
+
 async function espnFullStats(id){
   var path=ESPN_PATH[ST.sport];
   var out={season:{},playoff:{},gamelog:[],glCols:[]};
   var yr=new Date().getFullYear();
-  var years=[yr,yr-1]; // current season first, fall back to previous
+  var years=[yr,yr-1];
 
-  // Season stats: try current year then previous year, always with seasontype=2
+  // Season stats: strip career categories before collecting
   for(var yi=0;yi<years.length;yi++){
     try{
       var r=await fetch(
@@ -1601,13 +1629,13 @@ async function espnFullStats(id){
       );
       if(!r.ok) continue;
       var d=await r.json();
-      var raw=espnCollectStats(d);
+      var raw=espnCollectStats(stripCareerCats(d));
       var g=buildEspnGrid(raw,ST.sport);
       if(Object.keys(g).length){ out.season=g; break; }
     }catch(e){ continue; }
   }
 
-  // Playoff/postseason stats for current year
+  // Playoff stats
   try{
     var rp=await fetch(
       "https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+
@@ -1616,7 +1644,7 @@ async function espnFullStats(id){
     );
     if(rp.ok){
       var dp=await rp.json();
-      var rawp=espnCollectStats(dp);
+      var rawp=espnCollectStats(stripCareerCats(dp));
       out.playoff=buildEspnGrid(rawp,ST.sport);
     }
   }catch(e){}
