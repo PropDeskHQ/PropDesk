@@ -1457,49 +1457,27 @@ async function nhlSearch(name){
 
 async function nhlFullStats(name){
   var nhlId=await nhlSearch(name);
-  if(!nhlId) return null;
+  if(nhlId){var nhlOut=await nhlApiStats(nhlId);if(nhlOut&&Object.keys(nhlOut.season).length)return nhlOut;}
+  var meta=await getMeta(name);
+  if(!meta||!meta.id)return null;
+  return espnFullStats(meta.id);
+}
+async function nhlApiStats(nhlId){
   var out={season:{},playoff:{},gamelog:[],glCols:[]};
   try{
     var r=await fetch("https://api-web.nhle.com/v1/player/"+nhlId+"/landing",{signal:AbortSignal.timeout(8000)});
-    if(!r.ok) return null;
+    if(!r.ok)return null;
     var d=await r.json();
-    // Current season regular stats
     var fs=d.featuredStats;
     var ss=fs&&fs.regularSeason&&fs.regularSeason.subSeason;
-    if(ss){
-      var sg={"GP":ss.gamesPlayed,"G":ss.goals,"A":ss.assists,"PTS":ss.points,"+/-":ss.plusMinus,"SOG":ss.shots,"PIM":ss.pim,"TOI":ss.toi};
-      Object.keys(sg).forEach(function(k){if(sg[k]==null)delete sg[k];});
-      out.season=sg;
-    }
-    // Playoff stats
+    if(ss){var sg={"GP":ss.gamesPlayed,"G":ss.goals,"A":ss.assists,"PTS":ss.points,"+/-":ss.plusMinus,"SOG":ss.shots,"PIM":ss.pim};Object.keys(sg).forEach(function(k){if(sg[k]==null)delete sg[k];});out.season=sg;}
     var ps=fs&&fs.playoffs&&fs.playoffs.subSeason;
-    if(ps){
-      var pg={"GP":ps.gamesPlayed,"G":ps.goals,"A":ps.assists,"PTS":ps.points,"+/-":ps.plusMinus};
-      Object.keys(pg).forEach(function(k){if(pg[k]==null)delete pg[k];});
-      out.playoff=pg;
-    }
-  }catch(e){ return null; }
-  // Game log
+    if(ps){var pg={"GP":ps.gamesPlayed,"G":ps.goals,"A":ps.assists,"PTS":ps.points,"+/-":ps.plusMinus};Object.keys(pg).forEach(function(k){if(pg[k]==null)delete pg[k];});out.playoff=pg;}
+  }catch(e){return null;}
   try{
-    var yr=new Date().getFullYear();
-    var seasonStr=(yr-1)+""+yr; // e.g. "20252026"
+    var yr=new Date().getFullYear();var seasonStr=(yr-1)+""+yr;
     var rg=await fetch("https://api-web.nhle.com/v1/player/"+nhlId+"/game-log/"+seasonStr+"/2",{signal:AbortSignal.timeout(8000)});
-    if(rg.ok){
-      var dg=await rg.json();
-      var games=(dg.gameLog||[]).slice(0,10);
-      out.glCols=["Date","Opp","G","A","PTS","SOG","+/-"];
-      out.gamelog=games.map(function(g){
-        return [
-          (g.gameDate||"-").slice(5,10),
-          g.opponentAbbrev||"-",
-          g.goals!=null?g.goals:"-",
-          g.assists!=null?g.assists:"-",
-          g.points!=null?g.points:"-",
-          g.shots!=null?g.shots:"-",
-          g.plusMinus!=null?g.plusMinus:"-"
-        ];
-      });
-    }
+    if(rg.ok){var dg=await rg.json();var games=(dg.gameLog||[]).slice(0,10);out.glCols=["Date","Opp","G","A","PTS","SOG","+/-"];out.gamelog=games.map(function(g){return[(g.gameDate||"-").slice(5,10),g.opponentAbbrev||"-",g.goals!=null?g.goals:"-",g.assists!=null?g.assists:"-",g.points!=null?g.points:"-",g.shots!=null?g.shots:"-",g.plusMinus!=null?g.plusMinus:"-"];});}
   }catch(e){}
   return out;
 }
