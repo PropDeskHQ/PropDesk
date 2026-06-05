@@ -160,6 +160,12 @@ tbody tr.prow:hover{background:var(--surf2)}
 .mv{font-size:11px;font-weight:800;margin-left:3px}
 .mv.up{color:var(--accent)} .mv.down{color:var(--red)}
 
+/* INLINE QUICK STATS */
+.pl-qstats{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+.pl-qstats .qs{background:var(--surf2);border:1px solid var(--bd);border-radius:5px;padding:2px 6px;font-size:10px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pl-qstats .qs-l{color:var(--mut2);font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+.pl-qstats .qs-v{color:var(--text);font-weight:600;margin-left:3px}
+
 /* EXPAND */
 .expand td{background:var(--surf2);padding:0;border-bottom:1px solid var(--bd2)}
 .expand-inner{padding:16px 18px}
@@ -902,8 +908,15 @@ async function loadPropOfDay(){
     try{
       var data=await fetchOdds(eid, batch.join(","));
       batch.forEach(function(mk){
+        // Yes/no and binary over/under (line<=0.5) are longshots that inflate value score
+        // Use a penalized comparison score so over/under markets win Prop of the Day
+        var isLongshot=(YESNO_MARKETS[mk]||mk==="batter_home_runs"||mk==="player_first_td"||mk==="player_first_goalscorer"||mk==="player_first_basket");
         parseProps(data,mk).forEach(function(p){
-          if(p.value>bestScore){ bestScore=p.value; bestProp=p; bestMkt=mk; }
+          var compScore=p.value;
+          if(p.yesNo) compScore=Math.min(compScore,58);
+          if(!p.yesNo && p.bestLine!=null && p.bestLine<=0.5) compScore=Math.min(compScore,62);
+          if(isLongshot) compScore=Math.min(compScore,56);
+          if(compScore>bestScore){ bestScore=compScore; bestProp=p; bestMkt=mk; }
         });
       });
     }catch(e){ /* skip failed batch, try next */ }
@@ -984,23 +997,48 @@ async function loadLOTD(){
     (LOTD_MARKETS[ST.sport]||[getMarket()]).forEach(function(mk){
       parseProps(data,mk).forEach(function(p){ p._lotdMk=mk; pool.push(p); });
     });
-    pool=pool.filter(function(p){ return p.bestOdds!=null && p.bestOdds<=140 && p.value>=42; });
+    // Exclude yes/no markets — LOTD wants clean over/under legs only
+    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.value>=40; });
     pool.sort(function(a,b){ return b.value-a.value; });
-    var seen={}, legs=[];
-    for(var i=0;i<pool.length&&legs.length<3;i++){
-      var pp=pool[i];
-      if(seen[pp.player.toLowerCase()]) continue;
-      // For MLB: keep market variety
-      if(ST.sport==="baseball_mlb"&&legs.length>0){
-        var used=legs.map(function(l){return l._lotdMk;});
-        if(used.indexOf(pp._lotdMk)>=0) continue;
+    // Target: 3 legs, combined American odds <= +400 (~5.0 decimal)
+    // For 3 legs under +400 each leg should be priced near -141 or shorter
+    var PER_LEG_MAX=Math.pow(5.0,1/3); // ~1.71 decimal = ~-141 American
+    function pickLotdLegs(maxDecPerLeg){
+      var s={}, ls=[];
+      for(var i=0;i<pool.length&&ls.length<3;i++){
+        var pp=pool[i];
+        if(s[pp.player.toLowerCase()]) continue;
+        if(aToDec(pp.bestOdds)>maxDecPerLeg) continue;
+        if(ST.sport==="baseball_mlb"&&ls.length>0){
+          var u=ls.map(function(l){return l._lotdMk;});
+          if(u.indexOf(pp._lotdMk)>=0) continue;
+        }
+        s[pp.player.toLowerCase()]=1;
+        ls.push(pp);
       }
-      seen[pp.player.toLowerCase()]=1;
-      legs.push(pp);
+      return ls;
+    }
+    // Pass 1: strict chalk to stay under +400
+    var legs=pickLotdLegs(PER_LEG_MAX);
+    // Pass 2: relax to +150 max per leg if not enough chalk
+    if(legs.length<3) legs=pickLotdLegs(aToDec(150));
+    // Pass 3: any minus-money leg
+    if(legs.length<3){
+      var s2={}, ls2=[];
+      for(var i2=0;i2<pool.length&&ls2.length<3;i2++){
+        var pp2=pool[i2];
+        if(s2[pp2.player.toLowerCase()]) continue;
+        if(ST.sport==="baseball_mlb"&&ls2.length>0){
+          var u2=ls2.map(function(l){return l._lotdMk;});
+          if(u2.indexOf(pp2._lotdMk)>=0) continue;
+        }
+        s2[pp2.player.toLowerCase()]=1;
+        ls2.push(pp2);
+      }
+      legs=ls2;
     }
     if(legs.length<2){ return; }
     var dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-    if(decToA(dec)>500&&legs.length>2){ legs=legs.slice(0,2); dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1); }
     var amOdds=decToA(dec);
     var payout=Math.round(dec*100-100);
     var legHtml=legs.map(function(l,i){
@@ -1065,8 +1103,9 @@ function renderTable(silent){
   } else {
     props.forEach(function(p){ var node=document.getElementById("vsc-"+p._id); if(node) node.textContent=p.value; });
   }
-  /* re-apply meta we already loaded */
+  /* re-apply meta and quick stats we already loaded */
   props.forEach(function(p){ if(p._meta!=null) applyMeta(p); });
+  props.forEach(function(p){ if(p._quickStats!=null) applyQuickStats(p); });
   bindRowActions();
 }
 
@@ -1082,9 +1121,10 @@ function rowHtml(p,cols,idx,silent){
   var style=silent?"":'style="animation-delay:'+(idx*28)+'ms"';
   var h='<tr class="'+rcls+'" '+style+' data-pid="'+p._id+'">'+
     '<td><div class="pl-name">'+esc(p.player)+'</div><div class="pl-meta" id="meta-'+p._id+'">'+meta+'</div>'+
+      '<div class="pl-qstats" id="qstats-'+p._id+'"></div>'+
       '<div class="pl-acts">'+
         '<button class="mini" data-act="analyze" data-pid="'+p._id+'">Analyze</button>'+
-        '<button class="mini" data-act="stats" data-pid="'+p._id+'">Stats</button>'+
+        '<button class="mini" data-act="stats" data-pid="'+p._id+'">More Stats</button>'+
         '<button class="mini" data-act="save" data-pid="'+p._id+'">Save</button>'+
         '<button class="mini" data-act="share" data-pid="'+p._id+'">Share</button>'+
       '</div></td>'+
@@ -1234,19 +1274,55 @@ async function renderAnalyze(p){
 }
 function analyzeVerdict(p,line,seasonAvg,l5avg,overRate){
   var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"")+(p.bestOdds!=null?" at "+fmtOdds(p.bestOdds):"");
-  var parts=[];
-  parts.push("<b>Recommendation: "+esc(bet)+"</b> ("+esc(p.bestBook?p.bestBook.book:"best book")+"), graded "+p.value+"/100 - "+tierOf(p.value).t+".");
-  if(!p.yesNo && seasonAvg!=null){
-    var dir=seasonAvg>line?"above":"below";
-    parts.push("Statistically the case lines up: the season average of "+fmtStat(seasonAvg)+" sits "+dir+" the "+line+" line"+(l5avg!=null?", and the last-5 average of "+fmtStat(l5avg)+" "+(l5avg>line?"reinforces the Over":"leans Under"):"")+".");
+  var tier=tierOf(p.value).t;
+  var sentences=[];
+
+  // S1: Recommendation + grade
+  sentences.push("<b>"+esc(bet)+"</b> grades "+p.value+"/100 ("+tier+") — "+(p.value>=65?"a clear-cut edge worth backing":"a marginal lean; keep the stake modest")+".");
+
+  // S2: Pricing edge across books
+  if(!p.yesNo && p.edge>0 && p.consensus!=null){
+    sentences.push("The best available line gives you "+p.edge.toFixed(1)+" free point"+(p.edge!==1?"s":"")+" versus the "+p.consensus+" consensus across "+p.bookCount+" books — that built-in cushion is the primary driver of the score.");
+  } else if(!p.yesNo){
+    sentences.push("Books are posting this "+(p.lineSpread>0.5?"with "+p.lineSpread.toFixed(1)+" points of spread across the "+p.bookCount+" books quoting it, signaling the market hasn't settled — line-shop before it tightens":"tightly across "+p.bookCount+" books; the edge here lives in the odds rather than a free-point advantage")+".");
   } else {
-    parts.push("On this market the edge is price-driven: we found the best available number across "+p.bookCount+" books posting it.");
+    sentences.push("This yes/no market prices at "+fmtOdds(p.bestOdds)+" at the best available book — "+p.bookCount+" books post it and the consensus implied probability suggests the true odds are slightly better than that number.");
   }
-  if(overRate!=null){ parts.push("This player has gone over "+line+" in roughly "+overRate.toFixed(0)+"% of recent games, which "+(overRate>=55?"supports the Over":overRate<=45?"supports the Under":"keeps the play close to a coin flip")+"."); }
-  parts.push("Line shopping is the real value here: "+(p.edge>0?("you get about "+(p.edge||0).toFixed(1)+" free point(s) versus the "+line+" consensus, the single biggest driver of this score"):"prices vary enough that grabbing the best book matters")+".");
-  parts.push("Vig on the best book is near "+(p.vig||0).toFixed(1)+"%, "+(p.vig<5?"unusually low, so the no-vig EV is trustworthy":"normal, so do not overpay - hold out for the listed number")+".");
-  parts.push("Closing call: "+(p.value>=65?"this is a play":"treat it as a lean")+" - take "+p.side+(p.bestLine!=null?" "+p.bestLine:"")+" at "+(p.bestBook?esc(p.bestBook.book):"the best price")+" before the market moves toward consensus.");
-  return parts.join(" ");
+
+  // S3: Statistical context (season avg vs line)
+  if(!p.yesNo && seasonAvg!=null && line!=null){
+    var diff=seasonAvg-line;
+    var absDiff=Math.abs(diff).toFixed(1);
+    if(Math.abs(diff)>0.5){
+      sentences.push("On-field production backs the bet: the season average of "+fmtStat(seasonAvg)+" sits "+absDiff+" "+(diff>0?"above":"below")+" the "+line+" line, giving the "+(diff>0?"Over":"Under")+" a statistical foundation that goes beyond pure line-shopping.");
+    } else {
+      sentences.push("The season average of "+fmtStat(seasonAvg)+" lands right at the "+line+" line — a statistical coin-flip — so the pricing edge is the sole reason to play, not a production mismatch.");
+    }
+  } else if(!p.yesNo){
+    sentences.push("Season stat data was unavailable for a direct comparison; the recommendation is based entirely on cross-book line and odds analysis.");
+  }
+
+  // S4: Recent form trend
+  if(l5avg!=null && seasonAvg!=null){
+    var trend=l5avg-seasonAvg;
+    if(Math.abs(trend)>0.5){
+      sentences.push("Recent form is "+(trend>0?"heating up":"cooling down")+": the last-5 average of "+fmtStat(l5avg)+" runs "+Math.abs(trend).toFixed(1)+" "+(trend>0?"above":"below")+" the season norm of "+fmtStat(seasonAvg)+", "+(((p.side==="Over"&&trend>0)||(p.side==="Under"&&trend<0))?"which reinforces the "+p.side+" directly":"a counter-trend that adds uncertainty — factor that into your sizing")+".");
+    } else if(l5avg!=null){
+      sentences.push("The last-5 average of "+fmtStat(l5avg)+" is consistent with the season norm, confirming no hot or cold streak is distorting the line — "+(l5avg>(line||0)?"the sustained production above "+line+" supports the Over":"the sustained production below "+line+" supports the Under")+".");
+    }
+  } else if(l5avg!=null){
+    sentences.push("Recent form shows a last-5 average of "+fmtStat(l5avg)+", which points "+(l5avg>(line||0)?"toward the Over":"toward the Under")+" at the "+line+" line.");
+  }
+
+  // S5: Historical hit rate
+  if(overRate!=null && !p.yesNo){
+    sentences.push("Over the recent game log this player has cleared "+line+" in "+overRate.toFixed(0)+"% of appearances — "+(overRate>=60?"a strong hit rate that validates the Over bet":overRate<=40?"a rate that consistently favors the Under":"close to even historically, which means the real edge is in the price, not frequency")+".");
+  }
+
+  // S6: Vig + closing call
+  sentences.push("Vig on this market runs "+(p.vig||0).toFixed(1)+"% and the best price is at "+(p.bestBook?esc(p.bestBook.book):"your preferred book")+". "+(p.value>=65?"Lock this in before the line adjusts toward consensus — the edge is real and demonstrable.":"Play it small and treat it as a lean rather than a conviction bet."));
+
+  return sentences.join(" ");
 }
 
 /* STATS expand */
@@ -1363,18 +1439,83 @@ async function getMeta(name){
 }
 function lazyLoadPlayerMeta(){
   ST.props.forEach(function(p){
-    if(p._metaLoaded){ applyMeta(p); return; }
+    if(p._metaLoaded){ applyMeta(p); applyQuickStats(p); return; }
     p._metaLoaded=true;
     getMeta(p.player).then(function(m){
       if(m){ p._espnId=m.id; var bits=[]; if(m.pos) bits.push(m.pos); if(m.team) bits.push(m.team); p._meta=bits.join(" - "); }
       else p._meta="";
       applyMeta(p);
+      if(!p._quickStatsLoaded){
+        p._quickStatsLoaded=true;
+        getQuickStatsData(p.player, m).then(function(qs){ p._quickStats=qs||[]; applyQuickStats(p); });
+      }
     });
   });
 }
 function applyMeta(p){
   var node=document.getElementById("meta-"+p._id);
   if(node) node.innerHTML = p._meta? esc(p._meta) : '<span style="color:#444">-</span>';
+}
+function applyQuickStats(p){
+  var node=document.getElementById("qstats-"+p._id);
+  if(!node||!p._quickStats||!p._quickStats.length) return;
+  node.innerHTML=p._quickStats.map(function(s){
+    return '<span class="qs"><span class="qs-l">'+esc(s[0])+'</span><span class="qs-v">'+esc(String(s[1]))+'</span></span>';
+  }).join("");
+}
+
+var _qsCache={};
+async function getQuickStatsData(name, meta){
+  var key=ST.sport+"|"+name;
+  if(_qsCache[key]!==undefined) return _qsCache[key];
+  var result=null;
+  try{
+    var yr=new Date().getFullYear();
+    if(ST.sport==="baseball_mlb" && meta && meta.id){
+      var group=PITCHER_MARKETS[ST.market]?"pitching":"hitting";
+      var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+meta.id+"/stats?stats=season&season="+yr+"&group="+group);
+      var d=await r.json();
+      var st=(d.stats&&d.stats[0]&&d.stats[0].splits&&d.stats[0].splits[0])?d.stats[0].splits[0].stat:{};
+      if(group==="pitching"){
+        result=[["ERA",st.era],["SO",st.strikeOuts],["IP",st.inningsPitched],["WHIP",st.whip]].filter(function(s){return s[1]!=null;});
+      } else {
+        result=[["AVG",st.avg],["HR",st.homeRuns],["RBI",st.rbi],["H",st.hits]].filter(function(s){return s[1]!=null;});
+      }
+    } else if(meta && meta.id){
+      var path=ESPN_PATH[ST.sport];
+      var r2=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+meta.id+"/stats?seasontype=2&season="+yr,{signal:AbortSignal.timeout(6000)});
+      if(r2.ok){
+        var d2=await r2.json();
+        var raw=espnCollectStats(stripCareerCats(d2));
+        var grid=buildEspnGrid(raw,ST.sport);
+        var keys=Object.keys(grid);
+        var picks={
+          basketball_nba:["Avg Points","Avg Rebounds","Avg Assists","Avg Blocks"],
+          americanfootball_nfl:["Passing Yards","Rushing Yards","Receptions","Receiving Yards","Sacks"],
+          icehockey_nhl:["Goals","Assists","Points","Shots"]
+        };
+        var preferred=picks[ST.sport]||[];
+        result=[];
+        // Try preferred keys first
+        preferred.forEach(function(pk){
+          if(result.length>=4) return;
+          if(grid[pk]!=null) result.push([pk.replace(/^Avg /i,""),grid[pk]]);
+        });
+        // Fill remaining slots from grid
+        if(result.length<3){
+          keys.forEach(function(k){
+            if(result.length>=4) return;
+            if(!result.some(function(r){return r[0]===k.replace(/^Avg /i,"");})){
+              result.push([k.replace(/^Avg /i,""),grid[k]]);
+            }
+          });
+        }
+        if(!result.length) result=null;
+      }
+    }
+  }catch(e){ result=null; }
+  _qsCache[key]=result;
+  return result;
 }
 
 /* ============ GAME LOG for charts ============ */
@@ -1935,18 +2076,45 @@ function closeParlay(){ $("parlayModal").classList.remove("open"); }
 function generateParlay(){
   if(!ST.props.length){ $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Load a game and prop market first.</div>'; return; }
   var target=parseFloat($("targetOdds").value);
+  var hasTarget=(!isNaN(target) && target>0);
   var pool=ST.props.filter(function(p){ return p.bestOdds!=null; }).slice();
   pool.sort(function(a,b){ return b.value-a.value; });
+
+  // Build initial legs by value
   var seen={}, legs=[];
   for(var i=0;i<pool.length && legs.length<parlayLegs;i++){
     var p=pool[i]; var nk=p.player.toLowerCase(); if(seen[nk]) continue; seen[nk]=1; legs.push(p);
   }
-  if(legs.length<2){ $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Not enough distinct players to build a parlay.</div>'; return; }
-  var dec=1; legs.forEach(function(l){ dec*=aToDec(l.bestOdds); });
-  if(!isNaN(target) && target>0){
-    while(legs.length>2 && decToA(dec) > target*1.4){ legs.pop(); dec=1; legs.forEach(function(l){ dec*=aToDec(l.bestOdds); }); }
+  if(legs.length<2){ $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Not enough distinct players in this market. Try loading a different prop type.</div>'; return; }
+
+  if(hasTarget){
+    var targetDec=aToDec(target);
+    var dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
+    // If current odds are too high, swap in lower-odds legs to approach target
+    var maxPasses=20;
+    while(maxPasses-->0 && dec>targetDec*1.25 && legs.length>1){
+      // Find leg with highest (most speculative) odds
+      var worstIdx=0;
+      for(var j=1;j<legs.length;j++){ if(aToDec(legs[j].bestOdds)>aToDec(legs[worstIdx].bestOdds)) worstIdx=j; }
+      // Find best replacement with lower odds that isn't already in legs
+      var replaced=false;
+      for(var k=0;k<pool.length;k++){
+        var cand=pool[k];
+        var already=false; for(var m=0;m<legs.length;m++) if(legs[m].player===cand.player) already=true;
+        if(already) continue;
+        if(aToDec(cand.bestOdds)<aToDec(legs[worstIdx].bestOdds)){
+          legs[worstIdx]=cand;
+          dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
+          replaced=true; break;
+        }
+      }
+      if(!replaced) break;
+    }
+    // If still below target (odds too low), we accept it — never inflate to hit a longshot target
   }
-  renderParlayResult(legs,dec,decToA(dec),target);
+
+  var finalDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
+  renderParlayResult(legs,finalDec,decToA(finalDec),target);
 }
 function renderParlayResult(legs,dec,am,target){
   var payout=(aToDec(am)*100).toFixed(0);
