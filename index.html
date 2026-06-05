@@ -816,7 +816,10 @@ function computeValue(p){
   // Phase 2 (hit rate + recent form) added later by enrichPropScore()
 }
 
-/* Phase 2 enrichment — fetches game log after table renders, updates score + flags */
+/* Phase 2 enrichment — fetches game log after table renders, updates score + flags
+   Weights: L5 hit rate 35%, L14 hit rate 20%, Season hit rate 10%
+   Discrete bonuses: streak ≥3 → +15, L5 gap >2 → +10, FORM direction → ±10
+   DATA FLIP → guardrail flag + cap enrichment at +5 (conflicting signals) */
 async function enrichPropScore(p){
   try{
     var gl=await getGameLog(p.player);
@@ -824,46 +827,41 @@ async function enrichPropScore(p){
     var vals=gl.values;
     var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
     if(!line) return;
+    var isOver=p.side==="Over";
 
-    // Guardrail: thin data
     if(vals.length<10 && p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
 
-    // Compute hit rates for BOTH sides so we can pick the one most likely to hit
-    var overHits=vals.filter(function(v){return v>line;}).length;
-    var underHits=vals.filter(function(v){return v<line;}).length;
-    var overRate=overHits/vals.length;
-    var underRate=underHits/vals.length;
-    var isOver=p.side==="Over";
-    var myRate=isOver?overRate:underRate;
-    var otherRate=isOver?underRate:overRate;
-
-    // Flip to the better-hitting side when data clearly favors it (≥12 pt gap, other side ≥60%)
-    if(!p.yesNo && otherRate>=0.60 && myRate<0.52 && (otherRate-myRate)>=0.12){
-      var newSide=isOver?"Under":"Over";
-      var bestAlt=null;
-      p.books.forEach(function(b){
-        var odds=newSide==="Over"?b.over:b.under;
-        if(odds==null) return;
-        if(!bestAlt||aToDec(odds)>aToDec(bestAlt.odds))
-          bestAlt={book:b,odds:odds,line:b.point};
-      });
-      if(bestAlt){
-        p.side=newSide; isOver=!isOver;
-        p.bestLine=bestAlt.line; p.bestOdds=bestAlt.odds;
-        p.bestBook=bestAlt.book; p.decOdds=aToDec(bestAlt.odds);
-        myRate=otherRate;
-        p.valueFlags.push("DATA_FLIP");
-      }
+    // ---- Weighted composite hit rate: L5=35%, L14=20%, Season=10% ----
+    function sliceHR(n){
+      var sl=vals.slice(0,Math.min(n,vals.length));
+      if(!sl.length) return null;
+      return sl.filter(function(v){return isOver?v>line:v<line;}).length/sl.length;
     }
-    p.hitRate14=+(myRate*100).toFixed(1);
+    var l5Hr=sliceHR(5), l14Hr=sliceHR(14), sznHr=sliceHR(vals.length);
+    var wTot=(l5Hr!=null?0.35:0)+(l14Hr!=null?0.20:0)+(sznHr!=null?0.10:0);
+    var cHr=wTot>0?((l5Hr!=null?0.35*l5Hr:0)+(l14Hr!=null?0.20*l14Hr:0)+(sznHr!=null?0.10*sznHr:0))/wTot:null;
+    if(cHr!=null) p.hitRate14=+(cHr*100).toFixed(1);
 
-    // Recent averages
-    var l7=vals.slice(0,Math.min(7,vals.length));
-    p.l7Avg=avg(l7);
+    // ---- DATA FLIP detection: flag only, never auto-flip ----
+    function sliceHROther(n){
+      var sl=vals.slice(0,Math.min(n,vals.length));
+      if(!sl.length) return null;
+      return sl.filter(function(v){return isOver?v<line:v>line;}).length/sl.length;
+    }
+    var ol5=sliceHROther(5),ol14=sliceHROther(14),oszn=sliceHROther(vals.length);
+    var owTot=(ol5!=null?0.35:0)+(ol14!=null?0.20:0)+(oszn!=null?0.10:0);
+    var oHr=owTot>0?((ol5!=null?0.35*ol5:0)+(ol14!=null?0.20*ol14:0)+(oszn!=null?0.10*oszn:0))/owTot:null;
+    var dataFlip=!p.yesNo&&oHr!=null&&cHr!=null&&oHr>=0.60&&cHr<0.52&&(oHr-cHr)>=0.12;
+    if(dataFlip && p.guardrailFlags.indexOf("DATA_FLIP")<0) p.guardrailFlags.push("DATA_FLIP");
+
+    // ---- Recent averages ----
+    p.l5Avg=vals.length>=1?avg(vals.slice(0,Math.min(5,vals.length))):null;
+    p.l14Avg=vals.length>=1?avg(vals.slice(0,Math.min(14,vals.length))):null;
+    p.l7Avg=avg(vals.slice(0,Math.min(7,vals.length)));
     p.seasonAvgEnrich=gl.seasonAvg!=null?gl.seasonAvg:avg(vals);
 
-    // Streak: consecutive hits (positive) or misses (negative)
+    // ---- Streak: consecutive game hits on current side ----
     var streak=0;
     for(var i=0;i<vals.length;i++){
       var hit=isOver?vals[i]>line:vals[i]<line;
@@ -874,49 +872,65 @@ async function enrichPropScore(p){
     }
     p.streak=streak;
 
-    // Hit rate is the dominant factor — steep curve so bad hit rates tank the score
-    // 50%=0, 65%=+15, 75%=+25, 85%=+35 | 40%=-10, 30%=-20, 20%=-30
-    var hitScore=Math.max(-30, Math.min(35, (myRate-0.50)*100));
+    // ---- L5 avg vs line gap ----
+    var l5Gap=p.l5Avg!=null?(isOver?p.l5Avg-line:line-p.l5Avg):0; // positive = favors our side
+    var gapBonus=l5Gap>2?10:0;
 
-    // Recent form: how far L7 avg sits vs the line (max +20, min -10)
-    var formScore=0;
-    if(p.l7Avg!=null && line>0){
-      var ratio=isOver?(p.l7Avg-line)/line:(line-p.l7Avg)/line;
-      formScore=Math.max(-10, Math.min(20, ratio*80));
+    // ---- Streak bonus: 3+ game streak on correct side → +15 ----
+    var streakBonus=streak>=3?15:0;
+
+    // ---- Form direction bonus (±10) ----
+    var formUp=p.l5Avg!=null&&p.seasonAvgEnrich&&p.l5Avg>p.seasonAvgEnrich*1.05;
+    var formDown=p.l5Avg!=null&&p.seasonAvgEnrich&&p.l5Avg<p.seasonAvgEnrich*0.95;
+    var formBonus=0;
+    if(isOver){
+      if(formUp)   formBonus=10;  // FORM↑ on Over = tailwind
+      if(formDown) formBonus=-10; // FORM↓ on Over = headwind
+    } else {
+      if(formDown) formBonus=10;  // FORM↓ on Under = tailwind
+      if(formUp)   formBonus=-10; // FORM↑ on Under = headwind
     }
 
-    p.value=Math.max(0,Math.min(100,Math.round(p.value+hitScore+formScore)));
+    // ---- Hit rate score: moderate multiplier so discrete bonuses stay meaningful ----
+    // 50%=0, 65%=+6, 75%=+10, 85%=+14 | 40%=-4, 30%=-8, 20%=-12
+    var hitScore=cHr!=null?Math.max(-20,Math.min(20,(cHr-0.50)*40)):0;
+
+    // ---- Combine ----
+    var phase2=hitScore+gapBonus+streakBonus+formBonus;
+    // DATA FLIP = conflicting signals → cap enrichment at +5 so it won't auto-surface
+    if(dataFlip) phase2=Math.min(phase2,5);
+
+    p.value=Math.max(0,Math.min(100,Math.round(p.value+phase2)));
     p.enriched=true;
 
-    // Gap flags
-    if(myRate>=0.70 && p.valueFlags.indexOf("HOT_RATE")<0) p.valueFlags.push("HOT_RATE");
-    if(streak>=3 && !p.valueFlags.some(function(f){return f.indexOf("STREAK_")===0;}))
+    // ---- Emit flags ----
+    if(l5Gap>2 && p.valueFlags.indexOf("GAP_L5")<0) p.valueFlags.push("GAP_L5");
+    if(cHr!=null&&cHr>=0.70&&p.valueFlags.indexOf("HOT_RATE")<0) p.valueFlags.push("HOT_RATE");
+    if(streak>=3&&!p.valueFlags.some(function(f){return f.indexOf("STREAK_")===0;}))
       p.valueFlags.push("STREAK_"+streak);
-    if(streak<=-3 && p.guardrailFlags.indexOf("COLD_STREAK")<0) p.guardrailFlags.push("COLD_STREAK");
-    if(isOver && p.l7Avg>p.seasonAvgEnrich*1.05 && p.valueFlags.indexOf("FORM_UP")<0) p.valueFlags.push("FORM_UP");
-    if(!isOver && p.l7Avg<p.seasonAvgEnrich*0.95 && p.valueFlags.indexOf("FORM_DOWN")<0) p.valueFlags.push("FORM_DOWN");
+    if(streak<=-3&&p.guardrailFlags.indexOf("COLD_STREAK")<0) p.guardrailFlags.push("COLD_STREAK");
+    // FORM flags: supporting signals → valueFlags; opposing → guardrailFlags
+    if(formUp){
+      if(isOver&&p.valueFlags.indexOf("FORM_UP")<0) p.valueFlags.push("FORM_UP");
+      else if(!isOver&&p.guardrailFlags.indexOf("FORM_UP")<0) p.guardrailFlags.push("FORM_UP");
+    }
+    if(formDown){
+      if(!isOver&&p.valueFlags.indexOf("FORM_DOWN")<0) p.valueFlags.push("FORM_DOWN");
+      else if(isOver&&p.guardrailFlags.indexOf("FORM_DOWN")<0) p.guardrailFlags.push("FORM_DOWN");
+    }
 
     updatePropValueDisplay(p);
   }catch(e){}
 }
 
 function updatePropValueDisplay(p){
-  // Update value score cell
   var node=document.getElementById("vsc-"+p._id);
-  if(node){
-    var tier=tierOf(p.value);
-    node.textContent=p.value;
-    node.className=tier.c;
-    var vt=node.nextElementSibling;
-    if(vt&&vt.classList&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
-  }
-  // Update Best Bet cell (side may have been flipped by data)
-  var row=document.querySelector('tr[data-pid="'+p._id+'"]');
-  if(row&&row.cells&&row.cells.length>=2){
-    var bbcls=p.side==="Under"?"under":(p.side==="Yes"?"yes":"over");
-    var bb=p.side+(p.bestLine!=null?" "+p.bestLine:"");
-    row.cells[1].innerHTML='<span class="bb '+bbcls+'">'+esc(bb)+'<\/span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'<\/div>':'');
-  }
+  if(!node) return;
+  var tier=tierOf(p.value);
+  node.textContent=p.value;
+  node.className=tier.c;
+  var vt=node.nextElementSibling;
+  if(vt&&vt.classList&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
   applyPropFlags(p);
 }
 
@@ -927,7 +941,7 @@ function applyPropFlags(p){
   if(!vf.length&&!gf.length){ node.innerHTML=""; return; }
   var html="";
   vf.forEach(function(f){
-    var cls=f==="SHARP_SPLIT"?"vf-sharp":f==="HOT_RATE"||f.indexOf("STREAK_")===0||f==="DATA_FLIP"?"vf-hot":"vf-val";
+    var cls=f==="SHARP_SPLIT"?"vf-sharp":f==="HOT_RATE"||f.indexOf("STREAK_")===0||f==="GAP_L5"?"vf-hot":"vf-val";
     html+='<span class="vf '+cls+'" title="'+esc(flagTitle(f))+'">'+esc(flagLabel(f))+'</span>';
   });
   gf.forEach(function(f){
@@ -938,8 +952,8 @@ function applyPropFlags(p){
 
 function flagLabel(f){
   var m={FREE_POINTS:"Free Pts",SHARP_SPLIT:"Sharp Split",LOW_VIG:"Low Vig",
-    HOT_RATE:"Hot 70%+",FORM_UP:"Form↑",FORM_DOWN:"Form↓",DATA_FLIP:"Data Flip",
-    FEW_BOOKS:"Few Books",THIN_DATA:"Thin Data",COLD_STREAK:"Cold Streak"};
+    HOT_RATE:"Hot 70%+",GAP_L5:"L5 Gap 2+",FORM_UP:"Form↑",FORM_DOWN:"Form↓",
+    FEW_BOOKS:"Few Books",THIN_DATA:"Thin Data",COLD_STREAK:"Cold Streak",DATA_FLIP:"⚠ Review"};
   if(m[f]) return m[f];
   if(f.indexOf("STREAK_")===0) return "Streak "+f.slice(7);
   return f;
@@ -955,8 +969,9 @@ function flagTitle(f){
     FORM_DOWN:"L7 avg trending down vs season norm — supports Under",
     FEW_BOOKS:"Fewer than 3 books posting — limited market data",
     THIN_DATA:"Fewer than 10 games of data in this stat category",
+    GAP_L5:"L5 avg is 2+ points beyond the line in the right direction — strong form signal (+10)",
     COLD_STREAK:"3+ consecutive misses on this line",
-    DATA_FLIP:"Recommendation flipped — historical data favors this side 60%+ of the time"
+    DATA_FLIP:"Conflicting signals — market pick and historical data disagree. Manual review recommended before betting."
   };
   if(m[f]) return m[f];
   if(f.indexOf("STREAK_")===0) return "Active streak of "+f.slice(7)+" consecutive hits";
