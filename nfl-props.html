@@ -953,8 +953,8 @@ async function enrichPropScore(p){
       else if(isOver&&p.guardrailFlags.indexOf("FORM_DOWN")<0)  p.guardrailFlags.push("FORM_DOWN");
     }
 
-    // ---- Line adjustment engine: if score <60 and no blocking flags, try shifting ----
-    if(p.value<60&&!p.yesNo&&!reviewCond&&!dataFlipCond){
+    // ---- Line adjustment engine: if score <50 and no blocking flags, try shifting ----
+    if(p.value<50&&!p.yesNo&&!reviewCond&&!dataFlipCond){
       var adj2=tryLineAdjust(p,vals,line,isOver,formUp,formDown,hasSharSplit);
       if(adj2){
         p.value=adj2.score;
@@ -1029,7 +1029,7 @@ function tryLineAdjust(p,vals,origLine,isOver,formUp,formDown,hasSharSplit){
   for(var step=1;step<=4;step++){
     var testLine=Math.round((origLine+dir*step)*2)/2; // keep to clean 0.5 increments
     var sc=scoreAtLine(testLine,vals,isOver,formUp,formDown,hasSharSplit,phase1);
-    if(sc>=60) return{score:sc,line:testLine};
+    if(sc>=50) return{score:sc,line:testLine};
   }
   return null;
 }
@@ -1383,7 +1383,7 @@ function lotdText(legs,amOdds){
 function filteredProps(){
   var q=($("searchIn").value||"").toLowerCase().trim();
   return ST.props.filter(function(p){
-    if(p.enriched && p.value<60) return false;
+    if(p.enriched && p.value<50) return false;
     return !q || p.player.toLowerCase().indexOf(q)>=0;
   });
 }
