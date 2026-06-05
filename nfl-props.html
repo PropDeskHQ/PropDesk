@@ -823,17 +823,40 @@ async function enrichPropScore(p){
     if(!gl||!gl.values||gl.values.length<3) return;
     var vals=gl.values;
     var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
-    var isOver=p.side==="Over";
     if(!line) return;
 
     // Guardrail: thin data
     if(vals.length<10 && p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
 
-    // Hit rate: % of logged games player cleared this line
-    var hits=vals.filter(function(v){return isOver?v>line:v<line;}).length;
-    var hitRate=hits/vals.length;
-    p.hitRate14=+(hitRate*100).toFixed(1);
+    // Compute hit rates for BOTH sides so we can pick the one most likely to hit
+    var overHits=vals.filter(function(v){return v>line;}).length;
+    var underHits=vals.filter(function(v){return v<line;}).length;
+    var overRate=overHits/vals.length;
+    var underRate=underHits/vals.length;
+    var isOver=p.side==="Over";
+    var myRate=isOver?overRate:underRate;
+    var otherRate=isOver?underRate:overRate;
+
+    // Flip to the better-hitting side when data clearly favors it (≥12 pt gap, other side ≥60%)
+    if(!p.yesNo && otherRate>=0.60 && myRate<0.52 && (otherRate-myRate)>=0.12){
+      var newSide=isOver?"Under":"Over";
+      var bestAlt=null;
+      p.books.forEach(function(b){
+        var odds=newSide==="Over"?b.over:b.under;
+        if(odds==null) return;
+        if(!bestAlt||aToDec(odds)>aToDec(bestAlt.odds))
+          bestAlt={book:b,odds:odds,line:b.point};
+      });
+      if(bestAlt){
+        p.side=newSide; isOver=!isOver;
+        p.bestLine=bestAlt.line; p.bestOdds=bestAlt.odds;
+        p.bestBook=bestAlt.book; p.decOdds=aToDec(bestAlt.odds);
+        myRate=otherRate;
+        p.valueFlags.push("DATA_FLIP");
+      }
+    }
+    p.hitRate14=+(myRate*100).toFixed(1);
 
     // Recent averages
     var l7=vals.slice(0,Math.min(7,vals.length));
@@ -851,43 +874,49 @@ async function enrichPropScore(p){
     }
     p.streak=streak;
 
-    // Hit rate component (max +25, min -5): centered at 50% = 0
-    var hitScore=Math.max(-5, Math.min(25, (hitRate-0.50)*60));
+    // Hit rate is the dominant factor — steep curve so bad hit rates tank the score
+    // 50%=0, 65%=+15, 75%=+25, 85%=+35 | 40%=-10, 30%=-20, 20%=-30
+    var hitScore=Math.max(-30, Math.min(35, (myRate-0.50)*100));
 
-    // Recent form component (max +18, min -8): how far L7 avg is from line
+    // Recent form: how far L7 avg sits vs the line (max +20, min -10)
     var formScore=0;
     if(p.l7Avg!=null && line>0){
       var ratio=isOver?(p.l7Avg-line)/line:(line-p.l7Avg)/line;
-      formScore=Math.max(-8, Math.min(18, ratio*80));
+      formScore=Math.max(-10, Math.min(20, ratio*80));
     }
 
     p.value=Math.max(0,Math.min(100,Math.round(p.value+hitScore+formScore)));
     p.enriched=true;
 
-    // Additional gap flags from player data
-    if(hitRate>=0.70 && p.valueFlags.indexOf("HOT_RATE")<0)
-      p.valueFlags.push("HOT_RATE");
-    if(streak>=3 && p.valueFlags.indexOf("STREAK")<0)
+    // Gap flags
+    if(myRate>=0.70 && p.valueFlags.indexOf("HOT_RATE")<0) p.valueFlags.push("HOT_RATE");
+    if(streak>=3 && !p.valueFlags.some(function(f){return f.indexOf("STREAK_")===0;}))
       p.valueFlags.push("STREAK_"+streak);
-    if(streak<=-3 && p.guardrailFlags.indexOf("COLD_STREAK")<0)
-      p.guardrailFlags.push("COLD_STREAK");
-    if(isOver && p.l7Avg>p.seasonAvgEnrich*1.05 && p.valueFlags.indexOf("FORM_UP")<0)
-      p.valueFlags.push("FORM_UP");
-    if(!isOver && p.l7Avg<p.seasonAvgEnrich*0.95 && p.valueFlags.indexOf("FORM_DOWN")<0)
-      p.valueFlags.push("FORM_DOWN");
+    if(streak<=-3 && p.guardrailFlags.indexOf("COLD_STREAK")<0) p.guardrailFlags.push("COLD_STREAK");
+    if(isOver && p.l7Avg>p.seasonAvgEnrich*1.05 && p.valueFlags.indexOf("FORM_UP")<0) p.valueFlags.push("FORM_UP");
+    if(!isOver && p.l7Avg<p.seasonAvgEnrich*0.95 && p.valueFlags.indexOf("FORM_DOWN")<0) p.valueFlags.push("FORM_DOWN");
 
     updatePropValueDisplay(p);
   }catch(e){}
 }
 
 function updatePropValueDisplay(p){
+  // Update value score cell
   var node=document.getElementById("vsc-"+p._id);
-  if(!node) return;
-  var tier=tierOf(p.value);
-  node.textContent=p.value;
-  node.className=tier.c;
-  var vt=node.nextElementSibling;
-  if(vt&&vt.classList&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
+  if(node){
+    var tier=tierOf(p.value);
+    node.textContent=p.value;
+    node.className=tier.c;
+    var vt=node.nextElementSibling;
+    if(vt&&vt.classList&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
+  }
+  // Update Best Bet cell (side may have been flipped by data)
+  var row=document.querySelector('tr[data-pid="'+p._id+'"]');
+  if(row&&row.cells&&row.cells.length>=2){
+    var bbcls=p.side==="Under"?"under":(p.side==="Yes"?"yes":"over");
+    var bb=p.side+(p.bestLine!=null?" "+p.bestLine:"");
+    row.cells[1].innerHTML='<span class="bb '+bbcls+'">'+esc(bb)+'<\/span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'<\/div>':'');
+  }
   applyPropFlags(p);
 }
 
@@ -898,7 +927,7 @@ function applyPropFlags(p){
   if(!vf.length&&!gf.length){ node.innerHTML=""; return; }
   var html="";
   vf.forEach(function(f){
-    var cls=f==="SHARP_SPLIT"?"vf-sharp":f==="HOT_RATE"||f.indexOf("STREAK_")===0?"vf-hot":"vf-val";
+    var cls=f==="SHARP_SPLIT"?"vf-sharp":f==="HOT_RATE"||f.indexOf("STREAK_")===0||f==="DATA_FLIP"?"vf-hot":"vf-val";
     html+='<span class="vf '+cls+'" title="'+esc(flagTitle(f))+'">'+esc(flagLabel(f))+'</span>';
   });
   gf.forEach(function(f){
@@ -909,7 +938,7 @@ function applyPropFlags(p){
 
 function flagLabel(f){
   var m={FREE_POINTS:"Free Pts",SHARP_SPLIT:"Sharp Split",LOW_VIG:"Low Vig",
-    HOT_RATE:"Hot 70%+",FORM_UP:"Form↑",FORM_DOWN:"Form↓",
+    HOT_RATE:"Hot 70%+",FORM_UP:"Form↑",FORM_DOWN:"Form↓",DATA_FLIP:"Data Flip",
     FEW_BOOKS:"Few Books",THIN_DATA:"Thin Data",COLD_STREAK:"Cold Streak"};
   if(m[f]) return m[f];
   if(f.indexOf("STREAK_")===0) return "Streak "+f.slice(7);
@@ -926,7 +955,8 @@ function flagTitle(f){
     FORM_DOWN:"L7 avg trending down vs season norm — supports Under",
     FEW_BOOKS:"Fewer than 3 books posting — limited market data",
     THIN_DATA:"Fewer than 10 games of data in this stat category",
-    COLD_STREAK:"3+ consecutive misses on this line"
+    COLD_STREAK:"3+ consecutive misses on this line",
+    DATA_FLIP:"Recommendation flipped — historical data favors this side 60%+ of the time"
   };
   if(m[f]) return m[f];
   if(f.indexOf("STREAK_")===0) return "Active streak of "+f.slice(7)+" consecutive hits";
