@@ -633,12 +633,22 @@ function marketName(k){
   return k.replace(/^(player_|batter_|pitcher_)/,"").replace(/_/g," ");
 }
 
-/* count-up animation */
-function countUp(node,target,dec){
+/* count-up animation — fromVal lets Phase-2 re-animate from current displayed value */
+function countUp(node,target,dec,fromVal){
   target=Number(target)||0; dec=dec||0;
-  var t0=null, dur=550;
-  function step(ts){ if(!t0)t0=ts; var p=Math.min((ts-t0)/dur,1); var ease=1-Math.pow(1-p,3); var v=target*ease; node.textContent=dec?v.toFixed(dec):Math.round(v); if(p<1) requestAnimationFrame(step); else node.textContent=dec?target.toFixed(dec):Math.round(target); }
-  requestAnimationFrame(step);
+  var from=fromVal!=null?Number(fromVal):0;
+  if(node._raf){ cancelAnimationFrame(node._raf); node._raf=null; }
+  var t0=null, dur=fromVal!=null?220:550;
+  function step(ts){
+    if(!t0)t0=ts;
+    var prog=Math.min((ts-t0)/dur,1);
+    var ease=1-Math.pow(1-prog,3);
+    var v=from+(target-from)*ease;
+    node.textContent=dec?v.toFixed(dec):Math.round(v);
+    if(prog<1){ node._raf=requestAnimationFrame(step); }
+    else{ node.textContent=dec?target.toFixed(dec):Math.round(target); node._raf=null; }
+  }
+  node._raf=requestAnimationFrame(step);
 }
 
 /* ============ ODDS FETCH ============ */
@@ -979,10 +989,12 @@ function updatePropValueDisplay(p){
   var node=document.getElementById("vsc-"+p._id);
   if(!node) return;
   var tier=tierOf(p.value);
-  node.textContent=p.value;
+  // Cancel any running countUp before updating, then re-animate from current display value
+  var cur=parseInt(node.textContent,10)||0;
   node.className=tier.c;
   var vt=node.nextElementSibling;
   if(vt&&vt.classList&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
+  countUp(node,p.value,0,cur); // from=cur cancels old frame and re-animates correctly
   applyPropFlags(p);
 }
 
