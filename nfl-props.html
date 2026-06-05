@@ -152,7 +152,7 @@ tbody tr.prow:hover{background:var(--surf2)}
 .vs{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px}
 .vs b{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
 .vs .vt{font-size:9px;font-weight:800;letter-spacing:.5px}
-.t-hot{color:var(--accent)} .t-good{color:#7fe6a8} .t-fair{color:var(--yellow)} .t-weak{color:#ff9d4f} .t-pass{color:var(--red)}
+.t-lock{color:#ffd700} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:#b8f5d4} .t-fair{color:var(--mut2)} .t-pass{color:var(--mut2)}
 .bookcell{font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap}
 .bookcell .bk-line{font-weight:700}
 .bookcell .bk-odds{color:var(--mut);font-size:11px}
@@ -621,11 +621,11 @@ function avg(arr){ if(!arr.length) return 0; var s=0; for(var i=0;i<arr.length;i
 function fmtStat(v){ v=Number(v); if(isNaN(v)) return "-"; if(Number.isInteger(v)) return ""+v; return v.toFixed(1); }
 
 function tierOf(s){
-  if(s>=80) return {c:"t-hot",t:"HOT"};
-  if(s>=65) return {c:"t-good",t:"GOOD"};
-  if(s>=48) return {c:"t-fair",t:"FAIR"};
-  if(s>=32) return {c:"t-weak",t:"WEAK"};
-  return {c:"t-pass",t:"PASS"};
+  if(s>=90) return {c:"t-lock", t:"LOCK"};
+  if(s>=80) return {c:"t-elite",t:"ELITE"};
+  if(s>=70) return {c:"t-strong",t:"STRONG"};
+  if(s>=60) return {c:"t-good", t:"GOOD"};
+  return {c:"t-pass",t:"···"}; // Phase 1 preview — enrichment pending
 }
 function sportLabel(k){ for(var i=0;i<SPORTS.length;i++) if(SPORTS[i].key===k) return SPORTS[i].label; return k; }
 function marketName(k){
@@ -788,31 +788,47 @@ function computeBestBet(p,marketKey){
    Phase 2 (async, enrichPropScore): player data adds/subtracts discrete amounts
    Hard ceiling 95 | Hard floor 40 (filter, not clamp) */
 function computeValue(p){
-  var s=50; // fixed base for every prop
+  var s=50; // fixed base
   var sp=p.lineSpread||0;
   var edge=p.edge||0;
   var v=p.vig!=null?p.vig:6;
 
-  // SHARP_SPLIT: +5 (also a Phase 2 signal, added here so Phase 1 score reflects it)
-  if(!p.yesNo && sp>=2.0) s+=5;
-  else if(!p.yesNo && sp>=1.0) s+=2;
+  // Spread signal — 4 tiers (drives SHARP_SPLIT flag at ≥2.0)
+  if(!p.yesNo){
+    if(sp>=2.5)      s+=7;
+    else if(sp>=2.0) s+=5;
+    else if(sp>=1.5) s+=3;
+    else if(sp>=1.0) s+=1;
+  }
 
-  // Small market quality bonuses (don't dominate; player data drives the score)
-  if(edge>=1.0 && !p.yesNo) s+=3;
-  else if(edge>=0.5 && !p.yesNo) s+=1;
-  if(v<4.5 && !p.yesNo) s+=2;
+  // Edge (free points vs consensus) — 3 tiers
+  if(!p.yesNo){
+    if(edge>=2.0)      s+=5;
+    else if(edge>=1.0) s+=3;
+    else if(edge>=0.5) s+=1;
+  }
 
-  if(p.bookCount<3) s-=8; // thin market guardrail
+  // Vig quality — 4 tiers (+3 to -1)
+  if(!p.yesNo){
+    if(v<4.0)      s+=3;
+    else if(v<4.5) s+=2;
+    else if(v<5.0) s+=1;
+    else if(v>5.5) s-=1;
+  }
+
+  // Book coverage — 3 tiers
+  if(!p.yesNo && p.bookCount>=5) s+=2;
+  else if(p.bookCount<3)          s-=8;
 
   p.value=Math.round(s);
-  p.phase1Value=p.value; // save for line-adjustment engine
+  p.phase1Value=p.value; // preserved for line-adjustment engine
   p.valueFlags=[];
   p.guardrailFlags=[];
 
   if(edge>=0.5 && !p.yesNo) p.valueFlags.push("FREE_POINTS");
-  if(sp>=2.0 && !p.yesNo) p.valueFlags.push("SHARP_SPLIT");
-  if(v<4.5 && !p.yesNo) p.valueFlags.push("LOW_VIG");
-  if(p.bookCount<3) p.guardrailFlags.push("FEW_BOOKS");
+  if(sp>=2.0 && !p.yesNo)   p.valueFlags.push("SHARP_SPLIT");
+  if(v<4.5 && !p.yesNo)     p.valueFlags.push("LOW_VIG");
+  if(p.bookCount<3)          p.guardrailFlags.push("FEW_BOOKS");
 }
 
 /* Phase 2 enrichment — discrete additive/subtractive scoring model
@@ -886,22 +902,38 @@ async function enrichPropScore(p){
     if(dataFlipCond && !reviewCond && p.guardrailFlags.indexOf("DATA_FLIP")<0) p.guardrailFlags.push("DATA_FLIP");
 
     // ================================================================
-    // DISCRETE SCORE ADJUSTMENTS (spec v2)
+    // DISCRETE SCORE ADJUSTMENTS (spec v3 — granular tiers)
     // ================================================================
     var adj=0;
 
-    // Additive signals
-    if(l5Gap>2)                              adj+=15; // L5 avg 2+ pts beyond line in right direction
-    if(cHr!=null&&cHr>=0.70)                adj+=12; // HOT 70%+
-    if(streak>=4)                            adj+=Math.min(20,Math.floor(streak/2)*5); // streak ≥4: +5 per 2 games
-    if(isOver&&formUp)                       adj+=8;  // FORM↑ on Over = tailwind
-    if(!isOver&&formDown)                    adj+=8;  // FORM↓ on Under = tailwind
+    // L5 gap — 3 tiers (ensures different gaps produce different scores)
+    if(l5Gap>=3)       adj+=16;
+    else if(l5Gap>=2)  adj+=11;
+    else if(l5Gap>=1)  adj+=5;
 
-    // Subtractive signals
-    if(reviewCond)                           adj-=20; // REVIEW: conflicting signals
-    else if(dataFlipCond)                    adj-=15; // DATA FLIP (no-stack with REVIEW)
-    if(formContradicts)                      adj-=12; // form opposes bet direction
-    if(l5WrongDir)                           adj-=10; // L5 avg on wrong side of line
+    // Composite hit rate — 4 tiers (no more binary HOT/not-HOT)
+    if(cHr!=null){
+      if(cHr>=0.70)      adj+=12;
+      else if(cHr>=0.60) adj+=5;
+      else if(cHr<0.45)  adj-=6;
+    }
+
+    // Streak — 3 tiers up, 2 tiers down (each level is a distinct impact)
+    if(streak>=6)       adj+=15;
+    else if(streak>=4)  adj+=10;
+    else if(streak===3) adj+=5;
+    else if(streak<=-4) adj-=12;
+    else if(streak===-3) adj-=6;
+
+    // Form direction
+    if(isOver&&formUp)   adj+=8;   // FORM↑ on Over = tailwind
+    if(!isOver&&formDown) adj+=8;  // FORM↓ on Under = tailwind
+
+    // Subtractive signals (REVIEW and DATA_FLIP no-stack)
+    if(reviewCond)        adj-=20;
+    else if(dataFlipCond) adj-=15;
+    if(formContradicts)   adj-=12;
+    if(l5WrongDir)        adj-=10;
 
     p.value=Math.min(95,Math.round(p.value+adj)); // ceiling 95; floor enforced by filteredProps
     p.enriched=true;
@@ -961,26 +993,43 @@ function scoreAtLine(testLine,vals,isOver,formUp,formDown,hasSharSplit,phase1Sco
   var reviewCond=hasSharSplit&&formContradicts&&!l5WrongDir;
 
   var adj=0;
-  if(l5Gap>2)                   adj+=15;
-  if(cHr!=null&&cHr>=0.70)      adj+=12;
-  if(streak>=4)                  adj+=Math.min(20,Math.floor(streak/2)*5);
-  if(isOver&&formUp)             adj+=8;
-  if(!isOver&&formDown)          adj+=8;
-  if(reviewCond)                 adj-=20;
-  if(formContradicts)            adj-=12;
-  if(l5WrongDir)                 adj-=10;
+  // L5 gap — 3 tiers (mirror enrichPropScore)
+  if(l5Gap>=3)       adj+=16;
+  else if(l5Gap>=2)  adj+=11;
+  else if(l5Gap>=1)  adj+=5;
+  // Hit rate — 4 tiers
+  if(cHr!=null){
+    if(cHr>=0.70)      adj+=12;
+    else if(cHr>=0.60) adj+=5;
+    else if(cHr<0.45)  adj-=6;
+  }
+  // Streak — 3 up / 2 down
+  if(streak>=6)        adj+=15;
+  else if(streak>=4)   adj+=10;
+  else if(streak===3)  adj+=5;
+  else if(streak<=-4)  adj-=12;
+  else if(streak===-3) adj-=6;
+  // Form
+  if(isOver&&formUp)    adj+=8;
+  if(!isOver&&formDown) adj+=8;
+  // Negatives
+  if(reviewCond)        adj-=20;
+  if(formContradicts)   adj-=12;
+  if(l5WrongDir)        adj-=10;
   return Math.min(95,phase1Score+adj);
 }
 
-/* tryLineAdjust: shifts line 0.5 at a time (Under → up, Over → down) up to 2.0.
-   Returns {score, line} when score reaches ≥65, or null if never achieved. */
+/* tryLineAdjust: shifts line 0.5 at a time up to 2.0 from consensus.
+   Under → DOWN (tighter threshold, tests real confidence).
+   Over  → UP   (higher threshold, tests genuine upside conviction).
+   Returns {score, line} at first step that reaches ≥60, or null if never achieved. */
 function tryLineAdjust(p,vals,origLine,isOver,formUp,formDown,hasSharSplit){
   var phase1=p.phase1Value!=null?p.phase1Value:50;
-  var dir=isOver?-0.5:0.5; // Under → raise line, Over → lower line
+  var dir=isOver?0.5:-0.5; // Over → raise line; Under → lower line
   for(var step=1;step<=4;step++){
-    var testLine=origLine+dir*step;
+    var testLine=Math.round((origLine+dir*step)*2)/2; // keep to clean 0.5 increments
     var sc=scoreAtLine(testLine,vals,isOver,formUp,formDown,hasSharSplit,phase1);
-    if(sc>=65) return{score:sc,line:testLine};
+    if(sc>=60) return{score:sc,line:testLine};
   }
   return null;
 }
@@ -1334,7 +1383,7 @@ function lotdText(legs,amOdds){
 function filteredProps(){
   var q=($("searchIn").value||"").toLowerCase().trim();
   return ST.props.filter(function(p){
-    if(p.enriched && p.value<40) return false;
+    if(p.enriched && p.value<60) return false;
     return !q || p.player.toLowerCase().indexOf(q)>=0;
   });
 }
