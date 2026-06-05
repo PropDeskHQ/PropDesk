@@ -161,10 +161,10 @@ tbody tr.prow:hover{background:var(--surf2)}
 .mv.up{color:var(--accent)} .mv.down{color:var(--red)}
 
 /* INLINE QUICK STATS */
-.pl-qstats{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
-.pl-qstats .qs{background:var(--surf2);border:1px solid var(--bd);border-radius:5px;padding:2px 6px;font-size:10px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.pl-qstats .qs-l{color:var(--mut2);font-weight:700;letter-spacing:.3px;text-transform:uppercase}
-.pl-qstats .qs-v{color:var(--text);font-weight:600;margin-left:3px}
+.pl-qstats{display:flex;gap:5px;flex-wrap:wrap;margin:5px 0 2px}
+.pl-qstats .qs{background:rgba(255,255,255,.04);border:1px solid var(--bd2);border-radius:6px;padding:3px 7px;font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:4px}
+.pl-qstats .qs-l{color:var(--mut2);font-weight:700;font-size:9px;letter-spacing:.5px;text-transform:uppercase}
+.pl-qstats .qs-v{color:var(--text);font-weight:700}
 
 /* EXPAND */
 .expand td{background:var(--surf2);padding:0;border-bottom:1px solid var(--bd2)}
@@ -1116,9 +1116,12 @@ function rowHtml(p,cols,idx,silent){
   var bbcls=p.side==="Under"?"under":(p.side==="Yes"?"yes":"over");
   var ev=p.evOver;
   var evHtml=(ev==null)?'<span class="ev">-</span>':'<span class="ev '+(ev>=0?"pos":"neg")+'">'+(ev>=0?"+":"")+ev.toFixed(1)+'%</span>';
-  var meta=p._meta? esc(p._meta) : '<span style="color:#444">loading...</span>';
+  // Show existing meta, a dash if loaded-but-empty, or nothing while pending (no "loading..." flash)
+  var meta=p._metaLoaded ? (p._meta ? esc(p._meta) : '') : '';
   var rcls="prow"+(silent?"":" rowin");
-  var style=silent?"":'style="animation-delay:'+(idx*28)+'ms"';
+  // idx=0 gets a tiny delay so fill-mode:both never leaves it stuck at opacity:0
+  var delayMs=silent?0:(idx===0?16:idx*28);
+  var style=silent?"":'style="animation-delay:'+delayMs+'ms"';
   var h='<tr class="'+rcls+'" '+style+' data-pid="'+p._id+'">'+
     '<td><div class="pl-name">'+esc(p.player)+'</div><div class="pl-meta" id="meta-'+p._id+'">'+meta+'</div>'+
       '<div class="pl-qstats" id="qstats-'+p._id+'"></div>'+
@@ -1447,14 +1450,18 @@ function lazyLoadPlayerMeta(){
       applyMeta(p);
       if(!p._quickStatsLoaded){
         p._quickStatsLoaded=true;
-        getQuickStatsData(p.player, m).then(function(qs){ p._quickStats=qs||[]; applyQuickStats(p); });
+        getQuickStatsData(p.player, m).then(function(qs){
+          p._quickStats=qs&&qs.length?qs:[];
+          applyQuickStats(p);
+        }).catch(function(){ p._quickStats=[]; });
       }
-    });
+    }).catch(function(){ p._meta=""; applyMeta(p); });
   });
 }
 function applyMeta(p){
   var node=document.getElementById("meta-"+p._id);
-  if(node) node.innerHTML = p._meta? esc(p._meta) : '<span style="color:#444">-</span>';
+  if(!node) return;
+  node.innerHTML=p._meta ? esc(p._meta) : '';
 }
 function applyQuickStats(p){
   var node=document.getElementById("qstats-"+p._id);
@@ -1464,53 +1471,131 @@ function applyQuickStats(p){
   }).join("");
 }
 
+/* ---- Quick-stat spec: which ESPN raw-stat names map to which display label ---- */
+var QS_SPEC = {
+  basketball_nba: [
+    {l:"PPG",  k:["avgpoints","avgPoints","pts"]},
+    {l:"RPG",  k:["avgrebounds","avgRebounds","avgtotalrebounds","reb","rpg"]},
+    {l:"APG",  k:["avgassists","avgAssists","ast","apg"]},
+    {l:"SPG",  k:["avgsteals","avgSteals","stl","spg"]},
+    {l:"3PM",  k:["avgthrees","avgthreePointFieldGoalsMade","avgthreepointfieldgoalsmade","tpm","3pm"]},
+    {l:"FT%",  k:["freethrowpct","freeThrowPct","freethrowpercentage","ftpct","ftp"]},
+    {l:"MIN",  k:["avgminutes","avgMin","minutespergame","mpg"]}
+  ],
+  americanfootball_nfl: [
+    {l:"PASS/G",    k:["avgpassingyards","avgPassingYards","passingyardsavg","pydsavg"]},
+    {l:"RUSH/G",    k:["avgrushingyards","avgRushingYards","rushingyardsavg","rydsavg"]},
+    {l:"REC YDS/G", k:["avgreceivingyard","avgreceivingYards","avgreceiveyards","avgreceivinyards","recyardsavg"]},
+    {l:"REC/G",     k:["avgreceptions","avgReceptions","recavg","receptionsavg"]},
+    {l:"CAR/G",     k:["avgrushingattempts","avgRushingAttempts","avgcarries","rushingattempts"]},
+    {l:"SACKS",     k:["avgsacks","sacks","totalsacks","sacktotal"]}
+  ]
+};
+
+function findInRaw(raw, keys){
+  var norm=function(s){ return String(s).toLowerCase().replace(/[^a-z0-9]/g,""); };
+  var targets=keys.map(norm);
+  for(var i=0;i<raw.length;i++){
+    var nm=norm(raw[i].name), ab=norm(raw[i].abbr);
+    for(var j=0;j<targets.length;j++){
+      if(nm===targets[j]||ab===targets[j]) return raw[i].disp;
+    }
+  }
+  return null;
+}
+
 var _qsCache={};
 async function getQuickStatsData(name, meta){
   var key=ST.sport+"|"+name;
   if(_qsCache[key]!==undefined) return _qsCache[key];
   var result=null;
+  var yr=new Date().getFullYear();
   try{
-    var yr=new Date().getFullYear();
-    if(ST.sport==="baseball_mlb" && meta && meta.id){
+    /* ---- MLB ---- */
+    if(ST.sport==="baseball_mlb"){
+      if(!meta||!meta.id){ _qsCache[key]=null; return null; }
       var group=PITCHER_MARKETS[ST.market]?"pitching":"hitting";
-      var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+meta.id+"/stats?stats=season&season="+yr+"&group="+group);
-      var d=await r.json();
-      var st=(d.stats&&d.stats[0]&&d.stats[0].splits&&d.stats[0].splits[0])?d.stats[0].splits[0].stat:{};
-      if(group==="pitching"){
-        result=[["ERA",st.era],["SO",st.strikeOuts],["IP",st.inningsPitched],["WHIP",st.whip]].filter(function(s){return s[1]!=null;});
-      } else {
-        result=[["AVG",st.avg],["HR",st.homeRuns],["RBI",st.rbi],["H",st.hits]].filter(function(s){return s[1]!=null;});
+      // Try current year, fall back to previous
+      for(var yi=0;yi<2&&!result;yi++){
+        var y=yr-yi;
+        var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+meta.id+"/stats?stats=season&season="+y+"&group="+group,{signal:AbortSignal.timeout(7000)});
+        if(!r.ok) continue;
+        var d=await r.json();
+        var st=(d.stats&&d.stats[0]&&d.stats[0].splits&&d.stats[0].splits[0])?d.stats[0].splits[0].stat||{}:{};
+        if(!Object.keys(st).length) continue;
+        var gp=Number(st.gamesPlayed||st.games||0);
+        if(group==="pitching"){
+          var rows=[["ERA",st.era],["SO",st.strikeOuts],["IP",st.inningsPitched],["WHIP",st.whip],["BB",st.baseOnBalls]];
+          var bf=Number(st.battersFaced||0);
+          if(bf>0&&st.strikeOuts!=null) rows.push(["K%",(st.strikeOuts/bf*100).toFixed(0)+"%"]);
+          result=rows.filter(function(s){return s[1]!=null;}).slice(0,6);
+        } else {
+          var pa=Number(st.plateAppearances||0);
+          var rows2=[["AVG",st.avg],["HR",st.homeRuns],["RBI",st.rbi],["OBP",st.obp],["SLG",st.slg],["OPS",st.ops]];
+          if(pa>0&&st.strikeOuts!=null) rows2.push(["K%",(st.strikeOuts/pa*100).toFixed(0)+"%"]);
+          if(pa>0&&st.baseOnBalls!=null) rows2.push(["BB%",(st.baseOnBalls/pa*100).toFixed(0)+"%"]);
+          result=rows2.filter(function(s){return s[1]!=null;}).slice(0,7);
+        }
       }
-    } else if(meta && meta.id){
-      var path=ESPN_PATH[ST.sport];
-      var r2=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+meta.id+"/stats?seasontype=2&season="+yr,{signal:AbortSignal.timeout(6000)});
+    }
+    /* ---- NHL  (use official NHL landing endpoint) ---- */
+    else if(ST.sport==="icehockey_nhl"){
+      var nhlId=await nhlSearch(name);
+      if(nhlId){
+        var rn=await fetch("https://api-web.nhle.com/v1/player/"+nhlId+"/landing",{signal:AbortSignal.timeout(7000)});
+        if(rn.ok){
+          var dn=await rn.json();
+          var fs=dn.featuredStats, ss=fs&&fs.regularSeason&&fs.regularSeason.subSeason;
+          if(ss&&ss.gamesPlayed){
+            var gp2=ss.gamesPlayed, rows3=[];
+            if(ss.goals!=null)   rows3.push(["G/G",(ss.goals/gp2).toFixed(2)]);
+            if(ss.assists!=null) rows3.push(["A/G",(ss.assists/gp2).toFixed(2)]);
+            if(ss.points!=null)  rows3.push(["PTS/G",(ss.points/gp2).toFixed(2)]);
+            if(ss.shots!=null)   rows3.push(["SOG/G",(ss.shots/gp2).toFixed(1)]);
+            if(ss.avgTimeOnIce)  rows3.push(["TOI",ss.avgTimeOnIce]);
+            else if(ss.timeOnIcePerGame) rows3.push(["TOI",ss.timeOnIcePerGame]);
+            var ppPts=(ss.powerPlayGoals||0)+(ss.powerPlayAssists||0);
+            if(ppPts>0) rows3.push(["PP PTS",ppPts]);
+            if(rows3.length) result=rows3;
+          }
+        }
+      }
+      // ESPN fallback if NHL API fails
+      if(!result&&meta&&meta.id){
+        var path0=ESPN_PATH[ST.sport];
+        var r0=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path0+"/athletes/"+meta.id+"/stats?seasontype=2&season="+yr,{signal:AbortSignal.timeout(6000)});
+        if(r0.ok){
+          var d0=await r0.json();
+          var raw0=espnCollectStats(stripCareerCats(d0));
+          var nhlSpec=[
+            {l:"G",k:["goals","g","avggoals"]},{l:"A",k:["assists","a","avgassists"]},
+            {l:"PTS",k:["points","p","avgpoints"]},{l:"SOG",k:["shots","sog","shotsTotal","shotstotal"]},
+            {l:"TOI",k:["timeonicepergame","toi","avgtimeonice"]}
+          ];
+          var rows4=[];
+          nhlSpec.forEach(function(sp){
+            var v=findInRaw(raw0,sp.k);
+            if(v!=null) rows4.push([sp.l,v]);
+          });
+          if(rows4.length) result=rows4;
+        }
+      }
+    }
+    /* ---- NBA / NFL (ESPN) ---- */
+    else if(QS_SPEC[ST.sport]){
+      if(!meta||!meta.id){ _qsCache[key]=null; return null; }
+      var path2=ESPN_PATH[ST.sport];
+      var r2=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path2+"/athletes/"+meta.id+"/stats?seasontype=2&season="+yr,{signal:AbortSignal.timeout(7000)});
       if(r2.ok){
         var d2=await r2.json();
-        var raw=espnCollectStats(stripCareerCats(d2));
-        var grid=buildEspnGrid(raw,ST.sport);
-        var keys=Object.keys(grid);
-        var picks={
-          basketball_nba:["Avg Points","Avg Rebounds","Avg Assists","Avg Blocks"],
-          americanfootball_nfl:["Passing Yards","Rushing Yards","Receptions","Receiving Yards","Sacks"],
-          icehockey_nhl:["Goals","Assists","Points","Shots"]
-        };
-        var preferred=picks[ST.sport]||[];
-        result=[];
-        // Try preferred keys first
-        preferred.forEach(function(pk){
-          if(result.length>=4) return;
-          if(grid[pk]!=null) result.push([pk.replace(/^Avg /i,""),grid[pk]]);
+        var raw2=espnCollectStats(stripCareerCats(d2));
+        var spec=QS_SPEC[ST.sport];
+        var rows5=[];
+        spec.forEach(function(sp){
+          var v=findInRaw(raw2,sp.k);
+          if(v!=null&&v!=="0"&&v!=="0.0") rows5.push([sp.l,v]);
         });
-        // Fill remaining slots from grid
-        if(result.length<3){
-          keys.forEach(function(k){
-            if(result.length>=4) return;
-            if(!result.some(function(r){return r[0]===k.replace(/^Avg /i,"");})){
-              result.push([k.replace(/^Avg /i,""),grid[k]]);
-            }
-          });
-        }
-        if(!result.length) result=null;
+        if(rows5.length) result=rows5;
       }
     }
   }catch(e){ result=null; }
