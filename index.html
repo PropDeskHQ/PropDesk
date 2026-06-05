@@ -160,11 +160,11 @@ tbody tr.prow:hover{background:var(--surf2)}
 .mv{font-size:11px;font-weight:800;margin-left:3px}
 .mv.up{color:var(--accent)} .mv.down{color:var(--red)}
 
-/* INLINE QUICK STATS */
-.pl-qstats{display:flex;gap:5px;flex-wrap:wrap;margin:5px 0 2px}
-.pl-qstats .qs{background:rgba(255,255,255,.04);border:1px solid var(--bd2);border-radius:6px;padding:3px 7px;font-size:11px;white-space:nowrap;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:4px}
-.pl-qstats .qs-l{color:var(--mut2);font-weight:700;font-size:9px;letter-spacing:.5px;text-transform:uppercase}
-.pl-qstats .qs-v{color:var(--text);font-weight:700}
+/* INLINE QUICK STATS — stretch to fill row width */
+.pl-qstats{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px}
+.pl-qstats .qs{flex:1 1 68px;min-width:60px;background:rgba(255,255,255,.04);border:1px solid var(--bd2);border-radius:7px;padding:4px 6px 5px;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px}
+.pl-qstats .qs-l{color:var(--mut2);font-weight:700;font-size:8.5px;letter-spacing:.6px;text-transform:uppercase;line-height:1.1}
+.pl-qstats .qs-v{color:var(--text);font-weight:800;font-size:12px;line-height:1.2}
 
 /* EXPAND */
 .expand td{background:var(--surf2);padding:0;border-bottom:1px solid var(--bd2)}
@@ -1235,6 +1235,7 @@ async function renderAnalyze(p){
   var gl=await getGameLog(p.player).catch(function(){return null;});
   var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
   var vals=gl&&gl.values?gl.values:[];
+  var dates=gl&&gl.dates?gl.dates:[];
   var last5=vals.slice(0,5);
   var seasonAvg=gl&&gl.seasonAvg!=null?gl.seasonAvg:(vals.length?avg(vals):null);
   var l5avg=last5.length?avg(last5):null;
@@ -1273,7 +1274,7 @@ async function renderAnalyze(p){
     '<div class="subh">Verdict</div>'+
     '<div class="verdict">'+analyzeVerdict(p,line,seasonAvg,l5avg,overRate)+'</div>';
 
-  drawAnalyzeCharts(p,line,vals,seasonAvg,overRate);
+  drawAnalyzeCharts(p,line,vals,seasonAvg,overRate,dates);
 }
 function analyzeVerdict(p,line,seasonAvg,l5avg,overRate){
   var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"")+(p.bestOdds!=null?" at "+fmtOdds(p.bestOdds):"");
@@ -1474,13 +1475,16 @@ function applyQuickStats(p){
 /* ---- Quick-stat spec: which ESPN raw-stat names map to which display label ---- */
 var QS_SPEC = {
   basketball_nba: [
-    {l:"PPG",  k:["avgpoints","avgPoints","pts"]},
+    {l:"PPG",  k:["avgpoints","avgPoints","pts","ppg"]},
     {l:"RPG",  k:["avgrebounds","avgRebounds","avgtotalrebounds","reb","rpg"]},
     {l:"APG",  k:["avgassists","avgAssists","ast","apg"]},
     {l:"SPG",  k:["avgsteals","avgSteals","stl","spg"]},
+    {l:"BPG",  k:["avgblocks","avgBlocks","blk","bpg"]},
     {l:"3PM",  k:["avgthrees","avgthreePointFieldGoalsMade","avgthreepointfieldgoalsmade","tpm","3pm"]},
+    {l:"3P%",  k:["threepointpct","threepointfieldgoalpct","threepointfieldgoalpercentage","3ppct","tppct","avgtpp"]},
     {l:"FT%",  k:["freethrowpct","freeThrowPct","freethrowpercentage","ftpct","ftp"]},
-    {l:"MIN",  k:["avgminutes","avgMin","minutespergame","mpg"]}
+    {l:"USG%", k:["usagerate","usagepct","usg","usagepercentage","avgusagerate","avgusage"]},
+    {l:"MIN",  k:["avgminutes","avgMin","minutespergame","mpg","min"]}
   ],
   americanfootball_nfl: [
     {l:"PASS/G",    k:["avgpassingyards","avgPassingYards","passingyardsavg","pydsavg"]},
@@ -1506,7 +1510,8 @@ function findInRaw(raw, keys){
 
 var _qsCache={};
 async function getQuickStatsData(name, meta){
-  var key=ST.sport+"|"+name;
+  // Include market in key so L5/High refresh when player switches prop type
+  var key=ST.sport+"|"+ST.market+"|"+name;
   if(_qsCache[key]!==undefined) return _qsCache[key];
   var result=null;
   var yr=new Date().getFullYear();
@@ -1598,6 +1603,19 @@ async function getQuickStatsData(name, meta){
         if(rows5.length) result=rows5;
       }
     }
+    /* ---- L5 AVG + Season High (all sports, appended after main stats) ---- */
+    if(result&&result.length&&meta&&meta.id){
+      try{
+        var gl2=ST.sport==="baseball_mlb"?await mlbGameLog(meta.id):await espnGameLog(meta.id);
+        if(gl2&&gl2.values&&gl2.values.length>0){
+          var gv=gl2.values;
+          var l5=gv.slice(0,5).reduce(function(a,x){return a+x;},0)/Math.min(5,gv.length);
+          var high=Math.max.apply(null,gv);
+          result.push(["L5 AVG",l5.toFixed(1)]);
+          result.push(["HIGH",high%1===0?high:high.toFixed(1)]);
+        }
+      }catch(e){}
+    }
   }catch(e){ result=null; }
   _qsCache[key]=result;
   return result;
@@ -1619,14 +1637,19 @@ async function mlbGameLog(id){
       var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+id+"/stats?stats=gameLog&season="+years[y]+"&group="+group+"&limit=20");
       var d=await r.json();
       if(d.stats && d.stats[0] && d.stats[0].splits && d.stats[0].splits.length){
-        var vals=[];
+        var vals=[],dates=[];
         d.stats[0].splits.slice().reverse().slice(0,15).forEach(function(sp){
           var v=pickStat(sp.stat||{},keys);
-          if(v!=null) vals.push(Number(v));
+          if(v!=null){
+            vals.push(Number(v));
+            var dt=sp.date||(sp.game&&sp.game.gameDate)||"";
+            var m=dt.match(/\d{4}-(\d{2})-(\d{2})/);
+            dates.push(m?parseInt(m[1])+"/"+parseInt(m[2]):"");
+          }
         });
         if(vals.length){
           var savg=await mlbSeasonAvg(id,group,keys,years[y]);
-          return {values:vals, seasonAvg:savg!=null?savg:avg(vals)};
+          return {values:vals, seasonAvg:savg!=null?savg:avg(vals), dates:dates};
         }
       }
     }catch(e){}
@@ -1697,15 +1720,20 @@ function parseEspnGamelog(d,keys){
   var events=[];
   if(d.seasonTypes) events=collectEspnEvents(d.seasonTypes);
   if(!events.length && d.events) events=collectEspnEvents(d.events);
-  var vals=[];
+  var vals=[],dates=[];
   events.forEach(function(ev){
     if(ev && ev.stats && idx<ev.stats.length){
       var num=parseFloat(String(ev.stats[idx]).replace(/[^0-9.\-]/g,""));
-      if(!isNaN(num)) vals.push(num);
+      if(!isNaN(num)){
+        vals.push(num);
+        var dt=ev.gameDate||ev.date||ev.gameDatez||"";
+        var m=dt.match(/\d{4}-(\d{2})-(\d{2})/);
+        dates.push(m?parseInt(m[1])+"/"+parseInt(m[2]):"");
+      }
     }
   });
   if(!vals.length) return null;
-  return {values:vals.slice(0,15), seasonAvg:avg(vals)};
+  return {values:vals.slice(0,15), seasonAvg:avg(vals), dates:dates.slice(0,15)};
 }
 
 /* ============ FULL STATS for Stats expand ============ */
@@ -2029,7 +2057,7 @@ function ensureChart(cb){
   var tries=0; var iv=setInterval(function(){ tries++; if(window.Chart){ clearInterval(iv); cb(); } else if(tries>50){ clearInterval(iv); } },120);
 }
 function tierColor(s){ if(s>=80)return "#00ff87"; if(s>=65)return "#7fe6a8"; if(s>=48)return "#ffcc00"; if(s>=32)return "#ff9d4f"; return "#ff4f4f"; }
-function drawAnalyzeCharts(p,line,vals,seasonAvg,overRate){
+function drawAnalyzeCharts(p,line,vals,seasonAvg,overRate,dates){
   ensureChart(function(){
     if(!document.getElementById("ch1-"+p._id) && !document.getElementById("ch2-"+p._id)) return;
     var grid="rgba(255,255,255,.06)";
@@ -2037,47 +2065,91 @@ function drawAnalyzeCharts(p,line,vals,seasonAvg,overRate){
     var c1=document.getElementById("ch1-"+p._id);
     if(c1 && vals.length){
       var rv=vals.slice().reverse();
-      var ch=new Chart(c1,{type:"bar",data:{labels:rv.map(function(_,i){return i+1;}),
-        datasets:[
-          {data:rv,backgroundColor:rv.map(function(v){return v>line?"#00ff87":"#ff4f4f";}),borderRadius:3,order:2},
-          {type:"line",data:rv.map(function(){return line;}),borderColor:"#ffcc00",borderWidth:1.5,pointRadius:0,borderDash:[4,4],order:1}
-        ]},
-        options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:grid},beginAtZero:true}}}});
+      var rd=(dates||[]).slice().reverse();
+      var lbls=rv.map(function(_,i){return rd[i]||String(i+1);});
+      var ch=new Chart(c1,{type:"bar",data:{labels:lbls,datasets:[
+        {data:rv,backgroundColor:rv.map(function(v){return v>line?"#00ff87":"#ff4f4f";}),borderRadius:3,barThickness:12,order:2},
+        {type:"line",data:rv.map(function(){return line;}),borderColor:"rgba(255,255,255,.7)",borderWidth:1.5,pointRadius:0,borderDash:[5,4],order:1,fill:false}
+      ]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxRotation:45,font:{size:9}}},y:{grid:{color:grid},beginAtZero:false}}}});
       ST.charts.push(ch);
     }
     var c2=document.getElementById("ch2-"+p._id);
     if(c2){
       var conf=p.value;
-      var ch2=new Chart(c2,{type:"doughnut",data:{datasets:[{data:[conf,100-conf],backgroundColor:[tierColor(conf),"#222"],borderWidth:0}]},
-        options:{rotation:-90,circumference:180,cutout:"72%",plugins:{legend:{display:false},tooltip:{enabled:false}}}});
+      var col=tierColor(conf);
+      var ch2=new Chart(c2,{type:"doughnut",data:{datasets:[{data:[conf,100-conf],backgroundColor:[col,"rgba(255,255,255,.07)"],borderWidth:0}]},
+        options:{cutout:"74%",plugins:{legend:{display:false},tooltip:{enabled:false}}},
+        plugins:[{id:"confCenter",afterDraw:function(chart){
+          var meta=chart.getDatasetMeta(0);
+          if(!meta.data||!meta.data.length) return;
+          var ctx=chart.ctx; var arc=meta.data[0];
+          ctx.save(); ctx.font="800 22px Inter"; ctx.fillStyle=col; ctx.textAlign="center"; ctx.textBaseline="middle";
+          ctx.fillText(conf+"%",arc.x,arc.y); ctx.restore();
+        }}]
+      });
       ST.charts.push(ch2);
-      drawGaugeText(c2,conf);
     }
     var c3=document.getElementById("ch3-"+p._id);
     if(c3){
-      var bdata=[], blabels=[];
+      var bdata=[],blabels=[];
       p.books.slice(0,7).forEach(function(b){
         var odds=p.yesNo?b.yes:(p.side==="Under"?b.under:b.over);
-        if(odds!=null){ blabels.push(b.book.slice(0,10)); bdata.push(+(impliedProb(odds)*100).toFixed(1)); }
+        if(odds!=null){blabels.push(b.book.slice(0,10));bdata.push(+(impliedProb(odds)*100).toFixed(1));}
       });
       if(bdata.length){
-        var ch3=new Chart(c3,{type:"bar",data:{labels:blabels,datasets:[{data:bdata,backgroundColor:"#4f9fff",borderRadius:3}]},
-          options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{grid:{color:grid}},y:{grid:{display:false}}}}});
+        var ch3=new Chart(c3,{type:"bar",data:{labels:blabels,datasets:[{data:bdata,backgroundColor:"rgba(255,255,255,.75)",borderRadius:3}]},
+          options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{grid:{color:grid},ticks:{callback:function(v){return v+"% ";}},max:Math.min(100,Math.max.apply(null,bdata)+12)},y:{grid:{display:false}}}},
+          plugins:[{id:"barLbl3",afterDraw:function(chart){
+            var ctx=chart.ctx;
+            chart.data.datasets.forEach(function(ds,i){
+              var meta=chart.getDatasetMeta(i);
+              meta.data.forEach(function(bar,j){
+                var val=ds.data[j];
+                ctx.save(); ctx.font="700 10px Inter"; ctx.fillStyle="#fff"; ctx.textAlign="left"; ctx.textBaseline="middle";
+                ctx.fillText(val+"%",bar.x+4,bar.y); ctx.restore();
+              });
+            });
+          }}]
+        });
         ST.charts.push(ch3);
       }
     }
     var c4=document.getElementById("ch4-"+p._id);
     if(c4){
-      var orr=overRate!=null?overRate:50;
+      var orr=overRate!=null?Math.round(overRate):50;
       var ch4=new Chart(c4,{type:"doughnut",data:{labels:["Over","Under"],datasets:[{data:[orr,100-orr],backgroundColor:["#00ff87","#4f9fff"],borderWidth:0}]},
-        options:{cutout:"62%",plugins:{legend:{position:"bottom",labels:{boxWidth:10}}}}});
+        options:{cutout:"54%",plugins:{legend:{position:"bottom",labels:{boxWidth:10,color:"#aaa"}},tooltip:{enabled:true}}},
+        plugins:[{id:"donutLbl4",afterDraw:function(chart){
+          var ctx=chart.ctx; var meta=chart.getDatasetMeta(0); var ds=chart.data.datasets[0];
+          meta.data.forEach(function(arc,i){
+            var val=ds.data[i]; if(val<8) return;
+            var sa=arc.startAngle,ea=arc.endAngle,ma=(sa+ea)/2;
+            var mr=(arc.outerRadius+arc.innerRadius)/2;
+            ctx.save(); ctx.font="700 11px Inter"; ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.textBaseline="middle";
+            ctx.fillText(val+"%",arc.x+mr*Math.cos(ma),arc.y+mr*Math.sin(ma)); ctx.restore();
+          });
+        }}]
+      });
       ST.charts.push(ch4);
     }
     var c5=document.getElementById("ch5-"+p._id);
     if(c5){
-      var sa=seasonAvg!=null?seasonAvg:0;
-      var ch5=new Chart(c5,{type:"bar",data:{labels:["Season Avg","Line"],datasets:[{data:[sa,line],backgroundColor:["#a78bfa","#ffcc00"],borderRadius:4}]},
-        options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:grid},beginAtZero:true}}}});
+      var sa5=seasonAvg!=null?parseFloat(Number(seasonAvg).toFixed(2)):0;
+      var ln5=line!=null?parseFloat(Number(line).toFixed(2)):0;
+      var ch5=new Chart(c5,{type:"bar",data:{labels:["Season Avg","Line"],datasets:[{data:[sa5,ln5],backgroundColor:["#00ff87","rgba(255,255,255,.85)"],borderRadius:4}]},
+        options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:grid},beginAtZero:true}}},
+        plugins:[{id:"barTopLbl5",afterDraw:function(chart){
+          var ctx=chart.ctx;
+          chart.data.datasets.forEach(function(ds,i){
+            var meta=chart.getDatasetMeta(i);
+            meta.data.forEach(function(bar,j){
+              var val=ds.data[j];
+              ctx.save(); ctx.font="700 12px Inter"; ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.textBaseline="bottom";
+              ctx.fillText(val%1===0?String(val):val.toFixed(1),bar.x,bar.y-5); ctx.restore();
+            });
+          });
+        }}]
+      });
       ST.charts.push(ch5);
     }
   });
