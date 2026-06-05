@@ -165,6 +165,12 @@ tbody tr.prow:hover{background:var(--surf2)}
 .pl-qstats .qs{flex:1 1 68px;min-width:60px;background:rgba(255,255,255,.04);border:1px solid var(--bd2);border-radius:7px;padding:4px 6px 5px;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px}
 .pl-qstats .qs-l{color:var(--mut2);font-weight:700;font-size:8.5px;letter-spacing:.6px;text-transform:uppercase;line-height:1.1}
 .pl-qstats .qs-v{color:var(--text);font-weight:800;font-size:12px;line-height:1.2}
+.pl-flags{display:flex;flex-wrap:wrap;gap:3px;margin:3px 0 2px}
+.pl-flags .vf{font-size:9px;font-weight:700;letter-spacing:.4px;padding:2px 6px;border-radius:4px;text-transform:uppercase;cursor:default}
+.vf-val{background:rgba(0,255,135,.12);color:#00ff87;border:1px solid rgba(0,255,135,.25)}
+.vf-sharp{background:rgba(255,204,0,.12);color:#ffcc00;border:1px solid rgba(255,204,0,.25)}
+.vf-hot{background:rgba(255,107,0,.14);color:#ff8c42;border:1px solid rgba(255,107,0,.28)}
+.vf-guard{background:rgba(255,79,79,.1);color:#ff6b6b;border:1px solid rgba(255,79,79,.25)}
 
 /* EXPAND */
 .expand td{background:var(--surf2);padding:0;border-bottom:1px solid var(--bd2)}
@@ -769,22 +775,162 @@ function computeBestBet(p,marketKey){
 
 /* VALUE SCORE 0-100 */
 function computeValue(p){
-  var s=35;
+  // Phase 1: market data only (runs synchronously at parse time)
+  // Component 1 — Market edge / free points (max 30 pts)
   var edge=p.edge||0;
-  s += Math.min(30, edge*12);
+  var edgeScore=Math.min(30, edge*10);
+
+  // Component 2 — Vig quality: low vig = cleaner market (max 8 pts)
+  var v=p.vig!=null?p.vig:6;
+  var vigScore=Math.max(-4, Math.min(8, (8-v)*1.5));
+
+  // Component 3 — Liquidity: book count signals market depth (max 4 pts)
+  var liqScore=Math.min(4, (p.bookCount||0)*0.6);
+
+  // Component 4 — Sharp signals: spread across books (max 10 pts)
+  var sp=p.lineSpread||0;
+  var sharpScore=0;
+  if(!p.yesNo){
+    sharpScore=sp>=2.0?10:sp>=1.5?7:sp>=1.0?4:sp>=0.5?2:0;
+  }
+
+  // Component 5 — Odds quality: better than -110 is a bonus (max 3 pts)
+  var oddsScore=0;
   if(p.bestOdds!=null){
     var d=aToDec(p.bestOdds);
-    var oq=(d-1.909)/0.7;
-    s += Math.max(-4, Math.min(18, oq*18));
+    oddsScore=Math.max(-3, Math.min(3, (d-1.909)*6));
   }
-  var v=p.vig!=null?p.vig:6;
-  s += Math.max(0, Math.min(14,(8-v)*2));
-  s += Math.min(6,(p.bookCount||1)*0.8);
-  var sp=p.lineSpread||0;
-  if(!p.yesNo){
-    if(sp<=0.5) s+=8; else if(sp<=1) s+=4; else if(sp>=2.5) s-=8; else if(sp>=1.5) s-=3;
-  }
+
+  var s=30+edgeScore+vigScore+liqScore+sharpScore+oddsScore;
+  if(p.bookCount<3) s-=8; // guardrail penalty for thin market
+
   p.value=Math.max(0,Math.min(100,Math.round(s)));
+  p.valueFlags=[];
+  p.guardrailFlags=[];
+
+  // Synchronous gap detection flags
+  if(edge>=0.5 && !p.yesNo) p.valueFlags.push("FREE_POINTS");
+  if(sp>=2.0 && !p.yesNo) p.valueFlags.push("SHARP_SPLIT");
+  if(v<4.5 && !p.yesNo) p.valueFlags.push("LOW_VIG");
+  if(p.bookCount<3) p.guardrailFlags.push("FEW_BOOKS");
+  // Phase 2 (hit rate + recent form) added later by enrichPropScore()
+}
+
+/* Phase 2 enrichment — fetches game log after table renders, updates score + flags */
+async function enrichPropScore(p){
+  try{
+    var gl=await getGameLog(p.player);
+    if(!gl||!gl.values||gl.values.length<3) return;
+    var vals=gl.values;
+    var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
+    var isOver=p.side==="Over";
+    if(!line) return;
+
+    // Guardrail: thin data
+    if(vals.length<10 && p.guardrailFlags.indexOf("THIN_DATA")<0)
+      p.guardrailFlags.push("THIN_DATA");
+
+    // Hit rate: % of logged games player cleared this line
+    var hits=vals.filter(function(v){return isOver?v>line:v<line;}).length;
+    var hitRate=hits/vals.length;
+    p.hitRate14=+(hitRate*100).toFixed(1);
+
+    // Recent averages
+    var l7=vals.slice(0,Math.min(7,vals.length));
+    p.l7Avg=avg(l7);
+    p.seasonAvgEnrich=gl.seasonAvg!=null?gl.seasonAvg:avg(vals);
+
+    // Streak: consecutive hits (positive) or misses (negative)
+    var streak=0;
+    for(var i=0;i<vals.length;i++){
+      var hit=isOver?vals[i]>line:vals[i]<line;
+      if(i===0){streak=hit?1:-1;continue;}
+      if(hit&&streak>0)streak++;
+      else if(!hit&&streak<0)streak--;
+      else break;
+    }
+    p.streak=streak;
+
+    // Hit rate component (max +25, min -5): centered at 50% = 0
+    var hitScore=Math.max(-5, Math.min(25, (hitRate-0.50)*60));
+
+    // Recent form component (max +18, min -8): how far L7 avg is from line
+    var formScore=0;
+    if(p.l7Avg!=null && line>0){
+      var ratio=isOver?(p.l7Avg-line)/line:(line-p.l7Avg)/line;
+      formScore=Math.max(-8, Math.min(18, ratio*80));
+    }
+
+    p.value=Math.max(0,Math.min(100,Math.round(p.value+hitScore+formScore)));
+    p.enriched=true;
+
+    // Additional gap flags from player data
+    if(hitRate>=0.70 && p.valueFlags.indexOf("HOT_RATE")<0)
+      p.valueFlags.push("HOT_RATE");
+    if(streak>=3 && p.valueFlags.indexOf("STREAK")<0)
+      p.valueFlags.push("STREAK_"+streak);
+    if(streak<=-3 && p.guardrailFlags.indexOf("COLD_STREAK")<0)
+      p.guardrailFlags.push("COLD_STREAK");
+    if(isOver && p.l7Avg>p.seasonAvgEnrich*1.05 && p.valueFlags.indexOf("FORM_UP")<0)
+      p.valueFlags.push("FORM_UP");
+    if(!isOver && p.l7Avg<p.seasonAvgEnrich*0.95 && p.valueFlags.indexOf("FORM_DOWN")<0)
+      p.valueFlags.push("FORM_DOWN");
+
+    updatePropValueDisplay(p);
+  }catch(e){}
+}
+
+function updatePropValueDisplay(p){
+  var node=document.getElementById("vsc-"+p._id);
+  if(!node) return;
+  var tier=tierOf(p.value);
+  node.textContent=p.value;
+  node.className=tier.c;
+  var vt=node.nextElementSibling;
+  if(vt&&vt.classList&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
+  applyPropFlags(p);
+}
+
+function applyPropFlags(p){
+  var node=document.getElementById("flags-"+p._id);
+  if(!node) return;
+  var vf=p.valueFlags||[], gf=p.guardrailFlags||[];
+  if(!vf.length&&!gf.length){ node.innerHTML=""; return; }
+  var html="";
+  vf.forEach(function(f){
+    var cls=f==="SHARP_SPLIT"?"vf-sharp":f==="HOT_RATE"||f.indexOf("STREAK_")===0?"vf-hot":"vf-val";
+    html+='<span class="vf '+cls+'" title="'+esc(flagTitle(f))+'">'+esc(flagLabel(f))+'</span>';
+  });
+  gf.forEach(function(f){
+    html+='<span class="vf vf-guard" title="'+esc(flagTitle(f))+'">'+esc(flagLabel(f))+'</span>';
+  });
+  node.innerHTML=html;
+}
+
+function flagLabel(f){
+  var m={FREE_POINTS:"Free Pts",SHARP_SPLIT:"Sharp Split",LOW_VIG:"Low Vig",
+    HOT_RATE:"Hot 70%+",FORM_UP:"Form↑",FORM_DOWN:"Form↓",
+    FEW_BOOKS:"Few Books",THIN_DATA:"Thin Data",COLD_STREAK:"Cold Streak"};
+  if(m[f]) return m[f];
+  if(f.indexOf("STREAK_")===0) return "Streak "+f.slice(7);
+  return f;
+}
+
+function flagTitle(f){
+  var m={
+    FREE_POINTS:"Best book offers 0.5+ free points vs consensus line",
+    SHARP_SPLIT:"2+ point spread across books — sharp positioning signal",
+    LOW_VIG:"Vig under 4.5% — clean market, minimal house edge",
+    HOT_RATE:"Player cleared this line 70%+ of recent games",
+    FORM_UP:"L7 avg trending up vs season norm — supports Over",
+    FORM_DOWN:"L7 avg trending down vs season norm — supports Under",
+    FEW_BOOKS:"Fewer than 3 books posting — limited market data",
+    THIN_DATA:"Fewer than 10 games of data in this stat category",
+    COLD_STREAK:"3+ consecutive misses on this line"
+  };
+  if(m[f]) return m[f];
+  if(f.indexOf("STREAK_")===0) return "Active streak of "+f.slice(7)+" consecutive hits";
+  return f;
 }
 
 /* ============ TABS ============ */
@@ -1103,9 +1249,10 @@ function renderTable(silent){
   } else {
     props.forEach(function(p){ var node=document.getElementById("vsc-"+p._id); if(node) node.textContent=p.value; });
   }
-  /* re-apply meta and quick stats we already loaded */
+  /* re-apply meta, quick stats, and value flags we already loaded */
   props.forEach(function(p){ if(p._meta!=null) applyMeta(p); });
   props.forEach(function(p){ if(p._quickStats!=null) applyQuickStats(p); });
+  props.forEach(function(p){ if(p.valueFlags) applyPropFlags(p); });
   bindRowActions();
 }
 
@@ -1125,6 +1272,7 @@ function rowHtml(p,cols,idx,silent){
   var h='<tr class="'+rcls+'" '+style+' data-pid="'+p._id+'">'+
     '<td><div class="pl-name">'+esc(p.player)+'</div><div class="pl-meta" id="meta-'+p._id+'">'+meta+'</div>'+
       '<div class="pl-qstats" id="qstats-'+p._id+'"></div>'+
+      '<div class="pl-flags" id="flags-'+p._id+'"></div>'+
       '<div class="pl-acts">'+
         '<button class="mini" data-act="analyze" data-pid="'+p._id+'">Analyze</button>'+
         '<button class="mini" data-act="stats" data-pid="'+p._id+'">More Stats</button>'+
@@ -1442,8 +1590,10 @@ async function getMeta(name){
   return result;
 }
 function lazyLoadPlayerMeta(){
+  // Pre-sort so enrichment runs highest-value props first
+  var byValue=ST.props.slice().sort(function(a,b){return b.value-a.value;});
   ST.props.forEach(function(p){
-    if(p._metaLoaded){ applyMeta(p); applyQuickStats(p); return; }
+    if(p._metaLoaded){ applyMeta(p); applyQuickStats(p); applyPropFlags(p); return; }
     p._metaLoaded=true;
     getMeta(p.player).then(function(m){
       if(m){ p._espnId=m.id; var bits=[]; if(m.pos) bits.push(m.pos); if(m.team) bits.push(m.team); p._meta=bits.join(" - "); }
@@ -1454,6 +1604,9 @@ function lazyLoadPlayerMeta(){
         getQuickStatsData(p.player, m).then(function(qs){
           p._quickStats=qs&&qs.length?qs:[];
           applyQuickStats(p);
+          // Enrich score with real player data for top 15 props (avoids spamming APIs for full board)
+          var rank=byValue.indexOf(p);
+          if(rank<15 && !p.enriched) enrichPropScore(p);
         }).catch(function(){ p._quickStats=[]; });
       }
     }).catch(function(){ p._meta=""; applyMeta(p); });
@@ -1509,6 +1662,7 @@ function findInRaw(raw, keys){
 }
 
 var _qsCache={};
+var _glCache={};
 async function getQuickStatsData(name, meta){
   // Include market in key so L5/High refresh when player switches prop type
   var key=ST.sport+"|"+ST.market+"|"+name;
@@ -1623,10 +1777,14 @@ async function getQuickStatsData(name, meta){
 
 /* ============ GAME LOG for charts ============ */
 async function getGameLog(name){
+  var ckey=ST.sport+"|"+ST.market+"|"+name;
+  if(_glCache[ckey]!==undefined) return _glCache[ckey];
   var meta=await getMeta(name);
-  if(!meta || !meta.id) return null;
-  if(ST.sport==="baseball_mlb") return mlbGameLog(meta.id);
-  return espnGameLog(meta.id);
+  if(!meta||!meta.id){ _glCache[ckey]=null; return null; }
+  var result=null;
+  try{ result=ST.sport==="baseball_mlb"?await mlbGameLog(meta.id):await espnGameLog(meta.id); }catch(e){}
+  _glCache[ckey]=result;
+  return result;
 }
 async function mlbGameLog(id){
   var group=mlbGroup();
