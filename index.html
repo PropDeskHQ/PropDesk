@@ -1304,8 +1304,8 @@ async function loadLOTD(){
     (LOTD_MARKETS[ST.sport]||[getMarket()]).forEach(function(mk){
       parseProps(data,mk).forEach(function(p){ p._lotdMk=mk; pool.push(p); });
     });
-    // Exclude yes/no markets — LOTD wants clean over/under legs only
-    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.value>=60 && p.guardrailFlags.indexOf("REVIEW")<0; });
+    // Exclude yes/no markets and low-quality lines; Phase 1 scores used here so keep threshold realistic
+    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.value>=50; });
     pool.sort(function(a,b){ return b.value-a.value; });
     // Target: 3 legs, combined American odds <= +400 (~5.0 decimal)
     // For 3 legs under +400 each leg should be priced near -141 or shorter
@@ -1375,7 +1375,7 @@ function lotdText(legs,amOdds){
   var names=legs.map(function(l){return l.player;}).join(", ");
   var diverse=ST.sport==="baseball_mlb"?" pulled from different stat categories so the legs are independent":"";
   return "Today's Lay of the Day combines "+esc(names)+" into a "+fmtOdds(amOdds)+" parlay"+diverse+
-    ". Every leg scored 42 or better on our value model and was priced no longer than +140 individually - these are real edges stacked together, not longshot dart throws."+
+    ". Every leg scored 50 or better on our value model and was priced no longer than +140 individually - these are real edges stacked together, not longshot dart throws."+
     " Size this as a swing bet: every leg must hit, so keep stakes modest and consider playing the legs individually if your book restricts correlated props.";
 }
 
@@ -1383,7 +1383,7 @@ function lotdText(legs,amOdds){
 function filteredProps(){
   var q=($("searchIn").value||"").toLowerCase().trim();
   return ST.props.filter(function(p){
-    if(p.enriched && p.value<50) return false;
+    if(p.value<50) return false;
     return !q || p.player.toLowerCase().indexOf(q)>=0;
   });
 }
