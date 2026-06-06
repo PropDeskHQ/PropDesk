@@ -1381,8 +1381,11 @@ async function loadPropOfDay(){
 
   var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;});
   var bestProp=null, bestScore=-1, bestMkt=null;
-  // Alt track: best phase-1 candidate regardless of 65 floor (threshold props score ~50 in phase 1)
-  var bestAlt=null, bestAltScore=-1, bestAltMkt=null;
+  // Alt pool: ALL phase-1 candidates ≥44 — we'll enrich the top 5 unique players
+  // and pick the best enriched result. Enriching only 1 misses better props because
+  // threshold props (NHL goals, MLB hits) all score ~50-56 in phase 1 regardless of
+  // their true 70-80% hit rate that only appears after enrichWithConfidence runs.
+  var altPool=[]; // [{prop, mkt, compScore}]
 
   // Fetch in batches of 5   Odds API handles comma-separated markets but smaller batches are safer
   var BATCH=5;
@@ -1400,11 +1403,10 @@ async function loadPropOfDay(){
           if(p.yesNo) compScore=Math.min(compScore,58);
           if(!p.yesNo && p.bestLine!=null && p.bestLine<=0.5) compScore=Math.min(compScore,62);
           if(isLongshot) compScore=Math.min(compScore,56);
-          // Primary track: phase-1 score ≥POTD_MIN_SCORE means already high-confidence without enrichment
+          // Primary track: phase-1 score already clears the bar — no enrichment needed
           if(compScore>=POTD_MIN_SCORE && compScore>bestScore){ bestScore=compScore; bestProp=p; bestMkt=mk; }
-          // Alt track: keep best phase-1 candidate ≥44 so threshold props (score ~50) can
-          // still win POTD after enrichment bumps them to 65+
-          if(compScore>=44 && compScore>bestAltScore){ bestAltScore=compScore; bestAlt=p; bestAltMkt=mk; }
+          // Alt pool: collect every candidate ≥44 so we can enrich the best ones
+          if(compScore>=44) altPool.push({prop:p, mkt:mk, compScore:compScore});
         });
       });
     }catch(e){ /* skip failed batch, try next */ }
@@ -1415,21 +1417,39 @@ async function loadPropOfDay(){
   if(bestProp && bestMkt){
     _potgCache[eid]={prop:bestProp, mkt:bestMkt};
     renderPropOfDay(bestProp, bestMkt);
-  } else if(bestAlt && bestAltMkt){
-    // Best phase-1 candidate didn't hit 65 — enrich it first (gets real hit-rate score),
-    // then apply the 65 floor to the enriched value.
-    // Temporarily set ST.market so getGameLog fetches the right stat keys.
+    return;
+  }
+
+  // No phase-1 winner — enrich the top 5 unique players and pick the best result ≥ POTD_MIN_SCORE.
+  // Sorted descending by phase-1 score so the most promising candidates go first.
+  altPool.sort(function(a,b){ return b.compScore-a.compScore; });
+  // De-duplicate by player name (same player can appear in multiple markets)
+  var potdSeen={}, toEnrich=[];
+  for(var ai=0; ai<altPool.length && toEnrich.length<5; ai++){
+    var key=altPool[ai].prop.player.toLowerCase();
+    if(!potdSeen[key]){ potdSeen[key]=1; toEnrich.push(altPool[ai]); }
+  }
+
+  var bestEnriched=null, bestEnrichedScore=-1;
+  for(var ei=0; ei<toEnrich.length; ei++){
+    if(ST.eventId!==eid) return; // abort if user changed game mid-enrichment
+    var cand=toEnrich[ei];
+    // Temporarily set ST.market so getGameLog fetches the correct stat keys for this market
     var _savedMkt=ST.market;
-    ST.market=bestAltMkt;
-    try{ await enrichWithConfidence(bestAlt); }catch(e){}
+    ST.market=cand.mkt;
+    try{ await enrichWithConfidence(cand.prop); }catch(e){}
     ST.market=_savedMkt;
-    if(ST.eventId!==eid) return; // game changed during enrichment
-    if(bestAlt.value>=POTD_MIN_SCORE){
-      _potgCache[eid]={prop:bestAlt, mkt:bestAltMkt};
-      renderPropOfDay(bestAlt, bestAltMkt);
-    } else {
-      renderNoPropOfDay();
+    if(ST.eventId!==eid) return;
+    // Threshold props: value = hit-rate % (e.g. 77 for a player who gets 1+ hit 77% of the time)
+    if(!cand.prop.pdNoValue && cand.prop.value>=POTD_MIN_SCORE && cand.prop.value>bestEnrichedScore){
+      bestEnrichedScore=cand.prop.value;
+      bestEnriched=cand;
     }
+  }
+
+  if(bestEnriched){
+    _potgCache[eid]={prop:bestEnriched.prop, mkt:bestEnriched.mkt};
+    renderPropOfDay(bestEnriched.prop, bestEnriched.mkt);
   } else {
     renderNoPropOfDay();
   }
@@ -1447,7 +1467,7 @@ function renderNoPropOfDay(){
       'Our data didn\'t identify a Prop of the Day today.'+
     '</div>'+
     '<div class="analysis">'+
-      'No prop cleared our 65/100 confidence threshold. This can happen on slow lines, thin markets, '+
+      'No prop cleared our '+POTD_MIN_SCORE+'/100 confidence threshold. This can happen on slow lines, thin markets, '+
       'or early in the day before books sharpen. Check back as lines update throughout the day.'+
     '</div>';
   mount.innerHTML="";
