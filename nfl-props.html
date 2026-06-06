@@ -575,6 +575,9 @@ var THRESHOLD_STAT_NAMES = {
   pitcher_strikeouts:"Ks", pitcher_hits_allowed:"Hits Allowed",
   pitcher_earned_runs:"Earned Runs", pitcher_outs:"Outs", pitcher_walks:"Walks"
 };
+// Separate score floors — never share the same value; these are different products
+var POTD_MIN_SCORE   = 60;  // Prop of the Day: flagship single pick, higher confidence bar
+var PARLAY_MIN_SCORE = 50;  // Parlay legs: stacked edges, lower per-leg threshold
 // e.g. line 0.5 → "1+ Goals", line 1.5 → "2+ Shots"
 function threshLabel(line, marketKey){
   var n=Math.ceil(line>0?line:0.5);
@@ -1050,6 +1053,17 @@ async function enrichWithConfidence(p){
       // 5. Line edge vs consensus (10%)
       var wEdge=(p.edge||0)>=1.0?88:(p.edge||0)>=0.5?72:50;
       var composite=(wOpp*0.30)+(wL5*0.25)+(wSzn*0.20)+(wRest*0.15)+(wEdge*0.10);
+      // ── Pitcher K pipeline debug — open browser console to inspect ───────
+      console.log("[PropDesk Pitcher K]", p.player, {
+        bookLine: bookLine,
+        l5Ks: vals.slice(0,5),
+        l5K: +l5K.toFixed(2), sznK: +sznK.toFixed(2),
+        daysRest: daysRest,
+        oppTeam: oppTeam, oppKPct: oppKPct!=null ? +(oppKPct*100).toFixed(1)+"%" : null,
+        wOpp: wOpp, wL5: wL5, wSzn: wSzn, wRest: wRest, wEdge: wEdge,
+        composite: +composite.toFixed(1),
+        finalScore: Math.round(Math.min(95,composite))
+      });
       p.value=Math.round(Math.min(95,composite));
       // Confidence = historical hit rate at book line
       var kConfRaw=compositeConf(vals,bookLine,true);
@@ -1386,8 +1400,8 @@ async function loadPropOfDay(){
           if(p.yesNo) compScore=Math.min(compScore,58);
           if(!p.yesNo && p.bestLine!=null && p.bestLine<=0.5) compScore=Math.min(compScore,62);
           if(isLongshot) compScore=Math.min(compScore,56);
-          // Primary track: phase-1 score ≥65 means already high-confidence without enrichment
-          if(compScore>=65 && compScore>bestScore){ bestScore=compScore; bestProp=p; bestMkt=mk; }
+          // Primary track: phase-1 score ≥POTD_MIN_SCORE means already high-confidence without enrichment
+          if(compScore>=POTD_MIN_SCORE && compScore>bestScore){ bestScore=compScore; bestProp=p; bestMkt=mk; }
           // Alt track: keep best phase-1 candidate ≥44 so threshold props (score ~50) can
           // still win POTD after enrichment bumps them to 65+
           if(compScore>=44 && compScore>bestAltScore){ bestAltScore=compScore; bestAlt=p; bestAltMkt=mk; }
@@ -1410,7 +1424,7 @@ async function loadPropOfDay(){
     try{ await enrichWithConfidence(bestAlt); }catch(e){}
     ST.market=_savedMkt;
     if(ST.eventId!==eid) return; // game changed during enrichment
-    if(bestAlt.value>=65){
+    if(bestAlt.value>=POTD_MIN_SCORE){
       _potgCache[eid]={prop:bestAlt, mkt:bestAltMkt};
       renderPropOfDay(bestAlt, bestAltMkt);
     } else {
@@ -1443,8 +1457,8 @@ function renderNoPropOfDay(){
 function renderPropOfDay(p, mkt){
   var mount=$("potgMount");
   if(!mount||!p) return;
-  // Safety floor — never surface below 65 as flagship pick
-  if(p.value<65){ renderNoPropOfDay(); return; }
+  // Safety floor — never surface below POTD_MIN_SCORE as flagship pick
+  if(p.value<POTD_MIN_SCORE){ renderNoPropOfDay(); return; }
   var mktLabel=marketName(mkt);
   var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"");
   var sidecls=p.side==="Under"?"under":"over";
@@ -1513,63 +1527,63 @@ async function loadLOTD(){
     (LOTD_MARKETS[ST.sport]||[getMarket()]).forEach(function(mk){
       parseProps(data,mk).forEach(function(p){ p._lotdMk=mk; pool.push(p); });
     });
-    // Exclude yes/no markets and props without a valid book line
-    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null && p.value>=44; });
-    pool.sort(function(a,b){ return b.value-a.value; });
-    // Target: 3 legs, combined American odds <= +400 (~5.0 decimal)
-    // For 3 legs under +400 each leg should be priced near -141 or shorter
-    var PER_LEG_MAX=Math.pow(5.0,1/3); // ~1.71 decimal = ~-141 American
-    function pickLotdLegs(maxDecPerLeg){
-      var s={}, ls=[];
-      for(var i=0;i<pool.length&&ls.length<3;i++){
-        var pp=pool[i];
-        if(s[pp.player.toLowerCase()]) continue;
-        if(aToDec(pp.bestOdds)>maxDecPerLeg) continue;
-        if(ST.sport==="baseball_mlb"&&ls.length>0){
-          var u=ls.map(function(l){return l._lotdMk;});
-          if(u.indexOf(pp._lotdMk)>=0) continue;
+    // Exclude yes/no markets and props without a valid book line; use PARLAY_MIN_SCORE not POTD_MIN_SCORE
+    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null && p.value>=PARLAY_MIN_SCORE; });
+    // De-duplicate by player — one player can't appear in multiple legs
+    var lotdSeen={}, poolDedup=[];
+    pool.sort(function(a,b){ return b.value-a.value; }).forEach(function(p){
+      var k=p.player.toLowerCase();
+      if(!lotdSeen[k]){ lotdSeen[k]=1; poolDedup.push(p); }
+    });
+    pool=poolDedup;
+    if(pool.length<2){ return; }
+
+    var LOTD_MAX_DEC=5.0; // +400 hard cap for LOTD card
+    // Cap search pool for performance
+    var lotdSearch=pool.slice(0, Math.min(pool.length, 30));
+
+    // Exhaustive combination search: find best n-leg parlay ≤ LOTD_MAX_DEC
+    // MLB: bonus for legs from different stat categories (e.g. hits + Ks, not hits + hits)
+    function findLotdCombo(legCount, candidates){
+      if(candidates.length<legCount) return null;
+      var best=null, bestScore=-Infinity;
+      function choose(start, chosen){
+        if(chosen.length===legCount){
+          var dec=1;
+          for(var ii=0;ii<chosen.length;ii++) dec*=aToDec(chosen[ii].bestOdds);
+          if(dec>LOTD_MAX_DEC) return;
+          var sc=0;
+          for(var jj=0;jj<chosen.length;jj++) sc+=chosen[jj].value;
+          var avg2=sc/legCount;
+          // MLB: reward diverse stat categories
+          var cats={};
+          for(var cc=0;cc<chosen.length;cc++) cats[chosen[cc]._lotdMk]=1;
+          var catBonus=(ST.sport==="baseball_mlb")?(Object.keys(cats).length-1)*8:0;
+          // Sweet-spot bonus: +150 to +400
+          var sweetBonus=(dec>=aToDec(150)&&dec<=LOTD_MAX_DEC)?10:0;
+          var rank=avg2+catBonus+sweetBonus;
+          if(rank>bestScore){ bestScore=rank; best=chosen.slice(); }
+          return;
         }
-        s[pp.player.toLowerCase()]=1;
-        ls.push(pp);
-      }
-      return ls;
-    }
-    // Pass 1: strict chalk to stay under +400
-    var legs=pickLotdLegs(PER_LEG_MAX);
-    // Pass 2: relax to +150 max per leg if not enough chalk
-    if(legs.length<3) legs=pickLotdLegs(aToDec(150));
-    // Pass 3: any minus-money leg
-    if(legs.length<3){
-      var s2={}, ls2=[];
-      for(var i2=0;i2<pool.length&&ls2.length<3;i2++){
-        var pp2=pool[i2];
-        if(s2[pp2.player.toLowerCase()]) continue;
-        if(ST.sport==="baseball_mlb"&&ls2.length>0){
-          var u2=ls2.map(function(l){return l._lotdMk;});
-          if(u2.indexOf(pp2._lotdMk)>=0) continue;
+        var remaining=legCount-chosen.length;
+        for(var i=start;i<=candidates.length-remaining;i++){
+          chosen.push(candidates[i]);
+          choose(i+1, chosen);
+          chosen.pop();
         }
-        s2[pp2.player.toLowerCase()]=1;
-        ls2.push(pp2);
       }
-      legs=ls2;
+      choose(0,[]);
+      return best;
     }
-    if(legs.length<2){ return; }
+
+    // Try 3-leg first, fall back to 2-leg — show something if props exist
+    var legs=findLotdCombo(3, lotdSearch);
+    if(!legs) legs=findLotdCombo(2, lotdSearch);
+    // Last resort: take top-2 by value if combo search found nothing under +400
+    if(!legs) legs=pool.slice(0,2);
+
+    if(!legs||legs.length<2){ return; }
     var dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-    // Hard cap: combined parlay must be ≤ +400 (5.0 decimal). If legs combined to something
-    // wilder (e.g. because alternate longshot lines slipped through), show no LOTD today.
-    if(dec>5.0){
-      var noLotd=el("div","card card-lotd");
-      noLotd.innerHTML=
-        '<div class="card-h"><span class="tag tag-p">Lay of the Day</span>'+
-        '<span class="market" style="color:var(--mut2)">No Lay of the Day</span></div>'+
-        '<div class="pname" style="color:var(--mut2);font-weight:400;font-size:14px">'+
-          'No qualifying parlay today.'+
-        '</div>'+
-        '<div class="analysis">'+
-          'We couldn\'t build a ≤+400 parlay from today\'s available props. Check back as more lines post.'+
-        '</div>';
-      mount.innerHTML=""; mount.appendChild(noLotd); return;
-    }
     var amOdds=decToA(dec);
     var payout=Math.round(dec*100-100);
     var legHtml=legs.map(function(l,i){
@@ -2262,8 +2276,10 @@ async function mlbGameLog(id){
           if(v!=null){
             vals.push(Number(v));
             var dt=sp.date||(sp.game&&sp.game.gameDate)||"";
-            var m=dt.match(/\d{4}-(\d{2})-(\d{2})/);
-            dates.push(m?parseInt(m[1])+"/"+parseInt(m[2]):"");
+            var mDate=dt.match(/(\d{4}-\d{2}-\d{2})/);
+            // Store full ISO "2024-05-15" — new Date() parses it correctly for daysRest.
+            // Chart labels format it to "M/D" for display (see drawAnalyzeCharts).
+            dates.push(mDate?mDate[1]:"");
           }
         });
         if(vals.length){
@@ -2690,7 +2706,12 @@ function drawAnalyzeCharts(p,pdLine,vals,seasonAvg,hitRate,dates,isOver,confPct,
     if(c1 && vals.length){
       var rv=vals.slice(0,15).reverse();
       var rd=(dates||[]).slice(0,15).reverse();
-      var lbls=rv.map(function(_,i){ return rd[i]||String(i+1); });
+      var lbls=rv.map(function(_,i){
+        var d=rd[i]||"";
+        // Full ISO "2024-05-15" → compact "5/15" for chart axis labels
+        var mLbl=d.match(/\d{4}-(\d{2})-(\d{2})/);
+        return mLbl?parseInt(mLbl[1])+"/"+parseInt(mLbl[2]):(d||String(i+1));
+      });
       // Book line dashed overlay if different from PD line
       var datasets=[
         {data:rv,backgroundColor:rv.map(function(v){ return (isOv?v>line:v<line)?"#00ff87":"#ff4f4f"; }),borderRadius:3,barThickness:12,order:2},
@@ -2878,79 +2899,105 @@ function closeParlay(){ $("parlayModal").classList.remove("open"); }
 function generateParlay(){
   if(!ST.props.length){ $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Load a game and prop market first.</div>'; return; }
   var target=parseFloat($("targetOdds").value);
-  var hasTarget=(!isNaN(target) && target>0);
-  var pool=ST.props.filter(function(p){ return p.bestOdds!=null; }).slice();
-  pool.sort(function(a,b){ return b.value-a.value; });
+  var hasTarget=(!isNaN(target)&&target>0);
 
-  // Build initial legs by value
-  var seen={}, legs=[];
-  for(var i=0;i<pool.length && legs.length<parlayLegs;i++){
-    var p=pool[i]; var nk=p.player.toLowerCase(); if(seen[nk]) continue; seen[nk]=1; legs.push(p);
+  // Pool: valid odds + minimum value score (PARLAY_MIN_SCORE, not the stricter POTD floor)
+  // De-duplicate by player name so one player can't appear twice
+  var seenPl={}, pool=[];
+  ST.props
+    .filter(function(p){ return p.bestOdds!=null && p.value>=PARLAY_MIN_SCORE; })
+    .sort(function(a,b){ return b.value-a.value; })
+    .forEach(function(p){
+      var k=p.player.toLowerCase();
+      if(!seenPl[k]){ seenPl[k]=1; pool.push(p); }
+    });
+
+  // "No Parlay Today" is reserved for truly empty boards — if props exist, we always build
+  if(pool.length<2){
+    $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Not enough props (score ≥'+PARLAY_MIN_SCORE+') to build a parlay. Load more markets or wait for lines to open.</div>';
+    return;
   }
-  if(legs.length<2){ $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Not enough distinct players in this market. Try loading a different prop type.</div>'; return; }
 
+  var MAX_DEC=5.0; // +400 cap for the combination search
+  var n=Math.min(parlayLegs, pool.length);
+  // Cap search pool for performance: C(30,3)=4060, C(30,4)=27405 — both fast
+  var searchCap=n<=4?30:pool.length;
+  var searchPool=pool.slice(0, Math.min(pool.length, searchCap));
+
+  // Exhaustive combination search: find the best n-leg combo within MAX_DEC
+  // Returns highest-avg-value set; null if no combo fits under MAX_DEC
+  function findBestCombo(legCount, candidates){
+    if(candidates.length<legCount) return null;
+    var best=null, bestScore=-Infinity;
+    function choose(start, chosen){
+      if(chosen.length===legCount){
+        var dec=1;
+        for(var ii=0;ii<chosen.length;ii++) dec*=aToDec(chosen[ii].bestOdds);
+        if(dec>MAX_DEC) return; // over cap, skip
+        var sc=0;
+        for(var jj=0;jj<chosen.length;jj++) sc+=chosen[jj].value;
+        var avg2=sc/legCount;
+        // Bonus for landing in the sweet spot (+150 to +400)
+        var bonus=(dec>=aToDec(150))?10:0;
+        var rank=avg2+bonus;
+        if(rank>bestScore){ bestScore=rank; best=chosen.slice(); }
+        return;
+      }
+      var remaining=legCount-chosen.length;
+      for(var i=start;i<=candidates.length-remaining;i++){
+        chosen.push(candidates[i]);
+        choose(i+1, chosen);
+        chosen.pop();
+      }
+    }
+    choose(0,[]);
+    return best;
+  }
+
+  var legs=null;
+  if(n<=4){
+    // For 2-4 legs: try combination search within +400
+    legs=findBestCombo(n, searchPool);
+    // If n>2 and no combo fits under +400, try 2-leg fallback
+    if(!legs && n>2) legs=findBestCombo(2, searchPool);
+    // If still nothing, take top-n by value regardless of odds cap
+    // (props at normal prices will rarely exceed +400 for 2 legs anyway)
+    if(!legs) legs=pool.slice(0, n);
+  } else {
+    // Large leg counts (5+): combination search impractical — greedy top-N is fine
+    // Users selecting 5+ legs understand the parlay will be a longshot
+    legs=pool.slice(0, n);
+  }
+
+  if(!legs||legs.length<2){
+    $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Not enough distinct players for this market. Try a different prop type.</div>';
+    return;
+  }
+
+  // Apply target-odds adjustment if user specified one
   if(hasTarget){
     var targetDec=aToDec(target);
-    var dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-    // If current odds are too high, swap in lower-odds legs to approach target
+    var curDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
     var maxPasses=20;
-    while(maxPasses-->0 && dec>targetDec*1.25 && legs.length>1){
-      // Find leg with highest (most speculative) odds
+    while(maxPasses-->0 && curDec>targetDec*1.25 && legs.length>1){
       var worstIdx=0;
       for(var j=1;j<legs.length;j++){ if(aToDec(legs[j].bestOdds)>aToDec(legs[worstIdx].bestOdds)) worstIdx=j; }
-      // Find best replacement with lower odds that isn't already in legs
       var replaced=false;
       for(var k=0;k<pool.length;k++){
         var cand=pool[k];
-        var already=false; for(var m=0;m<legs.length;m++) if(legs[m].player===cand.player) already=true;
+        var already=false; for(var mm=0;mm<legs.length;mm++) if(legs[mm].player===cand.player) already=true;
         if(already) continue;
         if(aToDec(cand.bestOdds)<aToDec(legs[worstIdx].bestOdds)){
           legs[worstIdx]=cand;
-          dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
+          curDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
           replaced=true; break;
         }
       }
       if(!replaced) break;
     }
-    // If still below target (odds too low), we accept it — never inflate to hit a longshot target
   }
 
-  var MAX_DEC=aToDec(400); // 5.0 decimal — never surface above +400
   var finalDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-
-  // Hard cap: if still over +400, swap highest-odds legs for lower-probability plays
-  var capPasses=25;
-  while(capPasses-->0 && finalDec>MAX_DEC && legs.length>1){
-    var worstIdx=0;
-    for(var jj=1;jj<legs.length;jj++){ if(aToDec(legs[jj].bestOdds)>aToDec(legs[worstIdx].bestOdds)) worstIdx=jj; }
-    var swapped=false;
-    for(var kk=0;kk<pool.length;kk++){
-      var cand2=pool[kk];
-      var alreadyIn=false; for(var mm=0;mm<legs.length;mm++) if(legs[mm].player===cand2.player) alreadyIn=true;
-      if(alreadyIn) continue;
-      if(aToDec(cand2.bestOdds)<aToDec(legs[worstIdx].bestOdds)){
-        legs[worstIdx]=cand2;
-        finalDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-        swapped=true; break;
-      }
-    }
-    if(!swapped) break;
-  }
-
-  // If still above +400 after all swaps, no parlay today
-  if(finalDec>MAX_DEC){
-    $("parlayResult").innerHTML=
-      '<div class="empty" style="padding:20px;text-align:center">'+
-        '<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">No Parlay Today</div>'+
-        '<div style="color:var(--mut2);font-size:13px;line-height:1.5">'+
-          'We couldn\'t build a parlay under +400 with the available lines. '+
-          'The current board doesn\'t have enough lower-probability plays to hit our target range (+150 to +400). '+
-          'Check back as lines update.'+
-        '</div>'+
-      '</div>';
-    return;
-  }
-
   renderParlayResult(legs,finalDec,decToA(finalDec),target);
 }
 function renderParlayResult(legs,dec,am,target){
