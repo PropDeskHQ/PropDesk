@@ -153,6 +153,23 @@ tbody tr.prow:hover{background:var(--surf2)}
 .vs b{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
 .vs .vt{font-size:9px;font-weight:800;letter-spacing:.5px}
 .t-lock{color:#ffd700} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:#b8f5d4} .t-fair{color:var(--mut2)} .t-pass{color:var(--mut2)}
+/* PropDesk Line display */
+.pd-cell{display:flex;flex-direction:column;gap:3px}
+.pd-book-strike{font-size:11px;color:var(--mut2);text-decoration:line-through;line-height:1}
+.pd-arrow{font-size:11px;color:var(--mut2);line-height:1}
+.pd-line-val{font-size:15px;font-weight:900;line-height:1;letter-spacing:-.3px}
+.pd-line-val.over{color:var(--accent)} .pd-line-val.under{color:var(--blue)} .pd-line-val.no-val{color:var(--mut);font-size:12px;font-weight:600}
+.pd-loading{font-size:11px;color:var(--mut2);font-style:italic}
+.conf-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;width:fit-content;letter-spacing:.3px;margin-top:1px}
+.cb-strong{background:rgba(0,255,135,.15);color:var(--accent);border:1px solid rgba(0,255,135,.3)}
+.cb-mod{background:rgba(255,204,0,.12);color:var(--yellow);border:1px solid rgba(255,204,0,.3)}
+.cb-none{background:rgba(255,79,79,.1);color:#ff6b6b;border:1px solid rgba(255,79,79,.25)}
+.gap-badge{font-size:11px;font-weight:700;color:var(--accent)}
+.gap-zero{color:var(--mut2)}
+.pd-stats{font-size:11px;color:var(--mut2);display:flex;flex-direction:column;gap:2px}
+.pd-stats span{display:flex;gap:4px;align-items:center}
+.ps-lbl{color:var(--mut2)}
+.ps-val{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
 .bookcell{font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap}
 .bookcell .bk-line{font-weight:700}
 .bookcell .bk-odds{color:var(--mut);font-size:11px}
@@ -783,268 +800,206 @@ function computeBestBet(p,marketKey){
   }
 }
 
-/* VALUE SCORE 0-100
-   Phase 1 (synchronous): fixed base 50 + market quality signals
-   Phase 2 (async, enrichPropScore): player data adds/subtracts discrete amounts
-   Hard ceiling 95 | Hard floor 40 (filter, not clamp) */
-function computeValue(p){
-  var s=50; // fixed base
-  var sp=p.lineSpread||0;
-  var edge=p.edge||0;
-  var v=p.vig!=null?p.vig:6;
+/* ═══════════════════════════════════════════════════════════════════════
+   PROPDESK CONFIDENCE ENGINE v3
+   ─────────────────────────────────────────────────────────────────────
+   Phase 1 (synchronous): minimal market quality pass — base 50 ± small
+   Phase 2 (async, enrichWithConfidence): game-log hit-rate engine
+     • Weighted composite hit rate at book line (L5=40%, L10=35%, Szn=25%)
+     • If confidence <62%: Over→shift DOWN, Under→shift UP in 0.5 steps
+     • Max shift 2.0 from book line; discard if 62% never reached
+     • PropDesk Line = first line where confidence ≥62%
+     • Value score = 50 + gap×12 + conf_bonus (cap 98)
+   ═══════════════════════════════════════════════════════════════════════ */
 
-  // Spread signal — 4 tiers (drives SHARP_SPLIT flag at ≥2.0)
-  if(!p.yesNo){
-    if(sp>=2.5)      s+=7;
-    else if(sp>=2.0) s+=5;
-    else if(sp>=1.5) s+=3;
-    else if(sp>=1.0) s+=1;
-  }
-
-  // Edge (free points vs consensus) — 3 tiers
-  if(!p.yesNo){
-    if(edge>=2.0)      s+=5;
-    else if(edge>=1.0) s+=3;
-    else if(edge>=0.5) s+=1;
-  }
-
-  // Vig quality — 4 tiers (+3 to -1)
-  if(!p.yesNo){
-    if(v<4.0)      s+=3;
-    else if(v<4.5) s+=2;
-    else if(v<5.0) s+=1;
-    else if(v>5.5) s-=1;
-  }
-
-  // Book coverage — 3 tiers
-  if(!p.yesNo && p.bookCount>=5) s+=2;
-  else if(p.bookCount<3)          s-=8;
-
-  p.value=Math.round(s);
-  p.phase1Value=p.value; // preserved for line-adjustment engine
-  p.valueFlags=[];
-  p.guardrailFlags=[];
-
-  if(edge>=0.5 && !p.yesNo) p.valueFlags.push("FREE_POINTS");
-  if(sp>=2.0 && !p.yesNo)   p.valueFlags.push("SHARP_SPLIT");
-  if(v<4.5 && !p.yesNo)     p.valueFlags.push("LOW_VIG");
-  if(p.bookCount<3)          p.guardrailFlags.push("FEW_BOOKS");
-}
-
-/* Phase 2 enrichment — discrete additive/subtractive scoring model
-   Additive:  L5 gap >2 (+15), HOT 70%+ (+12), streak ≥4 (+5×floor(n/2)), form tailwind (+8), sharp split (+5 already in Phase 1)
-   Subtractive: REVIEW (-20), form contradiction (-12), L5 wrong direction (-10), DATA FLIP (-15, no-stack with REVIEW)
-   Ceiling: 95 | Floor: 40 enforced by filteredProps filter, not clamped here */
-async function enrichPropScore(p){
-  try{
-    var gl=await getGameLog(p.player);
-    if(!gl||!gl.values||gl.values.length<3) return;
-    var vals=gl.values;
-    var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
-    if(!line) return;
-    var isOver=p.side==="Over";
-
-    if(vals.length<10 && p.guardrailFlags.indexOf("THIN_DATA")<0)
-      p.guardrailFlags.push("THIN_DATA");
-
-    // ---- Weighted composite hit rate: L5=35%, L14=20%, Season=10% ----
-    function sliceHR(n){
-      var sl=vals.slice(0,Math.min(n,vals.length));
-      if(!sl.length) return null;
-      return sl.filter(function(v){return isOver?v>line:v<line;}).length/sl.length;
-    }
-    var l5Hr=sliceHR(5),l14Hr=sliceHR(14),sznHr=sliceHR(vals.length);
-    var wTot=(l5Hr!=null?0.35:0)+(l14Hr!=null?0.20:0)+(sznHr!=null?0.10:0);
-    var cHr=wTot>0?((l5Hr!=null?0.35*l5Hr:0)+(l14Hr!=null?0.20*l14Hr:0)+(sznHr!=null?0.10*sznHr:0))/wTot:null;
-    if(cHr!=null) p.hitRate14=+(cHr*100).toFixed(1);
-
-    // ---- Recent averages ----
-    p.l5Avg=vals.length>=1?avg(vals.slice(0,Math.min(5,vals.length))):null;
-    p.l14Avg=vals.length>=1?avg(vals.slice(0,Math.min(14,vals.length))):null;
-    p.l7Avg=avg(vals.slice(0,Math.min(7,vals.length)));
-    p.seasonAvgEnrich=gl.seasonAvg!=null?gl.seasonAvg:avg(vals);
-
-    // ---- Streak: consecutive hits on current side ----
-    var streak=0;
-    for(var i=0;i<vals.length;i++){
-      var hit=isOver?vals[i]>line:vals[i]<line;
-      if(i===0){streak=hit?1:-1;continue;}
-      if(hit&&streak>0)streak++;
-      else if(!hit&&streak<0)streak--;
-      else break;
-    }
-    p.streak=streak;
-
-    // ---- Form direction (L5 vs season avg) ----
-    var formUp=p.l5Avg!=null&&p.seasonAvgEnrich&&p.l5Avg>p.seasonAvgEnrich*1.05;
-    var formDown=p.l5Avg!=null&&p.seasonAvgEnrich&&p.l5Avg<p.seasonAvgEnrich*0.95;
-    var formContradicts=(isOver&&formDown)||(!isOver&&formUp);
-
-    // ---- L5 vs line gap and direction check ----
-    var l5Gap=p.l5Avg!=null?(isOver?p.l5Avg-line:line-p.l5Avg):0; // positive = supports our side
-    var l5WrongDir=p.l5Avg!=null&&((!isOver&&p.l5Avg>line)||(isOver&&p.l5Avg<line));
-
-    // ---- DATA FLIP: weighted hit rate data clearly favors other side ----
-    function sliceHROther(n){
-      var sl=vals.slice(0,Math.min(n,vals.length));
-      if(!sl.length) return null;
-      return sl.filter(function(v){return isOver?v<line:v>line;}).length/sl.length;
-    }
-    var ol5=sliceHROther(5),ol14=sliceHROther(14),oszn=sliceHROther(vals.length);
-    var owTot=(ol5!=null?0.35:0)+(ol14!=null?0.20:0)+(oszn!=null?0.10:0);
-    var oHr=owTot>0?((ol5!=null?0.35*ol5:0)+(ol14!=null?0.20*ol14:0)+(oszn!=null?0.10*oszn:0))/owTot:null;
-    var dataFlipCond=!p.yesNo&&!l5WrongDir&&oHr!=null&&cHr!=null&&oHr>=0.60&&cHr<0.52&&(oHr-cHr)>=0.12;
-
-    // ---- REVIEW: sharp split + form contradiction + no explicit L5 direction signal ----
-    var hasSharSplit=p.valueFlags.indexOf("SHARP_SPLIT")>=0;
-    var reviewCond=hasSharSplit&&formContradicts&&!l5WrongDir;
-    if(reviewCond && p.guardrailFlags.indexOf("REVIEW")<0) p.guardrailFlags.push("REVIEW");
-    if(dataFlipCond && !reviewCond && p.guardrailFlags.indexOf("DATA_FLIP")<0) p.guardrailFlags.push("DATA_FLIP");
-
-    // ================================================================
-    // DISCRETE SCORE ADJUSTMENTS (spec v3 — granular tiers)
-    // ================================================================
-    var adj=0;
-
-    // L5 gap — 3 tiers (ensures different gaps produce different scores)
-    if(l5Gap>=3)       adj+=16;
-    else if(l5Gap>=2)  adj+=11;
-    else if(l5Gap>=1)  adj+=5;
-
-    // Composite hit rate — 4 tiers (no more binary HOT/not-HOT)
-    if(cHr!=null){
-      if(cHr>=0.70)      adj+=12;
-      else if(cHr>=0.60) adj+=5;
-      else if(cHr<0.45)  adj-=6;
-    }
-
-    // Streak — 3 tiers up, 2 tiers down (each level is a distinct impact)
-    if(streak>=6)       adj+=15;
-    else if(streak>=4)  adj+=10;
-    else if(streak===3) adj+=5;
-    else if(streak<=-4) adj-=12;
-    else if(streak===-3) adj-=6;
-
-    // Form direction
-    if(isOver&&formUp)   adj+=8;   // FORM↑ on Over = tailwind
-    if(!isOver&&formDown) adj+=8;  // FORM↓ on Under = tailwind
-
-    // Subtractive signals (REVIEW and DATA_FLIP no-stack)
-    if(reviewCond)        adj-=20;
-    else if(dataFlipCond) adj-=15;
-    if(formContradicts)   adj-=12;
-    if(l5WrongDir)        adj-=10;
-
-    p.value=Math.min(95,Math.round(p.value+adj)); // ceiling 95; floor enforced by filteredProps
-    p.enriched=true;
-
-    // ---- Flags ----
-    if(l5Gap>2&&p.valueFlags.indexOf("GAP_L5")<0)         p.valueFlags.push("GAP_L5");
-    if(cHr!=null&&cHr>=0.70&&p.valueFlags.indexOf("HOT_RATE")<0) p.valueFlags.push("HOT_RATE");
-    if(streak>=4&&!p.valueFlags.some(function(f){return f.indexOf("STREAK_")===0;}))
-      p.valueFlags.push("STREAK_"+streak);
-    if(streak<=-3&&p.guardrailFlags.indexOf("COLD_STREAK")<0) p.guardrailFlags.push("COLD_STREAK");
-    if(formUp){
-      if(isOver&&p.valueFlags.indexOf("FORM_UP")<0)          p.valueFlags.push("FORM_UP");
-      else if(!isOver&&p.guardrailFlags.indexOf("FORM_UP")<0) p.guardrailFlags.push("FORM_UP");
-    }
-    if(formDown){
-      if(!isOver&&p.valueFlags.indexOf("FORM_DOWN")<0)         p.valueFlags.push("FORM_DOWN");
-      else if(isOver&&p.guardrailFlags.indexOf("FORM_DOWN")<0)  p.guardrailFlags.push("FORM_DOWN");
-    }
-
-    // ---- Line adjustment engine: if score <50 and no blocking flags, try shifting ----
-    if(p.value<50&&!p.yesNo&&!reviewCond&&!dataFlipCond){
-      var adj2=tryLineAdjust(p,vals,line,isOver,formUp,formDown,hasSharSplit);
-      if(adj2){
-        p.value=adj2.score;
-        p.adjustedLine=adj2.line;
-        if(p.valueFlags.indexOf("LINE_ADJ")<0) p.valueFlags.push("LINE_ADJ");
-      }
-    }
-
-    updatePropValueDisplay(p);
-  }catch(e){}
-}
-
-/* scoreAtLine: re-compute Phase 2 enrichment at a hypothetical line.
-   Returns the capped score (ceiling 95) at that line, using the same discrete model. */
-function scoreAtLine(testLine,vals,isOver,formUp,formDown,hasSharSplit,phase1Score){
-  if(!vals||!vals.length) return phase1Score;
-  function hr(n){
+// Weighted composite confidence player hits the prop at a given line
+// isOver=true → "hit" means val > line; isOver=false → val < line
+function compositeConf(vals, line, isOver){
+  if(!vals||vals.length<3) return null;
+  function sliceHR(n){
     var sl=vals.slice(0,Math.min(n,vals.length));
     if(!sl.length) return null;
-    return sl.filter(function(v){return isOver?v>testLine:v<testLine;}).length/sl.length;
+    return sl.filter(function(v){ return isOver?v>line:v<line; }).length/sl.length;
   }
-  var l5=hr(5),l14=hr(14),szn=hr(vals.length);
-  var wt=(l5!=null?0.35:0)+(l14!=null?0.20:0)+(szn!=null?0.10:0);
-  var cHr=wt>0?((l5!=null?0.35*l5:0)+(l14!=null?0.20*l14:0)+(szn!=null?0.10*szn:0))/wt:null;
-
-  var streak=0;
-  for(var i=0;i<vals.length;i++){
-    var hit=isOver?vals[i]>testLine:vals[i]<testLine;
-    if(i===0){streak=hit?1:-1;continue;}
-    if(hit&&streak>0)streak++;else if(!hit&&streak<0)streak--;else break;
-  }
-  var l5avg=vals.length?vals.slice(0,Math.min(5,vals.length)).reduce(function(a,b){return a+b;},0)/Math.min(5,vals.length):null;
-  var l5Gap=l5avg!=null?(isOver?l5avg-testLine:testLine-l5avg):0;
-  var l5WrongDir=l5avg!=null&&((!isOver&&l5avg>testLine)||(isOver&&l5avg<testLine));
-  var formContradicts=(isOver&&formDown)||(!isOver&&formUp);
-  var reviewCond=hasSharSplit&&formContradicts&&!l5WrongDir;
-
-  var adj=0;
-  // L5 gap — 3 tiers (mirror enrichPropScore)
-  if(l5Gap>=3)       adj+=16;
-  else if(l5Gap>=2)  adj+=11;
-  else if(l5Gap>=1)  adj+=5;
-  // Hit rate — 4 tiers
-  if(cHr!=null){
-    if(cHr>=0.70)      adj+=12;
-    else if(cHr>=0.60) adj+=5;
-    else if(cHr<0.45)  adj-=6;
-  }
-  // Streak — 3 up / 2 down
-  if(streak>=6)        adj+=15;
-  else if(streak>=4)   adj+=10;
-  else if(streak===3)  adj+=5;
-  else if(streak<=-4)  adj-=12;
-  else if(streak===-3) adj-=6;
-  // Form
-  if(isOver&&formUp)    adj+=8;
-  if(!isOver&&formDown) adj+=8;
-  // Negatives
-  if(reviewCond)        adj-=20;
-  if(formContradicts)   adj-=12;
-  if(l5WrongDir)        adj-=10;
-  return Math.min(95,phase1Score+adj);
+  var r5=vals.length>=5?sliceHR(5):null;
+  var r10=vals.length>=7?sliceHR(10):null;
+  var rAll=sliceHR(vals.length);
+  var w5=r5!=null?0.40:0, w10=r10!=null?0.35:0, wA=0.25;
+  var tot=w5+w10+wA;
+  if(!tot) return null;
+  return ((r5||0)*w5+(r10||0)*w10+(rAll||0)*wA)/tot;
 }
 
-/* tryLineAdjust: shifts line 0.5 at a time up to 2.0 from consensus.
-   Under → DOWN (tighter threshold, tests real confidence).
-   Over  → UP   (higher threshold, tests genuine upside conviction).
-   Returns {score, line} at first step that reaches ≥60, or null if never achieved. */
-function tryLineAdjust(p,vals,origLine,isOver,formUp,formDown,hasSharSplit){
-  var phase1=p.phase1Value!=null?p.phase1Value:50;
-  var dir=isOver?0.5:-0.5; // Over → raise line; Under → lower line
+// Find PropDesk Line: shift until confidence ≥62% or 2.0 max from book
+// Over → shift DOWN (lower threshold = easier to exceed)
+// Under → shift UP  (higher threshold = easier to stay under)
+function findPropDeskLine(vals, bookLine, isOver){
+  var TARGET=0.62;
+  var confAtBook=compositeConf(vals,bookLine,isOver);
+  if(confAtBook===null) return null;
+  if(confAtBook>=TARGET) return {line:bookLine,confidence:confAtBook,gap:0,confAtBook:confAtBook};
+  var dir=isOver?-0.5:0.5;
   for(var step=1;step<=4;step++){
-    var testLine=Math.round((origLine+dir*step)*2)/2; // keep to clean 0.5 increments
-    var sc=scoreAtLine(testLine,vals,isOver,formUp,formDown,hasSharSplit,phase1);
-    if(sc>=50) return{score:sc,line:testLine};
+    var testLine=Math.round((bookLine+dir*step)*2)/2;
+    var conf=compositeConf(vals,testLine,isOver);
+    if(conf!==null&&conf>=TARGET) return {line:testLine,confidence:conf,gap:step*0.5,confAtBook:confAtBook};
   }
-  return null;
+  return null; // NO VALUE — never reached 62% within 2.0 shift
+}
+
+// Value score: gap is primary driver, confidence above 62% adds premium
+function pdValueScore(gap, confidence){
+  var base=50;
+  var gapPts=Math.round(gap*12);                             // 0=0, 0.5=+6, 1.0=+12, 2.0=+24
+  var confPts=Math.round(Math.max(0,confidence-0.62)*130);   // 0→49 pts
+  return Math.min(98, base+gapPts+confPts);
+}
+
+// Phase 1: minimal market quality scaffold (real scoring deferred to Phase 2)
+function computeValue(p){
+  var sp=p.lineSpread||0;
+  var v=p.vig!=null?p.vig:6;
+  var s=50;
+  if(!p.yesNo){
+    if(sp>=2.5)      s+=5;
+    else if(sp>=2.0) s+=3;
+    else if(sp>=1.0) s+=1;
+    if(v<4.5)        s+=2;
+    else if(v>5.5)   s-=1;
+    if(p.bookCount>=5) s+=2;
+    else if(p.bookCount<3) s-=6;
+  }
+  p.value=Math.round(s);
+  p.phase1Value=p.value;
+  p.valueFlags=[];
+  p.guardrailFlags=[];
+  if(sp>=2.0&&!p.yesNo)   p.valueFlags.push("SHARP_SPLIT");
+  if(v<4.5&&!p.yesNo)     p.valueFlags.push("LOW_VIG");
+  if(p.bookCount<3)        p.guardrailFlags.push("FEW_BOOKS");
+  p.pdResult=null;
+}
+
+// Phase 2: full confidence analysis using real game log
+async function enrichWithConfidence(p){
+  try{
+    var gl=await getGameLog(p.player);
+    if(!gl||!gl.values||gl.values.length<3){ p.enriched=true; updatePropValueDisplay(p); return; }
+    var vals=gl.values;
+    var bookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
+    if(!bookLine){ p.enriched=true; updatePropValueDisplay(p); return; }
+
+    // Store recent averages for chart use
+    p.l5Avg=avg(vals.slice(0,Math.min(5,vals.length)));
+    p.l14Avg=avg(vals.slice(0,Math.min(14,vals.length)));
+    p.seasonAvgEnrich=gl.seasonAvg!=null?gl.seasonAvg:avg(vals);
+    p._vals=vals;
+    p._dates=gl.dates||[];
+
+    if(vals.length<8&&p.guardrailFlags.indexOf("THIN_DATA")<0)
+      p.guardrailFlags.push("THIN_DATA");
+
+    // Run both directions independently; pick whichever has higher value score
+    var overResult=findPropDeskLine(vals,bookLine,true);
+    var underResult=findPropDeskLine(vals,bookLine,false);
+    var overScore=overResult?pdValueScore(overResult.gap,overResult.confidence):0;
+    var underScore=underResult?pdValueScore(underResult.gap,underResult.confidence):0;
+
+    if(!overScore&&!underScore){
+      p.pdResult=null; p.pdNoValue=true; p.value=0; p.enriched=true;
+      updatePropValueDisplay(p); return;
+    }
+
+    var best, bestScore;
+    if(overScore>=underScore){ best=overResult; bestScore=overScore; p.pdSide="Over"; }
+    else                     { best=underResult; bestScore=underScore; p.pdSide="Under"; }
+
+    p.pdResult=best;
+    p.pdLine=best.line;
+    p.pdGap=best.gap;
+    p.pdConfidence=best.confidence;
+    p.pdConfAtBook=best.confAtBook;
+    p.hitRate14=+(best.confidence*100).toFixed(1);
+    p.value=bestScore;
+    p.enriched=true;
+
+    // Streak on PropDesk line
+    var streak=0;
+    for(var i=0;i<vals.length;i++){
+      var hit=p.pdSide==="Over"?vals[i]>p.pdLine:vals[i]<p.pdLine;
+      if(i===0){streak=hit?1:-1;continue;}
+      if(hit&&streak>0)streak++; else if(!hit&&streak<0)streak--; else break;
+    }
+    p.streak=streak;
+    if(streak>=3&&!p.valueFlags.some(function(f){return f.indexOf("STREAK_")===0;}))
+      p.valueFlags.push("STREAK_"+streak);
+    if(streak<=-3&&p.guardrailFlags.indexOf("COLD_STREAK")<0)
+      p.guardrailFlags.push("COLD_STREAK");
+
+    // Hit rate at PropDesk line
+    p.hitRatePd=vals.length?vals.filter(function(v){
+      return p.pdSide==="Over"?v>p.pdLine:v<p.pdLine;
+    }).length/vals.length:0;
+
+    // LINE_ADJ flag if PropDesk line differs from book line
+    if(p.pdGap>0&&p.valueFlags.indexOf("LINE_ADJ")<0) p.valueFlags.push("LINE_ADJ");
+
+    updatePropValueDisplay(p);
+    updatePropPDDisplay(p);
+  }catch(e){}
 }
 
 function updatePropValueDisplay(p){
   var node=document.getElementById("vsc-"+p._id);
   if(!node) return;
   var tier=tierOf(p.value);
-  // Cancel any running countUp before updating, then re-animate from current display value
   var cur=parseInt(node.textContent,10)||0;
   node.className=tier.c;
   var vt=node.nextElementSibling;
   if(vt&&vt.classList&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
-  countUp(node,p.value,0,cur); // from=cur cancels old frame and re-animates correctly
+  countUp(node,p.value,0,cur);
   applyPropFlags(p);
+}
+
+// Update the PropDesk Line cell once confidence engine finishes
+function updatePropPDDisplay(p){
+  var cell=document.getElementById("pdcell-"+p._id);
+  if(!cell) return;
+  if(!p.pdResult){
+    cell.innerHTML='<span class="pd-line-val no-val">NO VALUE</span>';
+    return;
+  }
+  var bookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:"-");
+  var pdLine=p.pdLine;
+  var conf=p.pdConfidence;
+  var confPct=Math.round(conf*100);
+  var side=p.pdSide||"Over";
+  var sideLow=side.toLowerCase();
+  var cbCls=conf>=0.65?"cb-strong":conf>=0.62?"cb-mod":"cb-none";
+  var gapHtml="";
+  if(p.pdGap>0){
+    gapHtml='<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>';
+  } else {
+    gapHtml='<span class="gap-zero">at book line</span>';
+  }
+  cell.innerHTML=
+    '<div class="pd-cell">'+
+      '<div style="display:flex;gap:6px;align-items:baseline">'+
+        '<span class="pd-book-strike">'+esc(""+bookLine)+'</span>'+
+        '<span class="pd-arrow">→</span>'+
+        '<span class="pd-line-val '+sideLow+'">'+esc(side+' '+pdLine)+'</span>'+
+      '</div>'+
+      '<span class="conf-badge '+cbCls+'">'+confPct+'% confidence</span>'+
+      gapHtml+
+    '</div>';
+  // Also update the mini stat row if visible
+  var statsRow=document.getElementById("pdstats-"+p._id);
+  if(statsRow){
+    var l5=p.l5Avg!=null?p.l5Avg.toFixed(1):"-";
+    var szn=p.seasonAvgEnrich!=null?p.seasonAvgEnrich.toFixed(1):"-";
+    statsRow.innerHTML=
+      '<span><span class="ps-lbl">L5:</span><span class="ps-val">'+esc(l5)+'</span></span>'+
+      '<span><span class="ps-lbl">Szn:</span><span class="ps-val">'+esc(szn)+'</span></span>';
+  }
 }
 
 function applyPropFlags(p){
@@ -1139,12 +1094,15 @@ function clearBoard(){_potgCache={};
 /* ============ LOAD BOARD ============ */
 function skeletonTable(){
   var bookCols=ST.book?1:0;
-  var h='<div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Best Bet</th><th>EV%</th><th>Value</th>';
+  var h='<div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>L5 / Szn</th><th>EV%</th><th>Value</th>';
   for(var i=0;i<bookCols;i++) h+='<th>Book</th>';
   h+='</tr></thead><tbody>';
   for(var r=0;r<8;r++){
     h+='<tr><td><div class="skel" style="width:120px"></div><div class="skel" style="width:70px;margin-top:6px;height:10px"></div></td>'+
-       '<td><div class="skel" style="width:70px"></div></td><td><div class="skel" style="width:40px"></div></td>'+
+       '<td><div class="skel" style="width:70px"></div></td>'+
+       '<td><div class="skel" style="width:100px"></div><div class="skel" style="width:70px;margin-top:5px;height:10px"></div></td>'+
+       '<td><div class="skel" style="width:50px"></div></td>'+
+       '<td><div class="skel" style="width:40px"></div></td>'+
        '<td><div class="skel" style="width:34px;height:18px"></div></td>';
     for(var c=0;c<bookCols;c++) h+='<td><div class="skel" style="width:70px"></div></td>';
     h+='</tr>';
@@ -1304,8 +1262,8 @@ async function loadLOTD(){
     (LOTD_MARKETS[ST.sport]||[getMarket()]).forEach(function(mk){
       parseProps(data,mk).forEach(function(p){ p._lotdMk=mk; pool.push(p); });
     });
-    // Exclude yes/no markets and low-quality lines; Phase 1 scores used here so keep threshold realistic
-    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.value>=50; });
+    // Exclude yes/no markets and props without a valid book line
+    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null && p.value>=44; });
     pool.sort(function(a,b){ return b.value-a.value; });
     // Target: 3 legs, combined American odds <= +400 (~5.0 decimal)
     // For 3 legs under +400 each leg should be priced near -141 or shorter
@@ -1383,7 +1341,10 @@ function lotdText(legs,amOdds){
 function filteredProps(){
   var q=($("searchIn").value||"").toLowerCase().trim();
   return ST.props.filter(function(p){
-    if(p.value<50) return false;
+    // Once enriched: only show props that have a valid PropDesk Line
+    if(p.enriched && p.pdNoValue) return false;
+    // Before enrichment: hide clearly low-quality market props
+    if(!p.enriched && p.value<44) return false;
     return !q || p.player.toLowerCase().indexOf(q)>=0;
   });
 }
@@ -1399,7 +1360,7 @@ function renderTable(silent){
   var props=filteredProps();
   var cols=bookColumns();
   $("resCount").textContent=props.length+" prop"+(props.length===1?"":"s");
-  var thead='<tr><th>Player</th><th>Best Bet</th><th>EV%</th><th>Value</th>';
+  var thead='<tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>L5 / Szn</th><th>EV%</th><th>Value</th>';
   cols.forEach(function(b){ thead+='<th>'+esc(b)+'</th>'; });
   thead+='</tr>';
   var tb="";
@@ -1413,29 +1374,57 @@ function renderTable(silent){
   } else {
     props.forEach(function(p){ var node=document.getElementById("vsc-"+p._id); if(node) node.textContent=p.value; });
   }
-  /* re-apply meta, quick stats, and value flags we already loaded */
+  /* re-apply meta, quick stats, value flags, and PropDesk cells already loaded */
   props.forEach(function(p){ if(p._meta!=null) applyMeta(p); });
   props.forEach(function(p){ if(p._quickStats!=null) applyQuickStats(p); });
   props.forEach(function(p){ if(p.valueFlags) applyPropFlags(p); });
+  props.forEach(function(p){ if(p.enriched) updatePropPDDisplay(p); });
   bindRowActions();
 }
 
 function rowHtml(p,cols,idx,silent){
   if(p._id==null) p._id=Math.random().toString(36).slice(2,9);
   var tier=tierOf(p.value);
-  var dispLine=p.adjustedLine!=null?p.adjustedLine:p.bestLine;
-  var bb=p.side+(dispLine!=null?" "+dispLine:"");
+  // Book line display (left column — what the book is offering)
+  var bookLine=p.bestLine!=null?p.bestLine:"";
   var bbcls=p.side==="Under"?"under":(p.side==="Yes"?"yes":"over");
+  var bb=p.side+(bookLine!==""?" "+bookLine:"");
   var ev=p.evOver;
   var evHtml=(ev==null)?'<span class="ev">-</span>':'<span class="ev '+(ev>=0?"pos":"neg")+'">'+(ev>=0?"+":"")+ev.toFixed(1)+'%</span>';
-  // Show existing meta, a dash if loaded-but-empty, or nothing while pending (no "loading..." flash)
-  var meta=p._metaLoaded ? (p._meta ? esc(p._meta) : '') : '';
+  var meta=p._metaLoaded?(p._meta?esc(p._meta):''):'';
   var rcls="prow"+(silent?"":" rowin");
-  // idx=0 gets a tiny delay so fill-mode:both never leaves it stuck at opacity:0
   var delayMs=silent?0:(idx===0?16:idx*28);
   var style=silent?"":'style="animation-delay:'+delayMs+'ms"';
+
+  // PropDesk Line cell — populated by updatePropPDDisplay once enriched
+  var pdCellContent;
+  if(p.pdResult){
+    // Already have enriched result — render immediately
+    var confPct=Math.round(p.pdConfidence*100);
+    var side=p.pdSide||"Over";
+    var sideLow=side.toLowerCase();
+    var cbCls=p.pdConfidence>=0.65?"cb-strong":p.pdConfidence>=0.62?"cb-mod":"cb-none";
+    var gapHtml=p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>';
+    pdCellContent=
+      '<div class="pd-cell">'+
+        '<div style="display:flex;gap:6px;align-items:baseline">'+
+          '<span class="pd-book-strike">'+esc(""+bookLine)+'</span>'+
+          '<span class="pd-arrow">→</span>'+
+          '<span class="pd-line-val '+sideLow+'">'+esc(side+' '+p.pdLine)+'</span>'+
+        '</div>'+
+        '<span class="conf-badge '+cbCls+'">'+confPct+'% confidence</span>'+
+        gapHtml+
+      '</div>';
+  } else if(p.pdNoValue){
+    pdCellContent='<span class="pd-line-val no-val">NO VALUE</span>';
+  } else {
+    pdCellContent='<span class="pd-loading">analyzing…</span>';
+  }
+
   var h='<tr class="'+rcls+'" '+style+' data-pid="'+p._id+'">'+
-    '<td><div class="pl-name">'+esc(p.player)+'</div><div class="pl-meta" id="meta-'+p._id+'">'+meta+'</div>'+
+    '<td>'+
+      '<div class="pl-name">'+esc(p.player)+'</div>'+
+      '<div class="pl-meta" id="meta-'+p._id+'">'+meta+'</div>'+
       '<div class="pl-qstats" id="qstats-'+p._id+'"></div>'+
       '<div class="pl-flags" id="flags-'+p._id+'"></div>'+
       '<div class="pl-acts">'+
@@ -1443,8 +1432,16 @@ function rowHtml(p,cols,idx,silent){
         '<button class="mini" data-act="stats" data-pid="'+p._id+'">More Stats</button>'+
         '<button class="mini" data-act="save" data-pid="'+p._id+'">Save</button>'+
         '<button class="mini" data-act="share" data-pid="'+p._id+'">Share</button>'+
-      '</div></td>'+
+      '</div>'+
+    '</td>'+
     '<td><span class="bb '+bbcls+'">'+esc(bb)+'</span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'</div>':'')+'</td>'+
+    '<td id="pdcell-'+p._id+'">'+pdCellContent+'</td>'+
+    '<td>'+
+      '<div class="pd-stats" id="pdstats-'+p._id+'">'+
+        (p.l5Avg!=null?'<span><span class="ps-lbl">L5:</span><span class="ps-val">'+p.l5Avg.toFixed(1)+'</span></span>':'<span class="ps-lbl">—</span>')+
+        (p.seasonAvgEnrich!=null?'<span><span class="ps-lbl">Szn:</span><span class="ps-val">'+p.seasonAvgEnrich.toFixed(1)+'</span></span>':'')+
+      '</div>'+
+    '</td>'+
     '<td>'+evHtml+'</td>'+
     '<td><span class="vs"><b id="vsc-'+p._id+'" class="'+tier.c+'">'+(silent?p.value:0)+'</b><span class="vt '+tier.c+'">'+tier.t+'</span></span></td>';
   cols.forEach(function(bk){ h+='<td>'+bookCellHtml(p,bk)+'</td>'; });
@@ -1491,8 +1488,12 @@ function bindRowActions(){
   });
 }
 function sharePick(p){
-  var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"")+(p.bestOdds!=null?" "+fmtOdds(p.bestOdds):"");
-  copyText("PropDesk Pick: "+p.player+" "+bet+" | Value: "+p.value+"/100 | propdeskhq.netlify.app");
+  var pdSide=p.pdSide||p.side;
+  var pdLine=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:"");
+  var confPct=p.pdConfidence!=null?Math.round(p.pdConfidence*100)+"% conf":"";
+  var gap=p.pdGap>0?" (Book: "+p.bestLine+" → PD: "+pdLine+")":"";
+  var bet=pdSide+(pdLine!=null?" "+pdLine:"")+(p.bestOdds!=null?" "+fmtOdds(p.bestOdds):"");
+  copyText("PropDesk Pick: "+p.player+" "+bet+gap+(confPct?" | "+confPct:"")+" | Value: "+p.value+"/100 | propdeskhq.netlify.app");
   toast("Copied!");
 }
 function copyText(txt){
@@ -1546,22 +1547,29 @@ async function renderAnalyze(p){
   var mount=$("exp-"+p._id);
   if(!mount) return;
   var gl=await getGameLog(p.player).catch(function(){return null;});
-  var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
-  var vals=gl&&gl.values?gl.values:[];
-  var dates=gl&&gl.dates?gl.dates:[];
+  var bookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
+  var vals=gl&&gl.values?gl.values:(p._vals||[]);
+  var dates=gl&&gl.dates?gl.dates:(p._dates||[]);
+  // Use PropDesk line if available; fall back to book line
+  var pdLine=p.pdLine!=null?p.pdLine:bookLine;
+  var pdSide=p.pdSide||p.side;
+  var isOver=pdSide==="Over";
   var last5=vals.slice(0,5);
-  var seasonAvg=gl&&gl.seasonAvg!=null?gl.seasonAvg:(vals.length?avg(vals):null);
-  var l5avg=last5.length?avg(last5):null;
-  var overRate=vals.length?(vals.filter(function(v){return v>line;}).length/vals.length*100):null;
+  var seasonAvg=gl&&gl.seasonAvg!=null?gl.seasonAvg:(p.seasonAvgEnrich!=null?p.seasonAvgEnrich:(vals.length?avg(vals):null));
+  var l5avg=p.l5Avg!=null?p.l5Avg:(last5.length?avg(last5):null);
+  var hitRate=vals.length?(vals.filter(function(v){ return isOver?v>pdLine:v<pdLine; }).length/vals.length*100):null;
+  var confPct=p.pdConfidence!=null?Math.round(p.pdConfidence*100):null;
   if(!mount.parentNode) return;
 
+  // Stat cards: show PropDesk line context
+  var pdLabel=p.pdLine!=null?(p.pdSide+' '+p.pdLine+(p.pdGap>0?' (adj)':'')):(p.side+' '+bookLine);
   var sc=[
-    ["Consensus", line!=null?fmtStat(line):"-"],
+    ["Book Line", p.side+" "+(bookLine||"-")],
+    ["PropDesk Line", pdLabel],
+    ["Confidence", confPct!=null?confPct+"%":"-"],
     ["Season Avg", seasonAvg!=null?fmtStat(seasonAvg):"-"],
     ["L5 Avg", l5avg!=null?fmtStat(l5avg):"-"],
-    ["Over Rate", overRate!=null?overRate.toFixed(0)+"%":"-"],
-    ["Line Spread", (p.lineSpread||0).toFixed(1)],
-    ["Lowest Vig", p.vig!=null?p.vig.toFixed(1)+"%":"-"]
+    ["Hit Rate", hitRate!=null?hitRate.toFixed(0)+"%":"-"]
   ];
   var scHtml=sc.map(function(s){ return '<div class="statcard"><div class="sc-l">'+esc(s[0])+'</div><div class="sc-v">'+esc(s[1])+'</div></div>'; }).join("");
 
@@ -1573,29 +1581,35 @@ async function renderAnalyze(p){
     ? '<div class="kelly">Kelly: bet '+(halfK*100).toFixed(1)+'% of bankroll (half-Kelly). The edge supports a measured position.</div>'
     : '<div class="kelly">Flat: 1 unit. The edge here is thin - keep stake conservative rather than scaling up.</div>';
 
+  var ch1Title='Last '+Math.min(vals.length,15)+' Games vs PropDesk Line'+(p.pdGap>0?' (Book: '+bookLine+' → PD: '+pdLine+')':'');
   mount.innerHTML=
     '<div class="subh">Snapshot</div>'+
     '<div class="statgrid">'+scHtml+'</div>'+
     '<div class="chartgrid">'+
-      '<div class="chartbox"><div class="cb-t">Last '+vals.length+' Games vs Line</div><canvas id="ch1-'+p._id+'"></canvas></div>'+
-      '<div class="chartbox"><div class="cb-t">Confidence</div><canvas id="ch2-'+p._id+'"></canvas></div>'+
+      '<div class="chartbox"><div class="cb-t">'+esc(ch1Title)+'</div><canvas id="ch1-'+p._id+'"></canvas></div>'+
+      '<div class="chartbox"><div class="cb-t">Confidence Meter</div><canvas id="ch2-'+p._id+'"></canvas></div>'+
       '<div class="chartbox"><div class="cb-t">Book Implied Probability</div><canvas id="ch3-'+p._id+'"></canvas></div>'+
-      '<div class="chartbox"><div class="cb-t">Over / Under Split</div><canvas id="ch4-'+p._id+'"></canvas></div>'+
-      '<div class="chartbox"><div class="cb-t">Season Avg vs Line</div><canvas id="ch5-'+p._id+'"></canvas></div>'+
+      '<div class="chartbox"><div class="cb-t">Hit Rate at PD Line</div><canvas id="ch4-'+p._id+'"></canvas></div>'+
+      '<div class="chartbox"><div class="cb-t">Season Avg vs PropDesk Line</div><canvas id="ch5-'+p._id+'"></canvas></div>'+
     '</div>'+
     kellyHtml+
     '<div class="subh">Verdict</div>'+
-    '<div class="verdict">'+analyzeVerdict(p,line,seasonAvg,l5avg,overRate)+'</div>';
+    '<div class="verdict">'+analyzeVerdict(p,pdLine,seasonAvg,l5avg,hitRate)+'</div>';
 
-  drawAnalyzeCharts(p,line,vals,seasonAvg,overRate,dates);
+  drawAnalyzeCharts(p,pdLine,vals,seasonAvg,hitRate,dates,isOver,confPct,bookLine);
 }
 function analyzeVerdict(p,line,seasonAvg,l5avg,overRate){
-  var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"")+(p.bestOdds!=null?" at "+fmtOdds(p.bestOdds):"");
+  var pdSide=p.pdSide||p.side;
+  var pdLine=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:line);
+  var confPct=p.pdConfidence!=null?Math.round(p.pdConfidence*100):null;
+  var bet=pdSide+(pdLine!=null?" "+pdLine:"")+(p.bestOdds!=null?" at "+fmtOdds(p.bestOdds):"");
   var tier=tierOf(p.value).t;
   var sentences=[];
 
-  // S1: Recommendation + grade
-  sentences.push("<b>"+esc(bet)+"</b> grades "+p.value+"/100 ("+tier+") — "+(p.value>=65?"a clear-cut edge worth backing":"a marginal lean; keep the stake modest")+".");
+  // S1: PropDesk Line recommendation + confidence
+  var confText=confPct!=null?" with "+confPct+"% historical confidence":"";
+  var gapText=p.pdGap>0?" (adjusted "+p.pdGap.toFixed(1)+" pts from the "+p.bestLine+" book line)":"";
+  sentences.push("<b>PropDesk Line: "+esc(pdSide+" "+pdLine)+gapText+"</b>"+confText+" — "+(p.value>=65?"a clear-cut edge worth backing":"a marginal lean; keep the stake modest")+".");
 
   // S2: Pricing edge across books
   if(!p.yesNo && p.edge>0 && p.consensus!=null){
@@ -1631,13 +1645,15 @@ function analyzeVerdict(p,line,seasonAvg,l5avg,overRate){
     sentences.push("Recent form shows a last-5 average of "+fmtStat(l5avg)+", which points "+(l5avg>(line||0)?"toward the Over":"toward the Under")+" at the "+line+" line.");
   }
 
-  // S5: Historical hit rate
+  // S5: Historical hit rate at PropDesk line
   if(overRate!=null && !p.yesNo){
-    sentences.push("Over the recent game log this player has cleared "+line+" in "+overRate.toFixed(0)+"% of appearances — "+(overRate>=60?"a strong hit rate that validates the Over bet":overRate<=40?"a rate that consistently favors the Under":"close to even historically, which means the real edge is in the price, not frequency")+".");
+    var hitLabel=pdSide==="Over"?"cleared the "+pdLine+" PropDesk line":"stayed under the "+pdLine+" PropDesk line";
+    sentences.push("Over the recent game log this player has "+hitLabel+" in "+overRate.toFixed(0)+"% of appearances — "+(overRate>=65?"a strong hit rate confirming this line has real value":overRate>=62?"above the 62% confidence threshold PropDesk requires":"this is right at the edge of our confidence threshold — size accordingly")+".");
   }
 
   // S6: Vig + closing call
-  sentences.push("Vig on this market runs "+(p.vig||0).toFixed(1)+"% and the best price is at "+(p.bestBook?esc(p.bestBook.book):"your preferred book")+". "+(p.value>=65?"Lock this in before the line adjusts toward consensus — the edge is real and demonstrable.":"Play it small and treat it as a lean rather than a conviction bet."));
+  var bookLineNote=p.pdGap>0?" (The book line is "+p.bestLine+"; PropDesk has shifted it "+p.pdGap.toFixed(1)+" pts to find the edge.)":"";
+  sentences.push("Best price is at "+(p.bestBook?esc(p.bestBook.book):"your preferred book")+", vig "+((p.vig||0).toFixed(1))+"%."+bookLineNote+" "+(p.value>=65?"Strong edge — back it with conviction.":"Moderate confidence — keep the unit size in check."));
 
   return sentences.join(" ");
 }
@@ -1771,7 +1787,7 @@ function lazyLoadPlayerMeta(){
           applyQuickStats(p);
           // Enrich score with real player data for top 15 props (avoids spamming APIs for full board)
           var rank=byValue.indexOf(p);
-          if(rank<15 && !p.enriched) enrichPropScore(p);
+          if(rank<15 && !p.enriched) enrichWithConfidence(p);
         }).catch(function(){ p._quickStats=[]; });
       }
     }).catch(function(){ p._meta=""; applyMeta(p); });
@@ -2380,48 +2396,65 @@ function ensureChart(cb){
   var tries=0; var iv=setInterval(function(){ tries++; if(window.Chart){ clearInterval(iv); cb(); } else if(tries>50){ clearInterval(iv); } },120);
 }
 function tierColor(s){ if(s>=80)return "#00ff87"; if(s>=65)return "#7fe6a8"; if(s>=48)return "#ffcc00"; if(s>=32)return "#ff9d4f"; return "#ff4f4f"; }
-function drawAnalyzeCharts(p,line,vals,seasonAvg,overRate,dates){
+// pdLine = PropDesk reference line, isOver = direction, confPct = 0-100 confidence, bookLine = original book line
+function drawAnalyzeCharts(p,pdLine,vals,seasonAvg,hitRate,dates,isOver,confPct,bookLine){
   ensureChart(function(){
     if(!document.getElementById("ch1-"+p._id) && !document.getElementById("ch2-"+p._id)) return;
     var grid="rgba(255,255,255,.06)";
     Chart.defaults.color="#888"; Chart.defaults.font.family="Inter"; Chart.defaults.font.size=10;
+    var line=pdLine||0;
+    var isOv=isOver!==undefined?isOver:true;
+
+    // Chart 1: Last ≤15 games vs PropDesk line (green = hit, red = miss)
     var c1=document.getElementById("ch1-"+p._id);
     if(c1 && vals.length){
-      var rv=vals.slice().reverse();
-      var rd=(dates||[]).slice().reverse();
-      var lbls=rv.map(function(_,i){return rd[i]||String(i+1);});
-      var ch=new Chart(c1,{type:"bar",data:{labels:lbls,datasets:[
-        {data:rv,backgroundColor:rv.map(function(v){return v>line?"#00ff87":"#ff4f4f";}),borderRadius:3,barThickness:12,order:2},
-        {type:"line",data:rv.map(function(){return line;}),borderColor:"rgba(255,255,255,.7)",borderWidth:1.5,pointRadius:0,borderDash:[5,4],order:1,fill:false}
-      ]},options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxRotation:45,font:{size:9}}},y:{grid:{color:grid},beginAtZero:false}}}});
+      var rv=vals.slice(0,15).reverse();
+      var rd=(dates||[]).slice(0,15).reverse();
+      var lbls=rv.map(function(_,i){ return rd[i]||String(i+1); });
+      // Book line dashed overlay if different from PD line
+      var datasets=[
+        {data:rv,backgroundColor:rv.map(function(v){ return (isOv?v>line:v<line)?"#00ff87":"#ff4f4f"; }),borderRadius:3,barThickness:12,order:2},
+        {type:"line",data:rv.map(function(){ return line; }),borderColor:"#00ff87",borderWidth:2,pointRadius:0,borderDash:[0,0],order:1,fill:false,label:"PD Line"}
+      ];
+      if(bookLine && bookLine!==line){
+        datasets.push({type:"line",data:rv.map(function(){ return bookLine; }),borderColor:"rgba(255,255,255,.4)",borderWidth:1.5,pointRadius:0,borderDash:[5,4],order:1,fill:false,label:"Book Line"});
+      }
+      var ch=new Chart(c1,{type:"bar",data:{labels:lbls,datasets:datasets},
+        options:{plugins:{legend:{display:bookLine&&bookLine!==line,labels:{boxWidth:10,color:"#888"}}},
+          scales:{x:{grid:{display:false},ticks:{maxRotation:45,font:{size:9}}},y:{grid:{color:grid},beginAtZero:false}}}});
       ST.charts.push(ch);
     }
+
+    // Chart 2: Confidence arc meter — shows pdConfidence % in center
     var c2=document.getElementById("ch2-"+p._id);
     if(c2){
-      var conf=p.value;
-      var col=tierColor(conf);
+      var conf=confPct!=null?confPct:(p.pdConfidence!=null?Math.round(p.pdConfidence*100):p.value);
+      var col=conf>=65?"#00ff87":conf>=62?"#ffcc00":"#ff6b6b";
       var ch2=new Chart(c2,{type:"doughnut",data:{datasets:[{data:[conf,100-conf],backgroundColor:[col,"rgba(255,255,255,.07)"],borderWidth:0}]},
         options:{cutout:"74%",plugins:{legend:{display:false},tooltip:{enabled:false}}},
         plugins:[{id:"confCenter",afterDraw:function(chart){
-          var meta=chart.getDatasetMeta(0);
-          if(!meta.data||!meta.data.length) return;
+          var meta=chart.getDatasetMeta(0); if(!meta.data||!meta.data.length) return;
           var ctx=chart.ctx; var arc=meta.data[0];
           ctx.save(); ctx.font="800 22px Inter"; ctx.fillStyle=col; ctx.textAlign="center"; ctx.textBaseline="middle";
-          ctx.fillText(conf+"%",arc.x,arc.y); ctx.restore();
+          ctx.fillText(conf+"%",arc.x,arc.y);
+          ctx.font="500 10px Inter"; ctx.fillStyle="#888"; ctx.textBaseline="middle";
+          ctx.fillText("confidence",arc.x,arc.y+22); ctx.restore();
         }}]
       });
       ST.charts.push(ch2);
     }
+
+    // Chart 3: Book implied probability horizontal bars
     var c3=document.getElementById("ch3-"+p._id);
     if(c3){
       var bdata=[],blabels=[];
       p.books.slice(0,7).forEach(function(b){
         var odds=p.yesNo?b.yes:(p.side==="Under"?b.under:b.over);
-        if(odds!=null){blabels.push(b.book.slice(0,10));bdata.push(+(impliedProb(odds)*100).toFixed(1));}
+        if(odds!=null){ blabels.push(b.book.slice(0,10)); bdata.push(+(impliedProb(odds)*100).toFixed(1)); }
       });
       if(bdata.length){
         var ch3=new Chart(c3,{type:"bar",data:{labels:blabels,datasets:[{data:bdata,backgroundColor:"rgba(255,255,255,.75)",borderRadius:3}]},
-          options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{grid:{color:grid},ticks:{callback:function(v){return v+"% ";}},max:Math.min(100,Math.max.apply(null,bdata)+12)},y:{grid:{display:false}}}},
+          options:{indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{grid:{color:grid},ticks:{callback:function(v){ return v+"% "; }},max:Math.min(100,Math.max.apply(null,bdata)+12)},y:{grid:{display:false}}}},
           plugins:[{id:"barLbl3",afterDraw:function(chart){
             var ctx=chart.ctx;
             chart.data.datasets.forEach(function(ds,i){
@@ -2437,10 +2470,13 @@ function drawAnalyzeCharts(p,line,vals,seasonAvg,overRate,dates){
         ST.charts.push(ch3);
       }
     }
+
+    // Chart 4: Hit/miss donut at PropDesk line
     var c4=document.getElementById("ch4-"+p._id);
     if(c4){
-      var orr=overRate!=null?Math.round(overRate):50;
-      var ch4=new Chart(c4,{type:"doughnut",data:{labels:["Over","Under"],datasets:[{data:[orr,100-orr],backgroundColor:["#00ff87","#4f9fff"],borderWidth:0}]},
+      var hr=hitRate!=null?Math.round(hitRate):50;
+      var sideLabel=isOv?"Hit (Over)":"Hit (Under)";
+      var ch4=new Chart(c4,{type:"doughnut",data:{labels:[sideLabel,"Miss"],datasets:[{data:[hr,100-hr],backgroundColor:["#00ff87","#ff4f4f"],borderWidth:0}]},
         options:{cutout:"54%",plugins:{legend:{position:"bottom",labels:{boxWidth:10,color:"#aaa"}},tooltip:{enabled:true}}},
         plugins:[{id:"donutLbl4",afterDraw:function(chart){
           var ctx=chart.ctx; var meta=chart.getDatasetMeta(0); var ds=chart.data.datasets[0];
@@ -2455,11 +2491,17 @@ function drawAnalyzeCharts(p,line,vals,seasonAvg,overRate,dates){
       });
       ST.charts.push(ch4);
     }
+
+    // Chart 5: Season avg vs PropDesk line bar chart
     var c5=document.getElementById("ch5-"+p._id);
     if(c5){
       var sa5=seasonAvg!=null?parseFloat(Number(seasonAvg).toFixed(2)):0;
       var ln5=line!=null?parseFloat(Number(line).toFixed(2)):0;
-      var ch5=new Chart(c5,{type:"bar",data:{labels:["Season Avg","Line"],datasets:[{data:[sa5,ln5],backgroundColor:["#00ff87","rgba(255,255,255,.85)"],borderRadius:4}]},
+      var labels5=["Season Avg","PropDesk Line"];
+      if(bookLine && bookLine!==line) labels5=["Season Avg","Book Line","PD Line"];
+      var data5=bookLine&&bookLine!==line?[sa5,parseFloat(Number(bookLine).toFixed(2)),ln5]:[sa5,ln5];
+      var bg5=bookLine&&bookLine!==line?["#00ff87","rgba(255,255,255,.4)","#00ff87"]:["#00ff87","rgba(255,255,255,.85)"];
+      var ch5=new Chart(c5,{type:"bar",data:{labels:labels5,datasets:[{data:data5,backgroundColor:bg5,borderRadius:4}]},
         options:{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:grid},beginAtZero:true}}},
         plugins:[{id:"barTopLbl5",afterDraw:function(chart){
           var ctx=chart.ctx;
