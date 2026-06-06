@@ -583,6 +583,45 @@ function threshLabel(line, marketKey){
 }
 function isThreshProp(p){ return !!(p._market && THRESHOLD_MARKETS[p._market]); }
 
+// Fetch opposing team's K% (strikeout rate as a batting team) from MLB Stats API
+// Cached by normalized team name; returns fraction 0-1 or null if unavailable
+var _teamKCache={};
+async function getTeamKPct(teamName){
+  if(!teamName) return null;
+  var ckey=teamName.toLowerCase().trim();
+  if(_teamKCache[ckey]!==undefined) return _teamKCache[ckey];
+  try{
+    var yr=new Date().getFullYear();
+    // Step 1: get team ID by name
+    var tr=await fetch("https://statsapi.mlb.com/api/v1/teams?sportId=1&activeStatus=Y&season="+yr,{signal:AbortSignal.timeout(6000)});
+    if(!tr.ok){ _teamKCache[ckey]=null; return null; }
+    var td=await tr.json();
+    var teams=td.teams||[];
+    var teamId=null;
+    var searchKey=ckey;
+    // Fuzzy: match by full name or last word (nickname like "Yankees")
+    for(var i=0;i<teams.length;i++){
+      var tn=(teams[i].name||"").toLowerCase();
+      if(tn===searchKey||tn.indexOf(searchKey)>=0||searchKey.indexOf(tn.split(" ").slice(-1)[0])>=0||tn.split(" ").slice(-1)[0]===searchKey.split(" ").slice(-1)[0]){
+        teamId=teams[i].id; break;
+      }
+    }
+    if(!teamId){ _teamKCache[ckey]=null; return null; }
+    // Step 2: get team hitting stats
+    var sr=await fetch("https://statsapi.mlb.com/api/v1/teams/"+teamId+"/stats?season="+yr+"&group=hitting&type=season",{signal:AbortSignal.timeout(6000)});
+    if(!sr.ok){ _teamKCache[ckey]=null; return null; }
+    var sd=await sr.json();
+    var splits=(sd.stats&&sd.stats[0]&&sd.stats[0].splits)||[];
+    if(!splits.length){ _teamKCache[ckey]=null; return null; }
+    var st=splits[0].stat||{};
+    var so=Number(st.strikeOuts||0);
+    var pa=Number(st.plateAppearances||st.atBats||1);
+    var kPct=pa>50?so/pa:null;
+    _teamKCache[ckey]=kPct;
+    return kPct;
+  }catch(e){ _teamKCache[ckey]=null; return null; }
+}
+
 /* show-stat preferences per sport for season grid (ESPN) */
 // Stat name fragments to match (normalized: lowercase, alphanum only).
 // Covers both ESPN long names (avgPoints) and short abbreviations (PTS, PPG).
@@ -928,6 +967,86 @@ async function enrichWithConfidence(p){
     if(vals.length<8&&p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
 
+    // ── Special: Pitcher strikeout props ─────────────────────────────────
+    // Guardrail-aware, matchup-weighted scoring (not generic hit-rate model)
+    if(p._market==="pitcher_strikeouts"){
+      // Need ≥3 starts of data
+      if(vals.length<3){
+        p.pdNoValue=true; p.value=0; p.enriched=true;
+        if(p.guardrailFlags.indexOf("THIN_DATA")<0) p.guardrailFlags.push("THIN_DATA");
+        updatePropValueDisplay(p); return;
+      }
+      // Days rest from last start
+      var daysRest=99;
+      if(p._dates&&p._dates.length){
+        var lastStart=new Date(p._dates[0]);
+        daysRest=Math.round((new Date()-lastStart)/864e5);
+      }
+      // Guardrail: ≤3 days rest → discard
+      if(daysRest<=3){
+        p.pdNoValue=true; p.value=0; p.enriched=true;
+        if(p.guardrailFlags.indexOf("SHORT_REST")<0) p.guardrailFlags.push("SHORT_REST");
+        updatePropValueDisplay(p); return;
+      }
+      // Determine opponent from current game
+      var oppTeam=null;
+      try{
+        var pitcherMeta=await getMeta(p.player);
+        var curGame=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0]||null;
+        if(pitcherMeta&&pitcherMeta.team&&curGame){
+          var pt=(pitcherMeta.team||"").toLowerCase();
+          var ht=(curGame.home_team||"").toLowerCase();
+          var at=(curGame.away_team||"").toLowerCase();
+          // Fuzzy match on last word (nickname) or full name
+          var nick=function(s){return s.split(" ").slice(-1)[0];};
+          if(nick(pt)===nick(ht)||ht.indexOf(pt)>=0) oppTeam=curGame.away_team;
+          else if(nick(pt)===nick(at)||at.indexOf(pt)>=0) oppTeam=curGame.home_team;
+        }
+      }catch(e){}
+      var oppKPct=await getTeamKPct(oppTeam);
+      // League average K% ≈ 22.5%; bottom-10 threshold ≈ 19.5%
+      var BOTTOM10=0.195;
+      if(oppKPct!==null&&oppKPct<BOTTOM10){
+        p.pdNoValue=true; p.value=0; p.enriched=true;
+        if(p.guardrailFlags.indexOf("CONTACT_TEAM")<0) p.guardrailFlags.push("CONTACT_TEAM");
+        updatePropValueDisplay(p); return;
+      }
+      var l5K=avg(vals.slice(0,Math.min(5,vals.length)));
+      var sznK=p.seasonAvgEnrich!=null?p.seasonAvgEnrich:avg(vals);
+      var l5Gap=l5K-bookLine, sznGap=sznK-bookLine;
+      if(l5Gap<0&&p.guardrailFlags.indexOf("LINE_ABOVE_L5")<0) p.guardrailFlags.push("LINE_ABOVE_L5");
+      // Weighted component scores 0-100
+      // 1. Opposing team K% (30%)
+      var wOpp=oppKPct===null?50:(oppKPct>=0.27?92:oppKPct>=0.245?78:oppKPct>=0.22?63:oppKPct>=0.20?44:24);
+      // 2. Pitcher L5 K avg vs line (25%)
+      var wL5=l5Gap>=2?92:l5Gap>=1?78:l5Gap>=0?63:l5Gap>=-1?40:20;
+      // 3. Season K avg vs line (20%)
+      var wSzn=sznGap>=2?88:sznGap>=1?73:sznGap>=0?59:sznGap>=-1?38:18;
+      // 4. Days rest + pitch depth (15%) — 5-day rotation = 85
+      var wRest=daysRest>=7?82:daysRest>=5?72:daysRest>=4?55:25;
+      // 5. Line edge vs consensus (10%)
+      var wEdge=(p.edge||0)>=1.0?88:(p.edge||0)>=0.5?72:50;
+      var composite=(wOpp*0.30)+(wL5*0.25)+(wSzn*0.20)+(wRest*0.15)+(wEdge*0.10);
+      p.value=Math.round(Math.min(95,composite));
+      // Confidence = historical hit rate at book line
+      var kConfRaw=compositeConf(vals,bookLine,true);
+      p.pdSide="Over";
+      p.pdLine=bookLine;
+      p.pdGap=0;
+      p.pdConfidence=kConfRaw!=null?kConfRaw:Math.max(0.01,composite/100);
+      p.pdConfAtBook=p.pdConfidence;
+      p.pdResult={line:bookLine,confidence:p.pdConfidence,gap:0,confAtBook:p.pdConfidence};
+      p.hitRate14=+(p.pdConfidence*100).toFixed(1);
+      p.enriched=true;
+      // Positive flags
+      if(oppKPct!==null&&oppKPct>=0.255&&p.valueFlags.indexOf("HIGH_K_TEAM")<0) p.valueFlags.push("HIGH_K_TEAM");
+      if(daysRest>=6&&p.valueFlags.indexOf("RESTED")<0) p.valueFlags.push("RESTED");
+      if(l5Gap>=1&&p.valueFlags.indexOf("HOT_RATE")<0) p.valueFlags.push("HOT_RATE");
+      updatePropValueDisplay(p);
+      updatePropPDDisplay(p);
+      return;
+    }
+
     var thresh=isThreshProp(p);
 
     if(thresh){
@@ -1074,9 +1193,11 @@ function applyPropFlags(p){
 
 function flagLabel(f){
   var m={FREE_POINTS:"Free Pts",SHARP_SPLIT:"Sharp Split",LOW_VIG:"Low Vig",
-    HOT_RATE:"Hot 70%+",GAP_L5:"L5 Gap 2+",FORM_UP:"Form↑",FORM_DOWN:"Form↓",
+    HOT_RATE:"Hot Rate",GAP_L5:"L5 Gap 2+",FORM_UP:"Form↑",FORM_DOWN:"Form↓",
     FEW_BOOKS:"Few Books",THIN_DATA:"Thin Data",COLD_STREAK:"Cold Streak",
-    DATA_FLIP:"Data Flip",REVIEW:"⚠ Review",LINE_ADJ:"Line Adj"};
+    DATA_FLIP:"Data Flip",REVIEW:"⚠ Review",LINE_ADJ:"Line Adj",
+    HIGH_K_TEAM:"K Team",RESTED:"Rested",
+    SHORT_REST:"⚠ Short Rest",CONTACT_TEAM:"⚠ Contact Team",LINE_ABOVE_L5:"Line > L5"};
   if(m[f]) return m[f];
   if(f.indexOf("STREAK_")===0) return "Streak "+f.slice(7);
   return f;
@@ -1096,7 +1217,12 @@ function flagTitle(f){
     COLD_STREAK:"3+ consecutive misses on this line — cold streak penalty applied",
     DATA_FLIP:"Historical hit rate strongly favors the other side — proceed with caution",
     REVIEW:"Sharp book split and recent form contradict each other — score penalized, excluded from LOTD",
-    LINE_ADJ:"Consensus line adjusted to find a realistic threshold — check adjusted line before betting"
+    LINE_ADJ:"Consensus line adjusted to find a realistic threshold — check adjusted line before betting",
+    HIGH_K_TEAM:"Opposing team K% is above league average — favorable strikeout matchup",
+    RESTED:"Pitcher has 6+ days rest — full stamina, deeper starts expected",
+    SHORT_REST:"Pitcher on 3 or fewer days rest — hidden (lower K ceiling, injury risk)",
+    CONTACT_TEAM:"Opposing team ranks in bottom 10 of MLB for K% — low-strikeout lineup, K prop is a trap",
+    LINE_ABOVE_L5:"Book line exceeds pitcher's L5 K average — market pricing in upside the recent data doesn't support"
   };
   if(m[f]) return m[f];
   if(f.indexOf("STREAK_")===0) return "Active streak of "+f.slice(7)+" consecutive hits";
@@ -1235,7 +1361,8 @@ async function loadPropOfDay(){
           if(p.yesNo) compScore=Math.min(compScore,58);
           if(!p.yesNo && p.bestLine!=null && p.bestLine<=0.5) compScore=Math.min(compScore,62);
           if(isLongshot) compScore=Math.min(compScore,56);
-          if(compScore>bestScore){ bestScore=compScore; bestProp=p; bestMkt=mk; }
+          // POTD floor: must score ≥65 — flagship pick must represent genuine high confidence
+          if(compScore>=65 && compScore>bestScore){ bestScore=compScore; bestProp=p; bestMkt=mk; }
         });
       });
     }catch(e){ /* skip failed batch, try next */ }
@@ -1243,41 +1370,79 @@ async function loadPropOfDay(){
 
   if(ST.eventId!==eid) return; // stale   game changed
 
+  if(ST.eventId!==eid) return;
+
   if(bestProp && bestMkt){
     _potgCache[eid]={prop:bestProp, mkt:bestMkt};
     renderPropOfDay(bestProp, bestMkt);
   } else {
-    // All batches failed   wait for loadBoard to finish then use its top result
+    // Nothing hit 65 from scan — wait for loadBoard, then try current top prop
     setTimeout(function(){
-      if(ST.eventId===eid && ST.props && ST.props.length){
-        var p=ST.props[0];
+      if(ST.eventId!==eid||!ST.props||!ST.props.length) return;
+      var p=ST.props[0];
+      if(p.value>=65){
         _potgCache[eid]={prop:p, mkt:ST.market};
         renderPropOfDay(p, ST.market);
+      } else {
+        renderNoPropOfDay();
       }
     }, 2500);
   }
 }
 
+function renderNoPropOfDay(){
+  var mount=$("potgMount"); if(!mount) return;
+  var c=el("div","card card-potg");
+  c.innerHTML=
+    '<div class="card-h">'+
+      '<span class="tag tag-g">Prop of the Day</span>'+
+      '<span class="market" style="color:var(--mut2)">No pick today</span>'+
+    '</div>'+
+    '<div class="pname" style="color:var(--mut2);font-weight:400;font-size:14px">'+
+      'Our data didn\'t identify a Prop of the Day today.'+
+    '</div>'+
+    '<div class="analysis">'+
+      'No prop cleared our 65/100 confidence threshold. This can happen on slow lines, thin markets, '+
+      'or early in the day before books sharpen. Check back as lines update throughout the day.'+
+    '</div>';
+  mount.innerHTML="";
+  mount.appendChild(c);
+}
+
 function renderPropOfDay(p, mkt){
   var mount=$("potgMount");
   if(!mount||!p) return;
+  // Safety floor — never surface below 65 as flagship pick
+  if(p.value<65){ renderNoPropOfDay(); return; }
   var mktLabel=marketName(mkt);
   var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"");
   var sidecls=p.side==="Under"?"under":"over";
   var t=tierOf(p.value).t;
   var sharp=(p.lineSpread>=1.5);
 
+  // PropDesk Line context
+  var hasPD = p.pdLine!=null && p.pdConfidence!=null;
+  var confPct = hasPD ? Math.round(p.pdConfidence*100) : null;
+  var pdSide = p.pdSide||p.side;
+  var pdLine = p.pdLine!=null ? p.pdLine : p.bestLine;
+  var isThresh = isThreshProp(p);
+  var betLabel = isThresh
+    ? threshLabel(pdLine, p._market)
+    : (pdSide + (pdLine!=null?" "+pdLine:""));
   // Analysis: 3 sentences explaining why this is the best prop across all markets
   var s1="Out of every prop available for this game across all markets, "+esc(p.player)+"'s "+esc(mktLabel)+" line earns Prop of the Day with a value score of "+p.value+"/100 ("+t+") - the highest edge found anywhere on the board.";
   var s2;
-  if(p.yesNo){
+  if(hasPD && confPct!=null){
+    var gapNote=p.pdGap>0?" — PropDesk shifted the line "+p.pdGap.toFixed(1)+" pts from the "+p.bestLine+" book line to find the edge":"";
+    s2="PropDesk confidence: <b>"+confPct+"%</b> — "+esc(betLabel)+gapNote+". The best available odds are "+fmtOdds(p.bestOdds)+" at "+(p.bestBook?esc(p.bestBook.book):"your top book")+".";
+  } else if(p.yesNo){
     s2="The best available price is "+fmtOdds(p.bestOdds)+" on this Yes market - a standout number relative to the rest of the field.";
   } else {
     var edgePts=(p.edge||0).toFixed(1);
     s2="The "+p.side+(p.bestLine!=null?" "+p.bestLine:"")+" is the call, with "+edgePts+" point(s) of free value versus the consensus line of "+(p.consensus!=null?p.consensus:"the market")+", giving you a mathematical edge before a single game plays out.";
   }
   var s3=(sharp?
-    "The "+( p.lineSpread||0).toFixed(1)+"-point spread across books signals sharp positioning is already in play - lock in the best available number before further movement narrows the gap.":
+    "The "+(p.lineSpread||0).toFixed(1)+"-point spread across books signals sharp positioning is already in play - lock in the best available number before further movement narrows the gap.":
     "Market consensus is tight and the vig runs near "+(p.vig||0).toFixed(1)+"%, so the pricing is clean - this edge is real, not a fluke of one outlier book."
   );
 
@@ -1290,7 +1455,8 @@ function renderPropOfDay(p, mkt){
       '<div class="vscore"><b id="potgScore">0</b><span>SCORE</span></div>'+
     '</div>'+
     '<div class="pname">'+esc(p.player)+'</div>'+
-    '<div class="pbet '+sidecls+'">'+esc(bet)+'</div>'+
+    '<div class="pbet '+sidecls+'">'+esc(betLabel)+'</div>'+
+    (confPct!=null?'<div class="conf-badge cb-strong" style="width:fit-content;margin:4px 0 8px">'+confPct+'% confidence</div>':'')+
     '<div class="analysis">'+s1+" "+s2+" "+s3+'</div>';
   mount.innerHTML="";
   mount.appendChild(c);
@@ -1395,11 +1561,15 @@ function lotdText(legs,amOdds){
 function filteredProps(){
   var q=($("searchIn").value||"").toLowerCase().trim();
   return ST.props.filter(function(p){
-    // Threshold markets always show — confidence is informational, never hidden
+    // Pitcher K props: guardrails can hide them (short rest, contact team)
+    if(p._market==="pitcher_strikeouts"){
+      if(p.enriched && p.pdNoValue) return false;
+      return !q || p.player.toLowerCase().indexOf(q)>=0;
+    }
+    // Other threshold markets (NHL goals, MLB hits…): always show, confidence is informational
     if(isThreshProp(p)) return !q || p.player.toLowerCase().indexOf(q)>=0;
-    // True over/under: once enriched, only show props with a valid PropDesk Line
+    // True over/under markets: only show with valid PropDesk Line once enriched
     if(p.enriched && p.pdNoValue) return false;
-    // Before enrichment: hide clearly low-quality market props
     if(!p.enriched && p.value<44) return false;
     return !q || p.player.toLowerCase().indexOf(q)>=0;
   });
@@ -2699,7 +2869,42 @@ function generateParlay(){
     // If still below target (odds too low), we accept it — never inflate to hit a longshot target
   }
 
+  var MAX_DEC=aToDec(400); // 5.0 decimal — never surface above +400
   var finalDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
+
+  // Hard cap: if still over +400, swap highest-odds legs for lower-probability plays
+  var capPasses=25;
+  while(capPasses-->0 && finalDec>MAX_DEC && legs.length>1){
+    var worstIdx=0;
+    for(var jj=1;jj<legs.length;jj++){ if(aToDec(legs[jj].bestOdds)>aToDec(legs[worstIdx].bestOdds)) worstIdx=jj; }
+    var swapped=false;
+    for(var kk=0;kk<pool.length;kk++){
+      var cand2=pool[kk];
+      var alreadyIn=false; for(var mm=0;mm<legs.length;mm++) if(legs[mm].player===cand2.player) alreadyIn=true;
+      if(alreadyIn) continue;
+      if(aToDec(cand2.bestOdds)<aToDec(legs[worstIdx].bestOdds)){
+        legs[worstIdx]=cand2;
+        finalDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
+        swapped=true; break;
+      }
+    }
+    if(!swapped) break;
+  }
+
+  // If still above +400 after all swaps, no parlay today
+  if(finalDec>MAX_DEC){
+    $("parlayResult").innerHTML=
+      '<div class="empty" style="padding:20px;text-align:center">'+
+        '<div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px">No Parlay Today</div>'+
+        '<div style="color:var(--mut2);font-size:13px;line-height:1.5">'+
+          'We couldn\'t build a parlay under +400 with the available lines. '+
+          'The current board doesn\'t have enough lower-probability plays to hit our target range (+150 to +400). '+
+          'Check back as lines update.'+
+        '</div>'+
+      '</div>';
+    return;
+  }
+
   renderParlayResult(legs,finalDec,decToA(finalDec),target);
 }
 function renderParlayResult(legs,dec,am,target){
