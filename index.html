@@ -558,15 +558,24 @@ var RATE_FRAGS = ["avg","obp","slg","ops","era","whip","pct","battingaverage","o
 var PITCHER_MARKETS = {pitcher_strikeouts:1,pitcher_hits_allowed:1,pitcher_earned_runs:1,pitcher_outs:1,pitcher_walks:1};
 var YESNO_MARKETS = {player_anytime_td:1,player_first_td:1,player_first_basket:1,player_anytime_goalscorer:1,player_first_goalscorer:1};
 
-// Threshold markets: integer-count stats displayed as "1+ Goals", "2+ Hits" etc.
-// Only the Over direction makes sense — no one bets "Under 0.5 goals".
+// Threshold markets: integer-count stats shown as "1+ Goals", "2+ Hits" etc.
+// SPORT-SPECIFIC — NBA player_points is a true O/U (Over 23.5 pts), NOT a threshold market.
+// NBA/NFL all use decimal lines → standard confidence shifting. Only NHL + MLB use thresholds.
 var THRESHOLD_MARKETS = {
-  player_goals:1, player_assists:1, player_points:1, player_shots_on_goal:1, player_saves:1,
-  batter_hits:1, batter_total_bases:1, batter_rbis:1, batter_home_runs:1,
-  batter_runs_scored:1, batter_hits_runs_rbis:1,
-  pitcher_strikeouts:1, pitcher_hits_allowed:1, pitcher_earned_runs:1,
-  pitcher_outs:1, pitcher_walks:1
+  icehockey_nhl: {
+    player_goals:1, player_assists:1, player_points:1,
+    player_shots_on_goal:1, player_saves:1
+  },
+  baseball_mlb: {
+    batter_hits:1, batter_total_bases:1, batter_rbis:1, batter_home_runs:1,
+    batter_runs_scored:1, batter_hits_runs_rbis:1,
+    pitcher_strikeouts:1, pitcher_hits_allowed:1, pitcher_earned_runs:1,
+    pitcher_outs:1, pitcher_walks:1
+  }
+  // basketball_nba + americanfootball_nfl: no threshold markets — all decimal O/U lines
 };
+// Helper: is the given marketKey a threshold market in the current sport?
+function isThreshMkt(marketKey){ return !!((THRESHOLD_MARKETS[ST.sport]||{})[marketKey]); }
 var THRESHOLD_STAT_NAMES = {
   player_goals:"Goals", player_assists:"Assists", player_points:"Points",
   player_shots_on_goal:"Shots", player_saves:"Saves",
@@ -584,7 +593,7 @@ function threshLabel(line, marketKey){
   var stat=THRESHOLD_STAT_NAMES[marketKey]||"";
   return n+"+ "+(stat?stat:"");
 }
-function isThreshProp(p){ return !!(p._market && THRESHOLD_MARKETS[p._market]); }
+function isThreshProp(p){ return !!(p._market && (THRESHOLD_MARKETS[ST.sport]||{})[p._market]); }
 
 // Fetch opposing team's K% (strikeout rate as a batting team) from MLB Stats API
 // Cached by normalized team name; returns fraction 0-1 or null if unavailable
@@ -835,7 +844,7 @@ function computeBestBet(p,marketKey){
     return;
   }
   var cons=p.consensus;
-  var forceOver = !!THRESHOLD_MARKETS[marketKey];
+  var forceOver = isThreshMkt(marketKey); // sport-aware: true for NHL goals/points/shots, MLB hits/Ks; false for NBA/NFL
   var bestOver=null, bestUnder=null;
 
   if(forceOver && cons!=null){
@@ -1405,8 +1414,15 @@ async function loadPropOfDay(){
           if(isLongshot) compScore=Math.min(compScore,56);
           // Primary track: phase-1 score already clears the bar — no enrichment needed
           if(compScore>=POTD_MIN_SCORE && compScore>bestScore){ bestScore=compScore; bestProp=p; bestMkt=mk; }
-          // Alt pool: collect every candidate ≥44 so we can enrich the best ones
-          if(compScore>=44) altPool.push({prop:p, mkt:mk, compScore:compScore});
+          // Alt pool: collect every candidate ≥44 for enrichment.
+          // Give low-line threshold props (e.g. "1+ Points" line=0.5) a +20 boost so they
+          // float to the top of the enrichment queue — they typically score 70-80% after
+          // enrichment, while "2+ Shots" (line=1.5) only scores 50-60% and wastes a slot.
+          if(compScore>=44){
+            var altBoost=0;
+            if(isThreshMkt(mk) && p.bestLine!=null && p.bestLine<=0.5) altBoost=20;
+            altPool.push({prop:p, mkt:mk, compScore:compScore+altBoost});
+          }
         });
       });
     }catch(e){ /* skip failed batch, try next */ }
@@ -1575,10 +1591,10 @@ async function loadLOTD(){
           var sc=0;
           for(var jj=0;jj<chosen.length;jj++) sc+=chosen[jj].value;
           var avg2=sc/legCount;
-          // MLB: reward diverse stat categories
+          // Reward diverse stat categories — avoids "2 legs of the same market" (e.g. both Shots on Goal)
           var cats={};
           for(var cc=0;cc<chosen.length;cc++) cats[chosen[cc]._lotdMk]=1;
-          var catBonus=(ST.sport==="baseball_mlb")?(Object.keys(cats).length-1)*8:0;
+          var catBonus=(ST.sport!=="americanfootball_nfl")?(Object.keys(cats).length-1)*8:0;
           // Sweet-spot bonus: +150 to +400
           var sweetBonus=(dec>=aToDec(150)&&dec<=LOTD_MAX_DEC)?10:0;
           var rank=avg2+catBonus+sweetBonus;
@@ -1631,9 +1647,11 @@ async function loadLOTD(){
 
 function lotdText(legs,amOdds){
   var names=legs.map(function(l){return l.player;}).join(", ");
-  var diverse=ST.sport==="baseball_mlb"?" pulled from different stat categories so the legs are independent":"";
+  var diverse=(ST.sport!=="americanfootball_nfl")?" across different stat categories so the legs are independent":"";
+  var maxLegDec=Math.max.apply(null,legs.map(function(l){return aToDec(l.bestOdds);}));
+  var maxLegStr=fmtOdds(decToA(maxLegDec));
   return "Today's Lay of the Day combines "+esc(names)+" into a "+fmtOdds(amOdds)+" parlay"+diverse+
-    ". Every leg scored 50 or better on our value model and was priced no longer than +140 individually - these are real edges stacked together, not longshot dart throws."+
+    ". Every leg scored "+PARLAY_MIN_SCORE+" or better on our value model; longest individual price is "+maxLegStr+" — real edges stacked together, not longshot dart throws."+
     " Size this as a swing bet: every leg must hit, so keep stakes modest and consider playing the legs individually if your book restricts correlated props.";
 }
 
@@ -2382,8 +2400,10 @@ function parseEspnGamelog(d,keys){
       if(!isNaN(num)){
         vals.push(num);
         var dt=ev.gameDate||ev.date||ev.gameDatez||"";
-        var m=dt.match(/\d{4}-(\d{2})-(\d{2})/);
-        dates.push(m?parseInt(m[1])+"/"+parseInt(m[2]):"");
+        var mD=dt.match(/(\d{4}-\d{2}-\d{2})/);
+        // Store full ISO "2024-11-15" so date math (e.g. days rest) is accurate;
+        // drawAnalyzeCharts formats to "M/D" for chart labels.
+        dates.push(mD?mD[1]:"");
       }
     }
   });
