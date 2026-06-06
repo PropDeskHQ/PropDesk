@@ -558,6 +558,31 @@ var RATE_FRAGS = ["avg","obp","slg","ops","era","whip","pct","battingaverage","o
 var PITCHER_MARKETS = {pitcher_strikeouts:1,pitcher_hits_allowed:1,pitcher_earned_runs:1,pitcher_outs:1,pitcher_walks:1};
 var YESNO_MARKETS = {player_anytime_td:1,player_first_td:1,player_first_basket:1,player_anytime_goalscorer:1,player_first_goalscorer:1};
 
+// Threshold markets: integer-count stats displayed as "1+ Goals", "2+ Hits" etc.
+// Only the Over direction makes sense — no one bets "Under 0.5 goals".
+var THRESHOLD_MARKETS = {
+  player_goals:1, player_assists:1, player_points:1, player_shots_on_goal:1, player_saves:1,
+  batter_hits:1, batter_total_bases:1, batter_rbis:1, batter_home_runs:1,
+  batter_runs_scored:1, batter_hits_runs_rbis:1,
+  pitcher_strikeouts:1, pitcher_hits_allowed:1, pitcher_earned_runs:1,
+  pitcher_outs:1, pitcher_walks:1
+};
+var THRESHOLD_STAT_NAMES = {
+  player_goals:"Goals", player_assists:"Assists", player_points:"Points",
+  player_shots_on_goal:"Shots", player_saves:"Saves",
+  batter_hits:"Hits", batter_total_bases:"Total Bases", batter_rbis:"RBIs",
+  batter_home_runs:"Home Runs", batter_runs_scored:"Runs", batter_hits_runs_rbis:"H+R+RBI",
+  pitcher_strikeouts:"Ks", pitcher_hits_allowed:"Hits Allowed",
+  pitcher_earned_runs:"Earned Runs", pitcher_outs:"Outs", pitcher_walks:"Walks"
+};
+// e.g. line 0.5 → "1+ Goals", line 1.5 → "2+ Shots"
+function threshLabel(line, marketKey){
+  var n=Math.ceil(line>0?line:0.5);
+  var stat=THRESHOLD_STAT_NAMES[marketKey]||"";
+  return n+"+ "+(stat?stat:"");
+}
+function isThreshProp(p){ return !!(p._market && THRESHOLD_MARKETS[p._market]); }
+
 /* show-stat preferences per sport for season grid (ESPN) */
 // Stat name fragments to match (normalized: lowercase, alphanum only).
 // Covers both ESPN long names (avgPoints) and short abbreviations (PTS, PPG).
@@ -744,6 +769,7 @@ function parseProps(data,marketKey){
   for(var pn2 in out){
     var p=out[pn2];
     p.yesNo=isYesNo;
+    p._market=marketKey; // store for threshold detection downstream
     var pts=p.books.map(function(b){return b.point;}).filter(function(x){return x!=null;});
     p.consensus = pts.length? median(pts) : null;
     p.lineSpread = pts.length? (Math.max.apply(null,pts)-Math.min.apply(null,pts)) : 0;
@@ -780,8 +806,11 @@ function computeBestBet(p,marketKey){
   });
   var overEdge = (bestOver&&cons!=null)? (cons-bestOver.point) : -99;
   var underEdge = (bestUnder&&cons!=null)? (bestUnder.point-cons) : -99;
+  // Threshold markets (NHL goals, MLB hits, etc.) are always Over — "1+ Goals", "2+ Hits"
+  var forceOver = !!THRESHOLD_MARKETS[marketKey];
   var chooseOver;
-  if(overEdge>underEdge) chooseOver=true;
+  if(forceOver) chooseOver=true;
+  else if(overEdge>underEdge) chooseOver=true;
   else if(underEdge>overEdge) chooseOver=false;
   else { var oo=bestOver?aToDec(bestOver.over):0, uo=bestUnder?aToDec(bestUnder.under):0; chooseOver=oo>=uo; }
   if(chooseOver && bestOver){ p.side="Over"; p.bestLine=bestOver.point; p.bestOdds=bestOver.over; p.bestBook=bestOver; p.edge=Math.max(0,overEdge); }
@@ -899,9 +928,11 @@ async function enrichWithConfidence(p){
     if(vals.length<8&&p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
 
-    // Run both directions independently; pick whichever has higher value score
+    // Threshold markets (NHL goals, MLB hits…) are always Over-direction only
+    var thresh=isThreshProp(p);
+    // Run both directions; threshold markets skip Under entirely
     var overResult=findPropDeskLine(vals,bookLine,true);
-    var underResult=findPropDeskLine(vals,bookLine,false);
+    var underResult=thresh?null:findPropDeskLine(vals,bookLine,false);
     var overScore=overResult?pdValueScore(overResult.gap,overResult.confidence):0;
     var underScore=underResult?pdValueScore(underResult.gap,underResult.confidence):0;
 
@@ -969,25 +1000,23 @@ function updatePropPDDisplay(p){
     cell.innerHTML='<span class="pd-line-val no-val">NO VALUE</span>';
     return;
   }
-  var bookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:"-");
+  var rawBookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
   var pdLine=p.pdLine;
   var conf=p.pdConfidence;
   var confPct=Math.round(conf*100);
   var side=p.pdSide||"Over";
   var sideLow=side.toLowerCase();
   var cbCls=conf>=0.65?"cb-strong":conf>=0.62?"cb-mod":"cb-none";
-  var gapHtml="";
-  if(p.pdGap>0){
-    gapHtml='<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>';
-  } else {
-    gapHtml='<span class="gap-zero">at book line</span>';
-  }
+  var thresh=isThreshProp(p);
+  // Build line labels — threshold markets use "1+ Goals" format
+  var pdLabel=thresh?threshLabel(pdLine,p._market):(side+' '+pdLine);
+  var bookLabel=thresh&&rawBookLine!=null?threshLabel(rawBookLine,p._market):(rawBookLine!=null?""+rawBookLine:"");
+  var gapHtml=p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>';
   cell.innerHTML=
     '<div class="pd-cell">'+
       '<div style="display:flex;gap:6px;align-items:baseline">'+
-        '<span class="pd-book-strike">'+esc(""+bookLine)+'</span>'+
-        '<span class="pd-arrow">→</span>'+
-        '<span class="pd-line-val '+sideLow+'">'+esc(side+' '+pdLine)+'</span>'+
+        (bookLabel&&bookLabel!==pdLabel?'<span class="pd-book-strike">'+esc(bookLabel)+'</span><span class="pd-arrow">→</span>':'')+
+        '<span class="pd-line-val '+sideLow+'">'+esc(pdLabel)+'</span>'+
       '</div>'+
       '<span class="conf-badge '+cbCls+'">'+confPct+'% confidence</span>'+
       gapHtml+
@@ -1386,10 +1415,13 @@ function renderTable(silent){
 function rowHtml(p,cols,idx,silent){
   if(p._id==null) p._id=Math.random().toString(36).slice(2,9);
   var tier=tierOf(p.value);
-  // Book line display (left column — what the book is offering)
+  var isThresh=isThreshProp(p);
+  // Book line display — threshold markets show "1+ Goals" instead of "Over 0.5"
   var bookLine=p.bestLine!=null?p.bestLine:"";
-  var bbcls=p.side==="Under"?"under":(p.side==="Yes"?"yes":"over");
-  var bb=p.side+(bookLine!==""?" "+bookLine:"");
+  var bbcls=isThresh?"over":(p.side==="Under"?"under":(p.side==="Yes"?"yes":"over"));
+  var bb=isThresh&&bookLine!==""
+    ? threshLabel(bookLine,p._market)
+    : (p.side+(bookLine!==""?" "+bookLine:""));
   var ev=p.evOver;
   var evHtml=(ev==null)?'<span class="ev">-</span>':'<span class="ev '+(ev>=0?"pos":"neg")+'">'+(ev>=0?"+":"")+ev.toFixed(1)+'%</span>';
   var meta=p._metaLoaded?(p._meta?esc(p._meta):''):'';
@@ -1405,13 +1437,15 @@ function rowHtml(p,cols,idx,silent){
     var side=p.pdSide||"Over";
     var sideLow=side.toLowerCase();
     var cbCls=p.pdConfidence>=0.65?"cb-strong":p.pdConfidence>=0.62?"cb-mod":"cb-none";
+    // For threshold markets: show "Book: 1+ → PD: 2+" format; otherwise normal
+    var pdLineLabel=isThresh?threshLabel(p.pdLine,p._market):(side+' '+p.pdLine);
+    var bookLineLabel=isThresh?(bookLine!==""?threshLabel(bookLine,p._market):""):""+bookLine;
     var gapHtml=p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>';
     pdCellContent=
       '<div class="pd-cell">'+
         '<div style="display:flex;gap:6px;align-items:baseline">'+
-          '<span class="pd-book-strike">'+esc(""+bookLine)+'</span>'+
-          '<span class="pd-arrow">→</span>'+
-          '<span class="pd-line-val '+sideLow+'">'+esc(side+' '+p.pdLine)+'</span>'+
+          (bookLineLabel&&bookLineLabel!==pdLineLabel?'<span class="pd-book-strike">'+esc(bookLineLabel)+'</span><span class="pd-arrow">→</span>':'')+
+          '<span class="pd-line-val '+sideLow+'">'+esc(pdLineLabel)+'</span>'+
         '</div>'+
         '<span class="conf-badge '+cbCls+'">'+confPct+'% confidence</span>'+
         gapHtml+
