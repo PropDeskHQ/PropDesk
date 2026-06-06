@@ -832,21 +832,44 @@ function computeBestBet(p,marketKey){
     return;
   }
   var cons=p.consensus;
+  var forceOver = !!THRESHOLD_MARKETS[marketKey];
   var bestOver=null, bestUnder=null;
-  p.books.forEach(function(b){
-    if(b.over!=null && b.point!=null){
-      if(!bestOver) bestOver=b;
-      else if(b.point>bestOver.point || (b.point===bestOver.point && aToDec(b.over)>aToDec(bestOver.over))) bestOver=b;
+
+  if(forceOver && cons!=null){
+    // Threshold markets: ONLY pick books at (or within 0.5 of) the consensus line.
+    // Without this, books posting alternate longshot lines like "Over 3.5 Hits" at +3000
+    // would win the odds comparison over the standard "Over 1.5" at -130.
+    p.books.forEach(function(b){
+      if(b.over!=null && b.point!=null && Math.abs(b.point-cons)<=0.5){
+        if(!bestOver || aToDec(b.over)>aToDec(bestOver.over)) bestOver=b;
+      }
+      if(b.under!=null && b.point!=null && Math.abs(b.point-cons)<=0.5){
+        if(!bestUnder || aToDec(b.under)>aToDec(bestUnder.under)) bestUnder=b;
+      }
+    });
+    // Fallback: if no books exactly at consensus, take the lowest line available
+    if(!bestOver){
+      p.books.forEach(function(b){
+        if(b.over!=null && b.point!=null){
+          if(!bestOver || b.point<bestOver.point || (b.point===bestOver.point && aToDec(b.over)>aToDec(bestOver.over))) bestOver=b;
+        }
+      });
     }
-    if(b.under!=null && b.point!=null){
-      if(!bestUnder) bestUnder=b;
-      else if(b.point<bestUnder.point || (b.point===bestUnder.point && aToDec(b.under)>aToDec(bestUnder.under))) bestUnder=b;
-    }
-  });
+  } else {
+    p.books.forEach(function(b){
+      if(b.over!=null && b.point!=null){
+        if(!bestOver) bestOver=b;
+        else if(b.point>bestOver.point || (b.point===bestOver.point && aToDec(b.over)>aToDec(bestOver.over))) bestOver=b;
+      }
+      if(b.under!=null && b.point!=null){
+        if(!bestUnder) bestUnder=b;
+        else if(b.point<bestUnder.point || (b.point===bestUnder.point && aToDec(b.under)>aToDec(bestUnder.under))) bestUnder=b;
+      }
+    });
+  }
+
   var overEdge = (bestOver&&cons!=null)? (cons-bestOver.point) : -99;
   var underEdge = (bestUnder&&cons!=null)? (bestUnder.point-cons) : -99;
-  // Threshold markets (NHL goals, MLB hits, etc.) are always Over — "1+ Goals", "2+ Hits"
-  var forceOver = !!THRESHOLD_MARKETS[marketKey];
   var chooseOver;
   if(forceOver) chooseOver=true;
   else if(overEdge>underEdge) chooseOver=true;
@@ -1344,6 +1367,8 @@ async function loadPropOfDay(){
 
   var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;});
   var bestProp=null, bestScore=-1, bestMkt=null;
+  // Alt track: best phase-1 candidate regardless of 65 floor (threshold props score ~50 in phase 1)
+  var bestAlt=null, bestAltScore=-1, bestAltMkt=null;
 
   // Fetch in batches of 5   Odds API handles comma-separated markets but smaller batches are safer
   var BATCH=5;
@@ -1361,8 +1386,11 @@ async function loadPropOfDay(){
           if(p.yesNo) compScore=Math.min(compScore,58);
           if(!p.yesNo && p.bestLine!=null && p.bestLine<=0.5) compScore=Math.min(compScore,62);
           if(isLongshot) compScore=Math.min(compScore,56);
-          // POTD floor: must score ≥65 — flagship pick must represent genuine high confidence
+          // Primary track: phase-1 score ≥65 means already high-confidence without enrichment
           if(compScore>=65 && compScore>bestScore){ bestScore=compScore; bestProp=p; bestMkt=mk; }
+          // Alt track: keep best phase-1 candidate ≥44 so threshold props (score ~50) can
+          // still win POTD after enrichment bumps them to 65+
+          if(compScore>=44 && compScore>bestAltScore){ bestAltScore=compScore; bestAlt=p; bestAltMkt=mk; }
         });
       });
     }catch(e){ /* skip failed batch, try next */ }
@@ -1370,23 +1398,26 @@ async function loadPropOfDay(){
 
   if(ST.eventId!==eid) return; // stale   game changed
 
-  if(ST.eventId!==eid) return;
-
   if(bestProp && bestMkt){
     _potgCache[eid]={prop:bestProp, mkt:bestMkt};
     renderPropOfDay(bestProp, bestMkt);
+  } else if(bestAlt && bestAltMkt){
+    // Best phase-1 candidate didn't hit 65 — enrich it first (gets real hit-rate score),
+    // then apply the 65 floor to the enriched value.
+    // Temporarily set ST.market so getGameLog fetches the right stat keys.
+    var _savedMkt=ST.market;
+    ST.market=bestAltMkt;
+    try{ await enrichWithConfidence(bestAlt); }catch(e){}
+    ST.market=_savedMkt;
+    if(ST.eventId!==eid) return; // game changed during enrichment
+    if(bestAlt.value>=65){
+      _potgCache[eid]={prop:bestAlt, mkt:bestAltMkt};
+      renderPropOfDay(bestAlt, bestAltMkt);
+    } else {
+      renderNoPropOfDay();
+    }
   } else {
-    // Nothing hit 65 from scan — wait for loadBoard, then try current top prop
-    setTimeout(function(){
-      if(ST.eventId!==eid||!ST.props||!ST.props.length) return;
-      var p=ST.props[0];
-      if(p.value>=65){
-        _potgCache[eid]={prop:p, mkt:ST.market};
-        renderPropOfDay(p, ST.market);
-      } else {
-        renderNoPropOfDay();
-      }
-    }, 2500);
+    renderNoPropOfDay();
   }
 }
 
@@ -1524,10 +1555,25 @@ async function loadLOTD(){
     }
     if(legs.length<2){ return; }
     var dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
+    // Hard cap: combined parlay must be ≤ +400 (5.0 decimal). If legs combined to something
+    // wilder (e.g. because alternate longshot lines slipped through), show no LOTD today.
+    if(dec>5.0){
+      var noLotd=el("div","card card-lotd");
+      noLotd.innerHTML=
+        '<div class="card-h"><span class="tag tag-p">Lay of the Day</span>'+
+        '<span class="market" style="color:var(--mut2)">No Lay of the Day</span></div>'+
+        '<div class="pname" style="color:var(--mut2);font-weight:400;font-size:14px">'+
+          'No qualifying parlay today.'+
+        '</div>'+
+        '<div class="analysis">'+
+          'We couldn\'t build a ≤+400 parlay from today\'s available props. Check back as more lines post.'+
+        '</div>';
+      mount.innerHTML=""; mount.appendChild(noLotd); return;
+    }
     var amOdds=decToA(dec);
     var payout=Math.round(dec*100-100);
     var legHtml=legs.map(function(l,i){
-      var bet=l.side+(l.bestLine!=null?" "+l.bestLine:"");
+      var bet=isThreshProp(l)?threshLabel(l.bestLine,l._lotdMk):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
       var bcls=l.side==="Under"?"under":(l.side==="Yes"?"yes":"over");
       return '<div class="leg"><div class="leg-n">'+(i+1)+'</div>'+
         '<div style="flex:1"><div class="ln">'+esc(l.player)+'</div>'+
