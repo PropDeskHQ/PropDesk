@@ -928,31 +928,50 @@ async function enrichWithConfidence(p){
     if(vals.length<8&&p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
 
-    // Threshold markets (NHL goals, MLB hits…) are always Over-direction only
     var thresh=isThreshProp(p);
-    // Run both directions; threshold markets skip Under entirely
-    var overResult=findPropDeskLine(vals,bookLine,true);
-    var underResult=thresh?null:findPropDeskLine(vals,bookLine,false);
-    var overScore=overResult?pdValueScore(overResult.gap,overResult.confidence):0;
-    var underScore=underResult?pdValueScore(underResult.gap,underResult.confidence):0;
 
-    if(!overScore&&!underScore){
-      p.pdResult=null; p.pdNoValue=true; p.value=0; p.enriched=true;
-      updatePropValueDisplay(p); return;
+    if(thresh){
+      // ── Threshold markets (NHL goals, MLB hits…) ──────────────────────
+      // Show raw confidence at the book line. No shifting — never change a
+      // "1+ Goals" to "0+ Goals". Always surface with real confidence %.
+      var confRaw=compositeConf(vals,bookLine,true);
+      if(confRaw===null){ p.enriched=true; updatePropValueDisplay(p); return; }
+      p.pdSide="Over";
+      p.pdLine=bookLine;
+      p.pdGap=0;
+      p.pdConfidence=confRaw;
+      p.pdConfAtBook=confRaw;
+      p.hitRate14=+(confRaw*100).toFixed(1);
+      // Score = straight confidence %; tier labels will reflect it naturally
+      p.value=Math.round(confRaw*100);
+      p.pdResult={line:bookLine,confidence:confRaw,gap:0,confAtBook:confRaw};
+      p.enriched=true;
+    } else {
+      // ── True over/under markets (NBA, NFL…) ───────────────────────────
+      // Find the PropDesk Line by shifting until 62% confidence or discard.
+      var overResult=findPropDeskLine(vals,bookLine,true);
+      var underResult=findPropDeskLine(vals,bookLine,false);
+      var overScore=overResult?pdValueScore(overResult.gap,overResult.confidence):0;
+      var underScore=underResult?pdValueScore(underResult.gap,underResult.confidence):0;
+
+      if(!overScore&&!underScore){
+        p.pdResult=null; p.pdNoValue=true; p.value=0; p.enriched=true;
+        updatePropValueDisplay(p); return;
+      }
+
+      var best, bestScore;
+      if(overScore>=underScore){ best=overResult; bestScore=overScore; p.pdSide="Over"; }
+      else                     { best=underResult; bestScore=underScore; p.pdSide="Under"; }
+
+      p.pdResult=best;
+      p.pdLine=best.line;
+      p.pdGap=best.gap;
+      p.pdConfidence=best.confidence;
+      p.pdConfAtBook=best.confAtBook;
+      p.hitRate14=+(best.confidence*100).toFixed(1);
+      p.value=bestScore;
+      p.enriched=true;
     }
-
-    var best, bestScore;
-    if(overScore>=underScore){ best=overResult; bestScore=overScore; p.pdSide="Over"; }
-    else                     { best=underResult; bestScore=underScore; p.pdSide="Under"; }
-
-    p.pdResult=best;
-    p.pdLine=best.line;
-    p.pdGap=best.gap;
-    p.pdConfidence=best.confidence;
-    p.pdConfAtBook=best.confAtBook;
-    p.hitRate14=+(best.confidence*100).toFixed(1);
-    p.value=bestScore;
-    p.enriched=true;
 
     // Streak on PropDesk line
     var streak=0;
@@ -1006,12 +1025,17 @@ function updatePropPDDisplay(p){
   var confPct=Math.round(conf*100);
   var side=p.pdSide||"Over";
   var sideLow=side.toLowerCase();
-  var cbCls=conf>=0.65?"cb-strong":conf>=0.62?"cb-mod":"cb-none";
   var thresh=isThreshProp(p);
+  // Threshold: 65%+ green, 50%+ yellow, below red (informational — no cutoff)
+  // Over/under: 65%+ green, 62%+ yellow, below red (cutoff at 62%)
+  var cbCls=thresh
+    ?(conf>=0.65?"cb-strong":conf>=0.50?"cb-mod":"cb-none")
+    :(conf>=0.65?"cb-strong":conf>=0.62?"cb-mod":"cb-none");
   // Build line labels — threshold markets use "1+ Goals" format
   var pdLabel=thresh?threshLabel(pdLine,p._market):(side+' '+pdLine);
   var bookLabel=thresh&&rawBookLine!=null?threshLabel(rawBookLine,p._market):(rawBookLine!=null?""+rawBookLine:"");
-  var gapHtml=p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>';
+  // Threshold: no gap badge (line never shifts); Over/Under: show gap if shifted
+  var gapHtml=thresh?"":(p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>');
   cell.innerHTML=
     '<div class="pd-cell">'+
       '<div style="display:flex;gap:6px;align-items:baseline">'+
@@ -1371,7 +1395,9 @@ function lotdText(legs,amOdds){
 function filteredProps(){
   var q=($("searchIn").value||"").toLowerCase().trim();
   return ST.props.filter(function(p){
-    // Once enriched: only show props that have a valid PropDesk Line
+    // Threshold markets always show — confidence is informational, never hidden
+    if(isThreshProp(p)) return !q || p.player.toLowerCase().indexOf(q)>=0;
+    // True over/under: once enriched, only show props with a valid PropDesk Line
     if(p.enriched && p.pdNoValue) return false;
     // Before enrichment: hide clearly low-quality market props
     if(!p.enriched && p.value<44) return false;
@@ -1436,11 +1462,14 @@ function rowHtml(p,cols,idx,silent){
     var confPct=Math.round(p.pdConfidence*100);
     var side=p.pdSide||"Over";
     var sideLow=side.toLowerCase();
-    var cbCls=p.pdConfidence>=0.65?"cb-strong":p.pdConfidence>=0.62?"cb-mod":"cb-none";
+    var cbCls=isThresh
+      ?(p.pdConfidence>=0.65?"cb-strong":p.pdConfidence>=0.50?"cb-mod":"cb-none")
+      :(p.pdConfidence>=0.65?"cb-strong":p.pdConfidence>=0.62?"cb-mod":"cb-none");
     // For threshold markets: show "Book: 1+ → PD: 2+" format; otherwise normal
     var pdLineLabel=isThresh?threshLabel(p.pdLine,p._market):(side+' '+p.pdLine);
     var bookLineLabel=isThresh?(bookLine!==""?threshLabel(bookLine,p._market):""):""+bookLine;
-    var gapHtml=p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>';
+    // Threshold: no gap badge — line never shifts, always at book line
+    var gapHtml=isThresh?"":(p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>');
     pdCellContent=
       '<div class="pd-cell">'+
         '<div style="display:flex;gap:6px;align-items:baseline">'+
