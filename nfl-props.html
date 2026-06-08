@@ -180,7 +180,7 @@ tbody tr.prow{transition:background .15s}
 tbody tr.prow:hover{background:var(--surf2)}
 .pl-name{font-weight:700;font-size:14px}
 .pl-meta{font-size:11px;color:var(--mut);margin-top:2px}
-.pl-acts{display:flex;flex-direction:column;gap:4px;margin-top:7px}
+.pl-acts{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px;margin-top:7px}
 .mini{font-size:10px;font-weight:600;padding:4px 8px;border-radius:6px;background:var(--surf2);border:1px solid var(--bd2);color:var(--mut);width:fit-content;transition:.12s}
 .mini:hover{color:var(--text);border-color:#3a3a3a}
 .mini.act{color:var(--accent);border-color:rgba(0,255,135,.4)}
@@ -1030,10 +1030,10 @@ function computeValue(p){
 async function enrichWithConfidence(p){
   try{
     var gl=await getGameLog(p.player);
-    if(!gl||!gl.values||gl.values.length<3){ p.enriched=true; updatePropValueDisplay(p); return; }
+    if(!gl||!gl.values||gl.values.length<3){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
     var vals=gl.values;
     var bookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
-    if(!bookLine){ p.enriched=true; updatePropValueDisplay(p); return; }
+    if(!bookLine){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
 
     // Store recent averages for chart use
     p.l5Avg=avg(vals.slice(0,Math.min(5,vals.length)));
@@ -1052,7 +1052,7 @@ async function enrichWithConfidence(p){
       if(vals.length<3){
         p.pdNoValue=true; p.value=0; p.enriched=true;
         if(p.guardrailFlags.indexOf("THIN_DATA")<0) p.guardrailFlags.push("THIN_DATA");
-        updatePropValueDisplay(p); return;
+        updatePropValueDisplay(p); updatePropPDDisplay(p); return;
       }
       // Days rest from last start
       var daysRest=99;
@@ -1064,7 +1064,7 @@ async function enrichWithConfidence(p){
       if(daysRest<=3){
         p.pdNoValue=true; p.value=0; p.enriched=true;
         if(p.guardrailFlags.indexOf("SHORT_REST")<0) p.guardrailFlags.push("SHORT_REST");
-        updatePropValueDisplay(p); return;
+        updatePropValueDisplay(p); updatePropPDDisplay(p); return;
       }
       // Determine opponent from current game
       var oppTeam=null;
@@ -1087,7 +1087,7 @@ async function enrichWithConfidence(p){
       if(oppKPct!==null&&oppKPct<BOTTOM10){
         p.pdNoValue=true; p.value=0; p.enriched=true;
         if(p.guardrailFlags.indexOf("CONTACT_TEAM")<0) p.guardrailFlags.push("CONTACT_TEAM");
-        updatePropValueDisplay(p); return;
+        updatePropValueDisplay(p); updatePropPDDisplay(p); return;
       }
       var l5K=avg(vals.slice(0,Math.min(5,vals.length)));
       var sznK=p.seasonAvgEnrich!=null?p.seasonAvgEnrich:avg(vals);
@@ -1143,7 +1143,7 @@ async function enrichWithConfidence(p){
       // Show raw confidence at the book line. No shifting — never change a
       // "1+ Goals" to "0+ Goals". Always surface with real confidence %.
       var confRaw=compositeConf(vals,bookLine,true);
-      if(confRaw===null){ p.enriched=true; updatePropValueDisplay(p); return; }
+      if(confRaw===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
       p.pdSide="Over";
       p.pdLine=bookLine;
       p.pdGap=0;
@@ -1164,7 +1164,7 @@ async function enrichWithConfidence(p){
 
       if(!overScore&&!underScore){
         p.pdResult=null; p.pdNoValue=true; p.value=0; p.enriched=true;
-        updatePropValueDisplay(p); return;
+        updatePropValueDisplay(p); updatePropPDDisplay(p); return;
       }
 
       var best, bestScore;
@@ -1204,7 +1204,12 @@ async function enrichWithConfidence(p){
 
     updatePropValueDisplay(p);
     updatePropPDDisplay(p);
-  }catch(e){}
+  }catch(e){
+    // On any unexpected error ensure the cell never stays at "analyzing..."
+    if(!p.enriched){ p.enriched=true; }
+    updatePropValueDisplay(p);
+    updatePropPDDisplay(p);
+  }
 }
 
 function updatePropValueDisplay(p){
@@ -1347,7 +1352,7 @@ function renderGames(){
     var when=dt.toLocaleDateString([], {month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
     var b=el("button","game"+(ev.id===ST.eventId?" active":""));
     b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
-    b.onclick=function(){ ST.eventId=ev.id; renderGames(); if(ST.market) loadBoard(); loadPropOfDay(); };
+    b.onclick=function(){ ST.eventId=ev.id; _glCache={}; _qsCache={}; renderGames(); if(ST.market) loadBoard(); loadPropOfDay(); };
     c.appendChild(b);
   });
 }
@@ -2221,10 +2226,14 @@ function findInRaw(raw, keys){
 
 var _qsCache={};
 var _glCache={};
+var _CACHE_TTL=10*60*1000; // 10 minutes
+function _cacheGet(store,key){ var e=store[key]; if(e===undefined) return undefined; if(Date.now()-e.t>_CACHE_TTL){ delete store[key]; return undefined; } return e.v; }
+function _cacheSet(store,key,val){ store[key]={v:val,t:Date.now()}; }
 async function getQuickStatsData(name, meta){
   // Include market in key so L5/High refresh when player switches prop type
   var key=ST.sport+"|"+ST.market+"|"+name;
-  if(_qsCache[key]!==undefined) return _qsCache[key];
+  var _qsCached=_cacheGet(_qsCache,key);
+  if(_qsCached!==undefined) return _qsCached;
   var result=null;
   var yr=new Date().getFullYear();
   try{
@@ -2329,19 +2338,20 @@ async function getQuickStatsData(name, meta){
       }catch(e){}
     }
   }catch(e){ result=null; }
-  _qsCache[key]=result;
+  _cacheSet(_qsCache,key,result);
   return result;
 }
 
 /* ============ GAME LOG for charts ============ */
 async function getGameLog(name){
   var ckey=ST.sport+"|"+ST.market+"|"+name;
-  if(_glCache[ckey]!==undefined) return _glCache[ckey];
+  var cached=_cacheGet(_glCache,ckey);
+  if(cached!==undefined) return cached;
   var meta=await getMeta(name);
-  if(!meta||!meta.id){ _glCache[ckey]=null; return null; }
+  if(!meta||!meta.id){ _cacheSet(_glCache,ckey,null); return null; }
   var result=null;
   try{ result=ST.sport==="baseball_mlb"?await mlbGameLog(meta.id):await espnGameLog(meta.id); }catch(e){}
-  _glCache[ckey]=result;
+  _cacheSet(_glCache,ckey,result);
   return result;
 }
 async function mlbGameLog(id){
