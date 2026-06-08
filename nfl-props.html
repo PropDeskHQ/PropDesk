@@ -116,6 +116,48 @@ input:focus,select:focus{border-color:var(--accent)}
 .leg .ls{margin-left:auto;font-size:12px;color:var(--mut);font-weight:700}
 .parlay-odds{font-size:28px;font-weight:800;color:var(--purple)}
 .payout{font-size:13px;color:var(--mut)}
+
+/* ---- MANUAL PARLAY BUILDER BAR ---- */
+.mpbar{position:fixed;bottom:0;left:0;right:0;z-index:70;background:var(--surf);border-top:2px solid var(--bd2);box-shadow:0 -6px 30px rgba(0,0,0,.65);transform:translateY(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.mpbar.visible{transform:translateY(0)}
+.mpbar-top{display:flex;align-items:center;gap:8px;padding:10px 14px;min-height:52px;cursor:pointer;user-select:none}
+.mpbar-icon{font-size:16px;flex-shrink:0}
+.mpbar-title{font-weight:800;font-size:13px;white-space:nowrap}
+.mpbar-count{font-size:12px;color:var(--mut);white-space:nowrap}
+.mpbar-codds{font-size:20px;font-weight:800;color:var(--purple);margin-left:4px;white-space:nowrap}
+.mpbar-chip{padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
+.mpbar-chip.strong{background:rgba(0,255,135,.13);color:var(--accent)}
+.mpbar-chip.good{background:rgba(167,139,250,.15);color:var(--purple)}
+.mpbar-chip.fair{background:rgba(255,204,0,.12);color:var(--yellow)}
+.mpbar-chip.risky{background:rgba(255,79,79,.12);color:var(--red)}
+.mpbar-spacer{flex:1}
+.mpbar-body{padding:0 14px 12px;border-top:1px solid var(--bd2);max-height:62vh;overflow-y:auto}
+.mpleg{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--bd);border-radius:10px;padding:8px 11px;margin-bottom:6px}
+.mpleg-n{width:20px;height:20px;border-radius:50%;background:rgba(167,139,250,.13);color:var(--purple);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mpleg-info{flex:1;min-width:0}
+.mpleg-name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mpleg-meta{font-size:11px;color:var(--mut)}
+.mpleg-bet{font-size:12px;font-weight:700;color:var(--accent);white-space:nowrap;flex-shrink:0}
+.mpleg-bet.under{color:var(--blue)}.mpleg-bet.thresh{color:var(--yellow)}
+.mpleg-score{font-size:12px;font-weight:700;color:var(--mut);white-space:nowrap;flex-shrink:0;margin-left:6px}
+.mpleg-rm{color:var(--mut2);font-size:18px;padding:1px 6px;border-radius:6px;transition:.15s;flex-shrink:0;cursor:pointer;line-height:1}
+.mpleg-rm:hover{color:var(--red);background:rgba(255,79,79,.1)}
+.mpgrade{background:var(--surf2);border:1px solid var(--bd2);border-radius:12px;padding:11px 13px;margin-bottom:8px}
+.mpgrade-h{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.mpgrade-score{font-size:28px;font-weight:900;line-height:1}
+.mpgrade-score.strong{color:var(--accent)}.mpgrade-score.good{color:var(--purple)}.mpgrade-score.fair{color:var(--yellow)}.mpgrade-score.risky{color:var(--red)}
+.mpgrade-tier{font-size:11px;font-weight:800;letter-spacing:1px}
+.mpgrade-tier.strong{color:var(--accent)}.mpgrade-tier.good{color:var(--purple)}.mpgrade-tier.fair{color:var(--yellow)}.mpgrade-tier.risky{color:var(--red)}
+.mpgrade-rows{display:flex;flex-direction:column;gap:4px}
+.mpgrade-row{display:flex;justify-content:space-between;font-size:12px;color:var(--mut)}
+.mpgrade-row b{color:var(--text);font-weight:600}
+.mpgrade-warn{font-size:11px;color:var(--yellow);margin-top:7px;display:flex;flex-direction:column;gap:2px}
+.mpgrade-note{font-size:12px;color:var(--mut);line-height:1.5;margin-top:7px;padding-top:7px;border-top:1px solid var(--bd)}
+.mpbar-foot{display:flex;gap:8px;padding:2px 0 2px}
+.mpb-add{color:var(--accent)!important;border-color:rgba(0,255,135,.3)!important;transition:.15s}
+.mpb-add.in-cart{color:var(--mut)!important;border-color:var(--bd2)!important}
+/* ---- END MANUAL PARLAY BAR ---- */
+
 .warn{font-size:12px;color:var(--yellow);margin-top:8px;background:rgba(255,204,0,.08);border:1px solid rgba(255,204,0,.25);border-radius:8px;padding:7px 10px}
 
 /* TOP VALUE BANNER */
@@ -690,7 +732,8 @@ var ST = {
   live:false,
   liveTimer:null,
   liveSecs:0,
-  charts:[]
+  charts:[],
+  parlayCart:[]
 };
 
 /* ============ MATH ============ */
@@ -1281,7 +1324,7 @@ function renderSportTabs(){
   SPORTS.forEach(function(sp){
     var b=el("button","pill"+(sp.key===ST.sport?" active":""),sp.label);
     b.onclick=function(){ if(ST.sport===sp.key) return; ST.sport=sp.key; ST.eventId=null; ST.props=[]; ST.snapshot={};
-      ST.market=MARKETS[sp.key][0].k; renderSportTabs(); renderPropTabs(); clearBoard(); fetchEvents();
+      ST.market=MARKETS[sp.key][0].k; renderSportTabs(); renderPropTabs(); clearParlay(); clearBoard(); fetchEvents();
     };
     c.appendChild(b);
   });
@@ -1764,6 +1807,7 @@ function rowHtml(p,cols,idx,silent){
         '<button class="mini" data-act="stats" data-pid="'+p._id+'">More Stats</button>'+
         '<button class="mini" data-act="save" data-pid="'+p._id+'">Save</button>'+
         '<button class="mini" data-act="share" data-pid="'+p._id+'">Share</button>'+
+        (function(){ var inCart=ST.parlayCart&&ST.parlayCart.find(function(c){return c._id===p._id;}); return '<button class="mini mpb-add'+(inCart?' in-cart':'')+'" data-act="parlay" data-pid="'+p._id+'">'+(inCart?'✓ Added':'＋ Parlay')+'</button>'; })()+
       '</div>'+
     '</td>'+
     '<td><span class="bb '+bbcls+'">'+esc(bb)+'</span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'</div>':'')+'</td>'+
@@ -1816,6 +1860,7 @@ function bindRowActions(){
       if(act==="save") return savePick(p,b);
       if(act==="analyze") return toggleExpand(p,"analyze",b);
       if(act==="stats") return toggleExpand(p,"stats",b);
+      if(act==="parlay") return toggleParlayCart(p,b);
     };
   });
 }
@@ -3199,6 +3244,20 @@ function init(){
   $("parlayModal").addEventListener("click",function(e){ if(e.target===$("parlayModal")) closeParlay(); });
   $("genParlay").onclick=generateParlay;
 
+  // Manual parlay bar
+  var mpExpanded=false;
+  function mpToggle(){ mpExpanded=!mpExpanded; renderParlayBar(mpExpanded); }
+  $("mpbarTop").addEventListener("click",function(e){
+    if(e.target.closest("#mpbarClearBtn")||e.target.closest("#mpbarReviewBtn")) return;
+    mpToggle();
+  });
+  $("mpbarReviewBtn").onclick=function(e){ e.stopPropagation(); mpToggle(); };
+  $("mpbarClearBtn").onclick=function(e){ e.stopPropagation(); clearParlay(); mpExpanded=false; };
+  $("mpbarSaveBtn").onclick=saveManualParlay;
+  $("mpbarCollapseBtn").onclick=function(){ mpExpanded=false; renderParlayBar(false); };
+  // expose so cart functions can call it
+  window._mpRender=function(expanded){ if(expanded!=null) mpExpanded=expanded; renderParlayBar(mpExpanded); };
+
   $("saveUnit").onclick=function(){ localStorage.setItem("pe_unit",parseFloat($("unitIn").value)||0); renderHistory(); toast("Unit size saved"); };
   $("clearHist").onclick=function(){ if(confirm("Clear all saved picks and parlays?")){ localStorage.removeItem("pe_hist"); renderHistory(); } };
 
@@ -3216,8 +3275,230 @@ function init(){
   if(k) fetchEvents();
 }
 
+/* ============================================================
+   MANUAL PARLAY CART
+   ============================================================ */
+
+function toggleParlayCart(p, btn){
+  var idx = ST.parlayCart.findIndex(function(c){ return c._id===p._id; });
+  if(idx>=0){
+    ST.parlayCart.splice(idx,1);
+    btn.textContent="＋ Parlay"; btn.classList.remove("in-cart");
+  } else {
+    ST.parlayCart.push(p);
+    btn.textContent="✓ Added"; btn.classList.add("in-cart");
+  }
+  if(window._mpRender) window._mpRender();
+  else renderParlayBar(false);
+}
+
+function clearParlay(){
+  // reset all + Parlay buttons
+  ST.parlayCart.forEach(function(p){
+    var btn=document.querySelector('[data-act="parlay"][data-pid="'+p._id+'"]');
+    if(btn){ btn.textContent="＋ Parlay"; btn.classList.remove("in-cart"); }
+  });
+  ST.parlayCart=[];
+  if(window._mpRender) window._mpRender(false);
+  else renderParlayBar(false);
+}
+
+function gradeParlayCart(){
+  var legs=ST.parlayCart;
+  if(legs.length<2) return null;
+
+  // Base: avg value score of legs
+  var base=legs.reduce(function(a,l){ return a+l.value; },0)/legs.length;
+
+  // Enrichment confidence bonus — if any legs have been enriched via game-log
+  var enriched=legs.filter(function(l){ return l.pdConfidence!=null && !l.pdNoValue; });
+  var confBonus=0, avgConfPct=null;
+  if(enriched.length>0){
+    var avgConf=enriched.reduce(function(a,l){ return a+l.pdConfidence; },0)/enriched.length;
+    avgConfPct=Math.round(avgConf*100);
+    confBonus=(avgConf-0.5)*20; // +0 at 50%, +10 at 100%, negative if <50%
+  }
+
+  // Combined parlay odds
+  var combinedDec=legs.reduce(function(acc,l){ return acc*aToDec(l.bestOdds!=null?l.bestOdds:-110); },1);
+  var combinedAm=decToA(combinedDec);
+  // Odds penalty for monster parlays (longshot stacks)
+  var oddsPenalty=combinedDec>12?-15:combinedDec>8?-8:combinedDec>6?-4:0;
+  // Slight bonus for sweet-spot parlay odds (+150 to +400)
+  var oddsBonus=(combinedAm>=150&&combinedAm<=400)?5:0;
+
+  // Guardrail flag penalties
+  var warnings=[], flagPenalty=0;
+  legs.forEach(function(l){
+    (l.guardrailFlags||[]).forEach(function(f){
+      var serious=f==="THIN_DATA"||f==="FEW_BOOKS"||f==="DATA_FLIP"||f==="BAD_REST"||f==="LOW_OPP_KPct";
+      if(serious){
+        flagPenalty-=5;
+        warnings.push(l.player+": "+f.replace(/_/g," ").toLowerCase());
+      }
+    });
+    if(l.pdNoValue){ flagPenalty-=4; warnings.push(l.player+": insufficient data"); }
+  });
+
+  // Leg count modifier
+  var legMod=legs.length===2?-3:legs.length===3||legs.length===4?4:legs.length===5?2:-5;
+
+  var raw=base+confBonus+oddsPenalty+oddsBonus+flagPenalty+legMod;
+  var score=Math.round(Math.max(0,Math.min(97,raw)));
+
+  var tier,cls,note;
+  if(score>=80){ tier="STRONG"; cls="strong";
+    note="PropDesk likes this parlay — every leg has strong historical backing and favorable pricing. Size it as a swing bet and consider playing legs individually at books that limit correlated props.";
+  } else if(score>=65){ tier="GOOD"; cls="good";
+    note="Solid parlay. The legs show positive value metrics and the combined odds fall in a reasonable range. Keep stakes measured.";
+  } else if(score>=50){ tier="FAIR"; cls="fair";
+    note="Mixed signals across some legs. Consider splitting your stake between this parlay and the strongest individual legs. ";
+  } else { tier="RISKY"; cls="risky";
+    note="One or more legs have significant data or pricing concerns. If you play this, size it as a small swing bet only.";
+  }
+
+  return { score:score, tier:tier, cls:cls, note:note,
+    base:Math.round(base), confBonus:confBonus, avgConfPct:avgConfPct,
+    combinedDec:combinedDec, combinedAm:combinedAm, warnings:warnings };
+}
+
+function renderParlayBar(expanded){
+  var bar=$("myParlayBar");
+  if(!bar) return;
+  var legs=ST.parlayCart;
+
+  if(!legs.length){ bar.classList.remove("visible"); return; }
+  bar.classList.add("visible");
+
+  // Update header
+  $("mpbarCount").textContent=legs.length+" leg"+(legs.length===1?"":"s");
+
+  var combinedDec=legs.reduce(function(acc,l){ return acc*aToDec(l.bestOdds!=null?l.bestOdds:-110); },1);
+  var co=$("mpbarCodds");
+  if(legs.length>=2){
+    co.style.display=""; co.textContent=fmtOdds(decToA(combinedDec));
+  } else { co.style.display="none"; }
+
+  var grade=gradeParlayCart();
+  var chip=$("mpbarChip");
+  if(grade){ chip.style.display=""; chip.className="mpbar-chip "+grade.cls; chip.textContent=grade.score+"/100 "+grade.tier; }
+  else { chip.style.display="none"; }
+
+  // Review button text
+  var revBtn=$("mpbarReviewBtn");
+  if(revBtn) revBtn.textContent=expanded?"▼ Collapse":"Review ▲";
+
+  if(!expanded){ $("mpbarBody").style.display="none"; return; }
+  $("mpbarBody").style.display="";
+
+  // ---- Render legs ----
+  var legHtml="";
+  legs.forEach(function(l,i){
+    var thresh=isThreshProp(l);
+    var betLabel=thresh?threshLabel(l.bestLine,l._market):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
+    var oddsStr=l.bestOdds!=null?" "+fmtOdds(l.bestOdds):"";
+    var bcls=thresh?"thresh":l.side==="Under"?"under":"over";
+    legHtml+=
+      '<div class="mpleg">'+
+        '<div class="mpleg-n">'+(i+1)+'</div>'+
+        '<div class="mpleg-info">'+
+          '<div class="mpleg-name">'+esc(l.player)+'</div>'+
+          '<div class="mpleg-meta">'+esc(marketName(l._market||ST.market))+(l.bestBook?' · '+esc(l.bestBook.book):'')+'</div>'+
+        '</div>'+
+        '<span class="mpleg-bet '+bcls+'">'+esc(betLabel)+esc(oddsStr)+'</span>'+
+        '<span class="mpleg-score">'+l.value+'/100</span>'+
+        '<span class="mpleg-rm" role="button" aria-label="Remove" onclick="mpLegRemove(\''+l._id+'\')">×</span>'+
+      '</div>';
+  });
+  $("mpbarLegs").innerHTML=legHtml;
+
+  // ---- Render grade ----
+  var gradeHtml="";
+  if(grade){
+    var confRow=grade.avgConfPct!=null?'<div class="mpgrade-row"><span>Avg hit-rate confidence</span><b>'+grade.avgConfPct+'%</b></div>':"";
+    var warnHtml=grade.warnings.length?'<div class="mpgrade-warn">⚠ '+grade.warnings.map(esc).join('<br>⚠ ')+'</div>':"";
+    gradeHtml=
+      '<div class="mpgrade">'+
+        '<div class="mpgrade-h">'+
+          '<span class="mpgrade-score '+grade.cls+'">'+grade.score+'</span>'+
+          '<div>'+
+            '<div class="mpgrade-tier '+grade.cls+'">'+grade.tier+'</div>'+
+            '<div style="font-size:11px;color:var(--mut)">PropDesk Parlay Grade</div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="mpgrade-rows">'+
+          '<div class="mpgrade-row"><span>Avg leg value</span><b>'+grade.base+'/100</b></div>'+
+          confRow+
+          '<div class="mpgrade-row"><span>Combined odds</span><b>'+esc(fmtOdds(grade.combinedAm))+'</b></div>'+
+          '<div class="mpgrade-row"><span>Legs</span><b>'+legs.length+'</b></div>'+
+        '</div>'+
+        warnHtml+
+        '<div class="mpgrade-note">'+esc(grade.note)+'</div>'+
+      '</div>';
+  }
+  $("mpbarGrade").innerHTML=gradeHtml;
+}
+
+// called from inline onclick in leg list
+function mpLegRemove(pid){
+  var idx=ST.parlayCart.findIndex(function(c){ return c._id===pid; });
+  if(idx>=0) ST.parlayCart.splice(idx,1);
+  var btn=document.querySelector('[data-act="parlay"][data-pid="'+pid+'"]');
+  if(btn){ btn.textContent="＋ Parlay"; btn.classList.remove("in-cart"); }
+  if(window._mpRender) window._mpRender();
+  else renderParlayBar(false);
+}
+
+function saveManualParlay(){
+  var legs=ST.parlayCart;
+  if(legs.length<2){ toast("Add at least 2 legs first"); return; }
+  var grade=gradeParlayCart();
+  var combinedDec=legs.reduce(function(acc,l){ return acc*aToDec(l.bestOdds!=null?l.bestOdds:-110); },1);
+  var hist=loadHist();
+  hist.unshift({
+    id:Date.now()+"_"+Math.random().toString(36).slice(2,6),
+    type:"parlay", date:new Date().toISOString(), sport:ST.sport, sportLabel:sportLabel(ST.sport),
+    odds:decToA(combinedDec),
+    value:grade?grade.score:Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length),
+    legs:legs.map(function(l){
+      var thresh=isThreshProp(l);
+      var betStr=(thresh?threshLabel(l.bestLine,l._market):(l.side+(l.bestLine!=null?" "+l.bestLine:"")))+(l.bestOdds!=null?" "+fmtOdds(l.bestOdds):"");
+      return { player:l.player, market:marketName(l._market||ST.market), bet:betStr, value:l.value };
+    }),
+    result:"pending"
+  });
+  saveHist(hist);
+  toast("Parlay saved to history!");
+  clearParlay();
+  if(window._mpRender) window._mpRender(false);
+}
+
+/* END MANUAL PARLAY CART */
+
 document.addEventListener("DOMContentLoaded",init);
 </script>
+
+<!-- MANUAL PARLAY BUILDER BAR -->
+<div id="myParlayBar" class="mpbar" role="region" aria-label="My Parlay Builder">
+  <div class="mpbar-top" id="mpbarTop">
+    <span class="mpbar-icon">🎰</span>
+    <span class="mpbar-title">My Parlay</span>
+    <span id="mpbarCount" class="mpbar-count">0 legs</span>
+    <span id="mpbarCodds" class="mpbar-codds" style="display:none"></span>
+    <span id="mpbarChip" class="mpbar-chip" style="display:none"></span>
+    <span class="mpbar-spacer"></span>
+    <button class="btn" id="mpbarClearBtn" style="font-size:12px;padding:5px 10px;margin-right:4px">Clear</button>
+    <button class="btn btn-accent" id="mpbarReviewBtn" style="font-size:12px;padding:5px 10px">Review ▲</button>
+  </div>
+  <div id="mpbarBody" class="mpbar-body" style="display:none">
+    <div id="mpbarLegs" style="margin-top:10px"></div>
+    <div id="mpbarGrade"></div>
+    <div class="mpbar-foot">
+      <button class="btn btn-accent" id="mpbarSaveBtn" style="flex:1">💾 Save Parlay</button>
+      <button class="btn" id="mpbarCollapseBtn" style="padding:7px 14px">▼ Collapse</button>
+    </div>
+  </div>
+</div>
 
 <!-- Chart.js loaded at BOTTOM of body so it does not block initial render -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
