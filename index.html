@@ -1667,9 +1667,6 @@ async function loadLOTD(){
     if(!legs) legs=pool.slice(0,2);
 
     if(!legs||legs.length<2){ return; }
-    var dec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-    var amOdds=decToA(dec);
-    var payout=Math.round(dec*100-100);
     var legHtml=legs.map(function(l,i){
       var bet=isThreshProp(l)?threshLabel(l.bestLine,l._lotdMk):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
       var bcls=l.side==="Under"?"under":(l.side==="Yes"?"yes":"over");
@@ -1684,22 +1681,20 @@ async function loadLOTD(){
     c.innerHTML=
       '<div class="card-h"><span class="tag tag-p">Lay of the Day</span>'+
         '<span class="market">'+legs.length+'-leg parlay</span>'+
-        '<div class="vscore" style="margin-left:auto"><b style="color:var(--purple)">'+fmtOdds(amOdds)+'</b></div></div>'+
+        '<div class="vscore" style="margin-left:auto"><b style="color:var(--purple)">'+avgScore+'/100</b></div></div>'+
       '<div class="legs">'+legHtml+'</div>'+
-      '<div class="payout">$100 wins ~$'+payout+' &nbsp;|&nbsp; Avg value score: '+avgScore+'/100</div>'+
-      '<div class="analysis">'+lotdText(legs,amOdds)+'</div>';
+      '<div class="analysis">'+lotdText(legs)+'</div>';
     mount.innerHTML="";
     mount.appendChild(c);
   }catch(e){}
 }
 
-function lotdText(legs,amOdds){
+function lotdText(legs){
   var names=legs.map(function(l){return l.player;}).join(", ");
   var diverse=(ST.sport!=="americanfootball_nfl")?" across different stat categories so the legs are independent":"";
-  var maxLegDec=Math.max.apply(null,legs.map(function(l){return aToDec(l.bestOdds);}));
-  var maxLegStr=fmtOdds(decToA(maxLegDec));
-  return "Today's Lay of the Day combines "+esc(names)+" into a "+fmtOdds(amOdds)+" parlay"+diverse+
-    ". Every leg scored "+PARLAY_MIN_SCORE+" or better on our value model; longest individual price is "+maxLegStr+" — real edges stacked together, not longshot dart throws."+
+  var avgConf=Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length);
+  return "Today's Lay of the Day combines "+esc(names)+diverse+
+    ". Every leg scored "+PARLAY_MIN_SCORE+" or better on our value model — PropDesk's avg confidence is "+avgConf+"/100."+
     " Size this as a swing bet: every leg must hit, so keep stakes modest and consider playing the legs individually if your book restricts correlated props.";
 }
 
@@ -3096,17 +3091,20 @@ function generateParlay(){
   renderParlayResult(legs,finalDec,decToA(finalDec),target);
 }
 function renderParlayResult(legs,dec,am,target){
-  var payout=(aToDec(am)*100).toFixed(0);
+  var avgConf=Math.round(avg(legs.map(function(l){return l.value;})));
   var legHtml="";
   legs.forEach(function(l){
-    var bet=l.side+(l.bestLine!=null?" "+l.bestLine:"")+" "+fmtOdds(l.bestOdds);
+    var isThresh=isThreshProp(l);
+    var bet=isThresh?threshLabel(l.bestLine,l._market):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
     legHtml+='<div class="leg"><div><div class="ln">'+esc(l.player)+'</div><div class="lm">'+esc(marketName(ST.market))+' - '+esc(l.bestBook?l.bestBook.book:"")+'</div></div>'+
       '<div class="lb">'+esc(bet)+'</div><div class="ls">'+l.value+'/100</div></div>';
   });
-  var targetNote=(!isNaN(target)&&target>0)?'<div class="payout">Target was '+fmtOdds(target)+'.</div>':'';
   $("parlayResult").innerHTML=
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><span class="parlay-odds">'+fmtOdds(am)+'</span><span class="payout">'+legs.length+' legs - $100 returns about $'+payout+'</span></div>'+
-    '<div class="legs">'+legHtml+'</div>'+targetNote+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
+      '<span class="parlay-odds" style="font-size:26px">'+avgConf+'/100</span>'+
+      '<span class="payout">PropDesk avg confidence &nbsp;·&nbsp; '+legs.length+' legs</span>'+
+    '</div>'+
+    '<div class="legs">'+legHtml+'</div>'+
     '<button class="btn" id="saveParlay" style="margin-right:8px">Save Parlay</button>'+
     '<button class="btn btn-accent" id="rebuildParlay">Rebuild</button>';
   $("rebuildParlay").onclick=generateParlay;
@@ -3360,7 +3358,7 @@ function gradeParlayCart(){
   if(score>=80){ tier="STRONG"; cls="strong";
     note="PropDesk likes this parlay — every leg has strong historical backing and favorable pricing. Size it as a swing bet and consider playing legs individually at books that limit correlated props.";
   } else if(score>=65){ tier="GOOD"; cls="good";
-    note="Solid parlay. The legs show positive value metrics and the combined odds fall in a reasonable range. Keep stakes measured.";
+    note="Solid parlay. The legs show positive value metrics and each leg has solid historical backing. Keep stakes measured.";
   } else if(score>=50){ tier="FAIR"; cls="fair";
     note="Mixed signals across some legs. Consider splitting your stake between this parlay and the strongest individual legs. ";
   } else { tier="RISKY"; cls="risky";
@@ -3369,7 +3367,7 @@ function gradeParlayCart(){
 
   return { score:score, tier:tier, cls:cls, note:note,
     base:Math.round(base), confBonus:confBonus, avgConfPct:avgConfPct,
-    combinedDec:combinedDec, combinedAm:combinedAm, warnings:warnings };
+    warnings:warnings };
 }
 
 function renderParlayBar(expanded){
@@ -3383,11 +3381,8 @@ function renderParlayBar(expanded){
   // Update header
   $("mpbarCount").textContent=legs.length+" leg"+(legs.length===1?"":"s");
 
-  var combinedDec=legs.reduce(function(acc,l){ return acc*aToDec(l.bestOdds!=null?l.bestOdds:-110); },1);
   var co=$("mpbarCodds");
-  if(legs.length>=2){
-    co.style.display=""; co.textContent=fmtOdds(decToA(combinedDec));
-  } else { co.style.display="none"; }
+  co.style.display="none"; // odds hidden — legs span multiple books
 
   var grade=gradeParlayCart();
   var chip=$("mpbarChip");
@@ -3439,7 +3434,6 @@ function renderParlayBar(expanded){
         '<div class="mpgrade-rows">'+
           '<div class="mpgrade-row"><span>Avg leg value</span><b>'+grade.base+'/100</b></div>'+
           confRow+
-          '<div class="mpgrade-row"><span>Combined odds</span><b>'+esc(fmtOdds(grade.combinedAm))+'</b></div>'+
           '<div class="mpgrade-row"><span>Legs</span><b>'+legs.length+'</b></div>'+
         '</div>'+
         warnHtml+
