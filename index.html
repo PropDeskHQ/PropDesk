@@ -2065,13 +2065,15 @@ async function renderStats(p){
   if(!mount.parentNode) return;
   var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
   var html="";
+  var seasonLbl=ST.sport==="icehockey_nhl"?"Season Totals":"Season Averages";
   if(res && res.season && Object.keys(res.season).length){
-    html+='<div class="subh">Season Averages</div><div class="statgrid">'+statBlock(res.season)+'</div>';
+    html+='<div class="subh">'+seasonLbl+'</div><div class="statgrid">'+statBlock(res.season)+'</div>';
   } else {
-    html+='<div class="subh">Season Averages</div><div class="empty" style="padding:14px">Season stats unavailable for this player.</div>';
+    html+='<div class="subh">'+seasonLbl+'</div><div class="empty" style="padding:14px">Season stats unavailable for this player.</div>';
   }
   if(res && res.playoff && Object.keys(res.playoff).length){
-    html+='<div class="subh">Playoff / Postseason Averages</div><div class="statgrid">'+statBlock(res.playoff)+'</div>';
+    var playoffLbl=ST.sport==="icehockey_nhl"?"Playoff Totals":"Playoff / Postseason Averages";
+    html+='<div class="subh">'+playoffLbl+'</div><div class="statgrid">'+statBlock(res.playoff)+'</div>';
   }
   if(res && res.gamelog && res.gamelog.length){
     html+='<div class="subh">Last 10 Games</div>'+gameLogTable(res.gamelog, res.glCols, p, line);
@@ -2536,15 +2538,17 @@ async function nhlApiStats(nhlId){
     if(!r.ok)return null;
     var d=await r.json();
     var fs=d.featuredStats;
-    // Use seasonTotals to find the most recently completed NHL regular season
-    // This is more reliable than featuredStats which may lag or be missing
-    var nhlTots=(d.seasonTotals||[]).filter(function(t){return t.gameTypeId===2&&t.leagueAbbrev==="NHL";});
-    nhlTots.sort(function(a,b){return (b.season||0)-(a.season||0);});
-    var ss=nhlTots[0]||(fs&&fs.regularSeason&&fs.regularSeason.subSeason);
+    // featuredStats.regularSeason.subSeason = current season totals (most accurate / up-to-date)
+    // Fall back to seasonTotals if featuredStats is missing
+    var ss=fs&&fs.regularSeason&&fs.regularSeason.subSeason;
+    if(!ss||!ss.gamesPlayed){
+      var nhlTots=(d.seasonTotals||[]).filter(function(t){return t.gameTypeId===2&&t.leagueAbbrev==="NHL";});
+      nhlTots.sort(function(a,b){return (b.season||0)-(a.season||0);});
+      if(nhlTots.length) ss=nhlTots[0];
+    }
     if(ss){
-      var sn=ss.season||0; var sy=sn?String(sn).slice(2,4)+"-"+String(sn).slice(6,8):"";
-      var sg={"Season":sy||undefined,"GP":ss.gamesPlayed,"G":ss.goals,"A":ss.assists,"PTS":ss.points,"+/-":ss.plusMinus,"SOG":ss.shots||ss.shotsOnGoal,"PIM":ss.pim};
-      Object.keys(sg).forEach(function(k){if(sg[k]==null||sg[k]===undefined)delete sg[k];});
+      var sg={"GP":ss.gamesPlayed,"G":ss.goals,"A":ss.assists,"PTS":ss.points,"+/-":ss.plusMinus,"SOG":ss.shots||ss.shotsOnGoal,"PIM":ss.pim};
+      Object.keys(sg).forEach(function(k){if(sg[k]==null)delete sg[k];});
       out.season=sg;
     }
     var ps=fs&&fs.playoffs&&fs.playoffs.subSeason;
