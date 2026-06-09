@@ -1282,15 +1282,6 @@ function updatePropPDDisplay(p){
       '</div>'+
       gapHtml+
     '</div>';
-  // Also update the mini stat row if visible
-  var statsRow=document.getElementById("pdstats-"+p._id);
-  if(statsRow){
-    var l5=p.l5Avg!=null?p.l5Avg.toFixed(1):"-";
-    var szn=p.seasonAvgEnrich!=null?p.seasonAvgEnrich.toFixed(1):"-";
-    statsRow.innerHTML=
-      '<span><span class="ps-lbl">L5:</span><span class="ps-val">'+esc(l5)+'</span></span>'+
-      '<span><span class="ps-lbl">Szn:</span><span class="ps-val">'+esc(szn)+'</span></span>';
-  }
 }
 
 function applyPropFlags(p){
@@ -1392,15 +1383,13 @@ function clearBoard(){_potgCache={};
 /* ============ LOAD BOARD ============ */
 function skeletonTable(){
   var bookCols=ST.book?1:0;
-  var h='<div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>L5 / Szn</th><th>EV%</th><th>Value</th>';
+  var h='<div class="tbl-wrap"><table><thead><tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>Value</th>';
   for(var i=0;i<bookCols;i++) h+='<th>Book</th>';
   h+='</tr></thead><tbody>';
   for(var r=0;r<8;r++){
     h+='<tr><td><div class="skel" style="width:120px"></div><div class="skel" style="width:70px;margin-top:6px;height:10px"></div></td>'+
        '<td><div class="skel" style="width:70px"></div></td>'+
        '<td><div class="skel" style="width:100px"></div><div class="skel" style="width:70px;margin-top:5px;height:10px"></div></td>'+
-       '<td><div class="skel" style="width:50px"></div></td>'+
-       '<td><div class="skel" style="width:40px"></div></td>'+
        '<td><div class="skel" style="width:34px;height:18px"></div></td>';
     for(var c=0;c<bookCols;c++) h+='<td><div class="skel" style="width:70px"></div></td>';
     h+='</tr>';
@@ -1751,7 +1740,7 @@ function renderTable(silent){
   var props=filteredProps();
   var cols=bookColumns();
   $("resCount").textContent=props.length+" prop"+(props.length===1?"":"s");
-  var thead='<tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>L5 / Szn</th><th>EV%</th><th>Confidence</th>';
+  var thead='<tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>Confidence</th>';
   cols.forEach(function(b){ thead+='<th>'+esc(b)+'</th>'; });
   thead+='</tr>';
   var tb="";
@@ -1845,14 +1834,7 @@ function rowHtml(p,cols,idx,silent){
       '</div>'+
     '</td>'+
     '<td><span class="bb '+bbcls+'">'+esc(bb)+'</span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'</div>':'')+'</td>'+
-    '<td id="pdcell-'+p._id+'">'+pdCellContent+'</td>'+
-    '<td>'+
-      '<div class="pd-stats" id="pdstats-'+p._id+'">'+
-        (p.l5Avg!=null?'<span><span class="ps-lbl">L5:</span><span class="ps-val">'+p.l5Avg.toFixed(1)+'</span></span>':'<span class="ps-lbl">—</span>')+
-        (p.seasonAvgEnrich!=null?'<span><span class="ps-lbl">Szn:</span><span class="ps-val">'+p.seasonAvgEnrich.toFixed(1)+'</span></span>':'')+
-      '</div>'+
-    '</td>'+
-    '<td>'+evHtml+'</td>';
+    '<td id="pdcell-'+p._id+'">'+pdCellContent+'</td>';
   // Confidence column — show X% when enriched, — while pending
   var isConf=p.pdConfidence!=null&&!p.pdNoValue;
   var confPct=isConf?Math.round(p.pdConfidence*100):null;
@@ -1983,8 +1965,9 @@ async function renderAnalyze(p){
     ["Book Line", p.side+" "+(bookLine||"-")],
     ["PropDesk Line", pdLabel],
     ["Confidence", confPct!=null?confPct+"%":"-"],
-    ["Season Avg", seasonAvg!=null?fmtStat(seasonAvg):"-"],
+    ["EV%", p.evOver!=null?(p.evOver>=0?"+":"")+p.evOver.toFixed(1)+"%":"-"],
     ["L5 Avg", l5avg!=null?fmtStat(l5avg):"-"],
+    ["Season Avg", seasonAvg!=null?fmtStat(seasonAvg):"-"],
     ["Hit Rate", hitRate!=null?hitRate.toFixed(0)+"%":"-"]
   ];
   var scHtml=sc.map(function(s){ return '<div class="statcard"><div class="sc-l">'+esc(s[0])+'</div><div class="sc-v">'+esc(s[1])+'</div></div>'; }).join("");
