@@ -2260,6 +2260,7 @@ function findInRaw(raw, keys){
 
 var _qsCache={};
 var _glCache={};
+var _fsCache={};  // full-stats cache keyed by date+sport+name — refreshes daily
 var _CACHE_TTL=10*60*1000; // 10 minutes
 function _cacheGet(store,key){ var e=store[key]; if(e===undefined) return undefined; if(Date.now()-e.t>_CACHE_TTL){ delete store[key]; return undefined; } return e.v; }
 function _cacheSet(store,key,val){ store[key]={v:val,t:Date.now()}; }
@@ -2502,11 +2503,18 @@ function parseEspnGamelog(d,keys){
 
 /* ============ FULL STATS for Stats expand ============ */
 async function getFullStats(name){
+  // Keyed by today's date so the cache refreshes automatically each day
+  var dayKey=new Date().toISOString().slice(0,10);
+  var ckey=dayKey+"|"+ST.sport+"|"+name;
+  if(_fsCache[ckey]!==undefined) return _fsCache[ckey];
   var meta=await getMeta(name);
-  if(!meta || !meta.id) return null;
-  if(ST.sport==="baseball_mlb") return mlbFullStats(meta.id);
-  if(ST.sport==="icehockey_nhl")  return nhlFullStats(name);
-  return espnFullStats(meta.id);
+  if(!meta||!meta.id){ _fsCache[ckey]=null; return null; }
+  var result=null;
+  if(ST.sport==="baseball_mlb") result=await mlbFullStats(meta.id);
+  else if(ST.sport==="icehockey_nhl") result=await nhlFullStats(name);
+  else result=await espnFullStats(meta.id);
+  _fsCache[ckey]=result;
+  return result;
 }
 
 /* ============ NHL OFFICIAL API STATS ============ */
@@ -2552,8 +2560,25 @@ async function nhlApiStats(nhlId){
   }catch(e){return null;}
   try{
     var yr=new Date().getFullYear();var seasonStr=(yr-1)+""+yr;
-    var rg=await fetch("https://api-web.nhle.com/v1/player/"+nhlId+"/game-log/"+seasonStr+"/2",{signal:AbortSignal.timeout(8000)});
-    if(rg.ok){var dg=await rg.json();var games=(dg.gameLog||[]).slice(0,10);out.glCols=["Date","Opp","G","A","PTS","SOG","+/-"];out.gamelog=games.map(function(g){return[(g.gameDate||"-").slice(5,10),g.opponentAbbrev||"-",g.goals!=null?g.goals:"-",g.assists!=null?g.assists:"-",g.points!=null?g.points:"-",g.shots!=null?g.shots:"-",g.plusMinus!=null?g.plusMinus:"-"];});}
+    // Fetch both regular season (type 2) and playoffs (type 3) so June games show
+    var allGames=[];
+    for(var gt=0;gt<2;gt++){
+      try{
+        var rgt=await fetch("https://api-web.nhle.com/v1/player/"+nhlId+"/game-log/"+seasonStr+"/"+(gt===0?2:3),{signal:AbortSignal.timeout(8000)});
+        if(rgt.ok){var dgt=await rgt.json();allGames=allGames.concat(dgt.gameLog||[]);}
+      }catch(e){}
+    }
+    // Most-recent first, keep up to 10
+    allGames.sort(function(a,b){return (b.gameDate||"").localeCompare(a.gameDate||"");});
+    var games=allGames.slice(0,10);
+    if(games.length){
+      out.glCols=["Date","Opp","G","A","PTS","SOG","+/-"];
+      out.gamelog=games.map(function(g){
+        var dm=(g.gameDate||"").match(/^(\d{4})-(\d{2})-(\d{2})/);
+        var dateFmt=dm?parseInt(dm[2])+"/"+parseInt(dm[3]):"-";
+        return[dateFmt,g.opponentAbbrev||"-",g.goals!=null?g.goals:"-",g.assists!=null?g.assists:"-",g.points!=null?g.points:"-",g.shots!=null?g.shots:"-",g.plusMinus!=null?g.plusMinus:"-"];
+      });
+    }
   }catch(e){}
   return out;
 }
@@ -2740,57 +2765,70 @@ async function espnFullStats(id){
   }catch(e){}
   return out;
 }
+// Parses ESPN date fields — handles YYYYMMDD, ISO "2024-10-09", and "October 9, 2024"
+function fmtEspnDate(d){
+  if(!d||d==="-") return "-";
+  var s=String(d).trim();
+  if(/^\d{8}$/.test(s)) return parseInt(s.slice(4,6))+"/"+parseInt(s.slice(6,8));
+  var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return parseInt(m[2])+"/"+parseInt(m[3]);
+  try{var dt=new Date(s);if(!isNaN(dt.getTime())) return (dt.getMonth()+1)+"/"+dt.getDate();}catch(e){}
+  return "-";
+}
 function espnGameLogGrid(d){
   if(!d) return null;
-  // ESPN gamelog nests column headers inside seasonTypes[n].categories[n].names/labels
-  // We need to find the first category that has BOTH column headers and events
+  // d.events is the top-level event metadata dict: { eventId: {gameDate, opponent, atVs} }
+  var eventMeta=d.events||{};
+  // Find best category — ESPN stores stats as cat.events = { eventId: statsArray[] }
+  // Prefer regular season (id "2") over other types
   var bestCat=null;
-  var types=d.seasonTypes||[];
-  // Prefer regular season (id "2") first
-  types=types.slice().sort(function(a,b){ return (a.id==="2"?0:1)-(b.id==="2"?0:1); });
+  var types=(d.seasonTypes||[]).slice().sort(function(a,b){return (a.id==="2"?0:1)-(b.id==="2"?0:1);});
   for(var ti=0;ti<types.length&&!bestCat;ti++){
     var cats=types[ti].categories||[];
     for(var ci=0;ci<cats.length&&!bestCat;ci++){
       var cat=cats[ci];
       var hdrs=cat.names||cat.labels||[];
-      var evts=cat.events||[];
-      if(hdrs.length && evts.length) bestCat={hdrs:hdrs,events:evts};
+      var evts=cat.events;
+      if(!evts||!hdrs.length) continue;
+      var cnt=Array.isArray(evts)?evts.length:Object.keys(evts).length;
+      if(cnt) bestCat={hdrs:hdrs,evts:evts};
     }
-  }
-  // Fallback: top-level labels
-  if(!bestCat){
-    var topHdrs=d.labels||d.names||[];
-    var topEvts=[];
-    if(d.seasonTypes) topEvts=collectEspnEvents(d.seasonTypes);
-    if(!topEvts.length && d.events) topEvts=collectEspnEvents(d.events);
-    if(topHdrs.length && topEvts.length) bestCat={hdrs:topHdrs,events:topEvts};
   }
   if(!bestCat) return null;
-  var labels=bestCat.hdrs;
-  var events=bestCat.events||[];
-  // Pick up to 7 stat columns (skip the first 0 if it's "MIN" for readability, keep it)
+  var labels=bestCat.hdrs, evtsData=bestCat.evts;
+  // Pick up to 7 stat columns
   var chosen=[];
-  for(var i=0;i<labels.length && chosen.length<7;i++){
-    chosen.push({idx:i,label:String(labels[i])});
-  }
+  for(var i=0;i<labels.length&&chosen.length<7;i++) chosen.push({idx:i,label:String(labels[i])});
   var cols=["Date","Opp"].concat(chosen.map(function(c){return c.label;}));
+  // Build {id,stats} entry list — events can be an array or a dict {id: statsArray}
+  var entries=[];
+  if(Array.isArray(evtsData)){
+    evtsData.forEach(function(ev){ entries.push({id:null,stats:ev.stats||ev}); });
+  } else {
+    Object.keys(evtsData).forEach(function(eid){
+      var v=evtsData[eid];
+      entries.push({id:eid,stats:Array.isArray(v)?v:(v.stats||[])});
+    });
+    // Higher ESPN event IDs = more recent games
+    entries.sort(function(a,b){return (parseInt(b.id)||0)-(parseInt(a.id)||0);});
+  }
   var rows=[];
-  events.slice(0,10).forEach(function(ev){
-    if(!ev || !ev.stats) return;
+  entries.slice(0,10).forEach(function(entry){
+    var stats=entry.stats;
+    if(!Array.isArray(stats)||!stats.length) return;
     var date="-", opp="-";
-    if(ev.gameDate) date=String(ev.gameDate).slice(5,10);
-    if(ev.opponent){
-      opp=(ev.atVs?ev.atVs+" ":"")+(ev.opponent.abbreviation||ev.opponent.displayName||"-");
+    // Look up game metadata from top-level d.events dict
+    if(entry.id&&eventMeta[entry.id]){
+      var meta=eventMeta[entry.id];
+      date=fmtEspnDate(meta.gameDate||meta.date||"");
+      if(meta.opponent) opp=(meta.atVs?meta.atVs+" ":"")+(meta.opponent.abbreviation||meta.opponent.displayName||"-");
     }
     var row=[date,opp];
-    chosen.forEach(function(c){
-      var v=ev.stats[c.idx];
-      row.push(v!=null? v:"-");
-    });
+    chosen.forEach(function(c){ row.push(stats[c.idx]!=null?stats[c.idx]:"-"); });
     rows.push(row);
   });
   if(!rows.length) return null;
-  return {cols:cols, rows:rows};
+  return {cols:cols,rows:rows};
 }
 
 /* ============ NEWS ============ */
