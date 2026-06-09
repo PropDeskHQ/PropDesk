@@ -2553,8 +2553,17 @@ async function nhlApiStats(nhlId){
     if(!r.ok)return null;
     var d=await r.json();
     var fs=d.featuredStats;
-    var ss=fs&&fs.regularSeason&&fs.regularSeason.subSeason;
-    if(ss){var sg={"GP":ss.gamesPlayed,"G":ss.goals,"A":ss.assists,"PTS":ss.points,"+/-":ss.plusMinus,"SOG":ss.shots,"PIM":ss.pim};Object.keys(sg).forEach(function(k){if(sg[k]==null)delete sg[k];});out.season=sg;}
+    // Use seasonTotals to find the most recently completed NHL regular season
+    // This is more reliable than featuredStats which may lag or be missing
+    var nhlTots=(d.seasonTotals||[]).filter(function(t){return t.gameTypeId===2&&t.leagueAbbrev==="NHL";});
+    nhlTots.sort(function(a,b){return (b.season||0)-(a.season||0);});
+    var ss=nhlTots[0]||(fs&&fs.regularSeason&&fs.regularSeason.subSeason);
+    if(ss){
+      var sn=ss.season||0; var sy=sn?String(sn).slice(2,4)+"-"+String(sn).slice(6,8):"";
+      var sg={"Season":sy||undefined,"GP":ss.gamesPlayed,"G":ss.goals,"A":ss.assists,"PTS":ss.points,"+/-":ss.plusMinus,"SOG":ss.shots||ss.shotsOnGoal,"PIM":ss.pim};
+      Object.keys(sg).forEach(function(k){if(sg[k]==null||sg[k]===undefined)delete sg[k];});
+      out.season=sg;
+    }
     var ps=fs&&fs.playoffs&&fs.playoffs.subSeason;
     if(ps){var pg={"GP":ps.gamesPlayed,"G":ps.goals,"A":ps.assists,"PTS":ps.points,"+/-":ps.plusMinus};Object.keys(pg).forEach(function(k){if(pg[k]==null)delete pg[k];});out.playoff=pg;}
   }catch(e){return null;}
@@ -2765,61 +2774,62 @@ async function espnFullStats(id){
   }catch(e){}
   return out;
 }
-// Parses ESPN date fields — handles YYYYMMDD, ISO "2024-10-09", and "October 9, 2024"
+// Parses ESPN date fields — handles ISO datetime, YYYYMMDD, and human-readable formats
 function fmtEspnDate(d){
   if(!d||d==="-") return "-";
   var s=String(d).trim();
-  if(/^\d{8}$/.test(s)) return parseInt(s.slice(4,6))+"/"+parseInt(s.slice(6,8));
+  // ISO datetime: "2026-05-27T01:00:00.000+00:00" or plain "2026-05-27"
   var m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if(m) return parseInt(m[2])+"/"+parseInt(m[3]);
+  // YYYYMMDD: "20241009"
+  if(/^\d{8}$/.test(s)) return parseInt(s.slice(4,6))+"/"+parseInt(s.slice(6,8));
+  // Human readable fallback
   try{var dt=new Date(s);if(!isNaN(dt.getTime())) return (dt.getMonth()+1)+"/"+dt.getDate();}catch(e){}
   return "-";
 }
 function espnGameLogGrid(d){
   if(!d) return null;
-  // d.events is the top-level event metadata dict: { eventId: {gameDate, opponent, atVs} }
+  // ── Actual ESPN gamelog structure (confirmed from live API):
+  //   d.labels = ["G","A","PTS","+/-","PIM","S","SPCT",...] — headers at TOP LEVEL
+  //   d.seasonTypes[n].categories[n].events = ARRAY of {eventId:"401872906", stats:[...]}
+  //   d.events = { "401872906": {gameDate, opponent, atVs, ...} } — metadata dict
+
+  // 1. Column headers — always at top level
+  var labels=d.labels||d.names||[];
+  if(!labels.length) return null;
+
+  // 2. Game metadata dict
   var eventMeta=d.events||{};
-  // Find best category — ESPN stores stats as cat.events = { eventId: statsArray[] }
-  // Prefer regular season (id "2") over other types
-  var bestCat=null;
-  var types=(d.seasonTypes||[]).slice().sort(function(a,b){return (a.id==="2"?0:1)-(b.id==="2"?0:1);});
-  for(var ti=0;ti<types.length&&!bestCat;ti++){
-    var cats=types[ti].categories||[];
-    for(var ci=0;ci<cats.length&&!bestCat;ci++){
-      var cat=cats[ci];
-      var hdrs=cat.names||cat.labels||[];
-      var evts=cat.events;
-      if(!evts||!hdrs.length) continue;
-      var cnt=Array.isArray(evts)?evts.length:Object.keys(evts).length;
-      if(cnt) bestCat={hdrs:hdrs,evts:evts};
-    }
-  }
-  if(!bestCat) return null;
-  var labels=bestCat.hdrs, evtsData=bestCat.evts;
-  // Pick up to 7 stat columns
+
+  // 3. Collect all events across all seasonTypes/categories
+  var allEntries=[];
+  (d.seasonTypes||[]).forEach(function(type){
+    (type.categories||[]).forEach(function(cat){
+      var evts=cat.events||[];
+      if(Array.isArray(evts)){
+        evts.forEach(function(ev){
+          if(ev&&ev.eventId&&ev.stats) allEntries.push({id:String(ev.eventId),stats:ev.stats});
+        });
+      }
+    });
+  });
+
+  if(!allEntries.length) return null;
+
+  // 4. Sort most-recent first (higher ESPN event ID = newer game)
+  allEntries.sort(function(a,b){return (parseInt(b.id)||0)-(parseInt(a.id)||0);});
+
+  // 5. Build table
   var chosen=[];
   for(var i=0;i<labels.length&&chosen.length<7;i++) chosen.push({idx:i,label:String(labels[i])});
   var cols=["Date","Opp"].concat(chosen.map(function(c){return c.label;}));
-  // Build {id,stats} entry list — events can be an array or a dict {id: statsArray}
-  var entries=[];
-  if(Array.isArray(evtsData)){
-    evtsData.forEach(function(ev){ entries.push({id:null,stats:ev.stats||ev}); });
-  } else {
-    Object.keys(evtsData).forEach(function(eid){
-      var v=evtsData[eid];
-      entries.push({id:eid,stats:Array.isArray(v)?v:(v.stats||[])});
-    });
-    // Higher ESPN event IDs = more recent games
-    entries.sort(function(a,b){return (parseInt(b.id)||0)-(parseInt(a.id)||0);});
-  }
   var rows=[];
-  entries.slice(0,10).forEach(function(entry){
+  allEntries.slice(0,10).forEach(function(entry){
     var stats=entry.stats;
-    if(!Array.isArray(stats)||!stats.length) return;
+    if(!stats||!stats.length) return;
     var date="-", opp="-";
-    // Look up game metadata from top-level d.events dict
-    if(entry.id&&eventMeta[entry.id]){
-      var meta=eventMeta[entry.id];
+    var meta=eventMeta[entry.id];
+    if(meta){
       date=fmtEspnDate(meta.gameDate||meta.date||"");
       if(meta.opponent) opp=(meta.atVs?meta.atVs+" ":"")+(meta.opponent.abbreviation||meta.opponent.displayName||"-");
     }
