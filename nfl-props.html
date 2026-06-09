@@ -763,6 +763,14 @@ function tierOf(s){
   if(s>=60) return {c:"t-good", t:"GOOD"};
   return {c:"t-pass",t:"···"}; // Phase 1 preview — enrichment pending
 }
+// Confidence-based tier (used after phase-2 enrichment to display X%)
+function confTierOf(pct){ // pct is 0-100
+  if(pct>=75) return {c:"t-lock",  t:"LOCK"};
+  if(pct>=65) return {c:"t-elite", t:"ELITE"};
+  if(pct>=60) return {c:"t-strong",t:"STRONG"};
+  if(pct>=55) return {c:"t-good",  t:"GOOD"};
+  return       {c:"t-pass",  t:"···"};
+}
 function sportLabel(k){ for(var i=0;i<SPORTS.length;i++) if(SPORTS[i].key===k) return SPORTS[i].label; return k; }
 function marketName(k){
   for(var sp in MARKETS){ for(var j=0;j<MARKETS[sp].length;j++){ if(MARKETS[sp][j].k===k) return MARKETS[sp][j].n; } }
@@ -770,7 +778,8 @@ function marketName(k){
 }
 
 /* count-up animation — fromVal lets Phase-2 re-animate from current displayed value */
-function countUp(node,target,dec,fromVal){
+function countUp(node,target,dec,fromVal,suffix){
+  suffix=suffix||"";
   target=Number(target)||0; dec=dec||0;
   var from=fromVal!=null?Number(fromVal):0;
   if(node._raf){ cancelAnimationFrame(node._raf); node._raf=null; }
@@ -780,9 +789,9 @@ function countUp(node,target,dec,fromVal){
     var prog=Math.min((ts-t0)/dur,1);
     var ease=1-Math.pow(1-prog,3);
     var v=from+(target-from)*ease;
-    node.textContent=dec?v.toFixed(dec):Math.round(v);
+    node.textContent=(dec?v.toFixed(dec):Math.round(v))+suffix;
     if(prog<1){ node._raf=requestAnimationFrame(step); }
-    else{ node.textContent=dec?target.toFixed(dec):Math.round(target); node._raf=null; }
+    else{ node.textContent=(dec?target.toFixed(dec):Math.round(target))+suffix; node._raf=null; }
   }
   node._raf=requestAnimationFrame(step);
 }
@@ -887,7 +896,7 @@ function computeBestBet(p,marketKey){
     return;
   }
   var cons=p.consensus;
-  var forceOver = isThreshMkt(marketKey); // sport-aware: true for NHL goals/points/shots, MLB hits/Ks; false for NBA/NFL
+  var forceOver = true; // always recommend Over — sportsbooks don't offer alternate-line Unders
   var bestOver=null, bestUnder=null;
 
   if(forceOver && cons!=null){
@@ -1155,29 +1164,32 @@ async function enrichWithConfidence(p){
       p.pdResult={line:bookLine,confidence:confRaw,gap:0,confAtBook:confRaw};
       p.enriched=true;
     } else {
-      // ── True over/under markets (NBA, NFL…) ───────────────────────────
-      // Find the PropDesk Line by shifting until 62% confidence or discard.
+      // ── True over/under markets (NBA, NFL…) — always Over ─────────────
+      // Shift the line up from book line until 62% Over confidence.
+      // If no shifted line qualifies, fall back to showing raw book-line
+      // Over confidence — we never recommend Under.
+      p.pdSide="Over";
       var overResult=findPropDeskLine(vals,bookLine,true);
-      var underResult=findPropDeskLine(vals,bookLine,false);
-      var overScore=overResult?pdValueScore(overResult.gap,overResult.confidence):0;
-      var underScore=underResult?pdValueScore(underResult.gap,underResult.confidence):0;
-
-      if(!overScore&&!underScore){
-        p.pdResult=null; p.pdNoValue=true; p.value=0; p.enriched=true;
-        updatePropValueDisplay(p); updatePropPDDisplay(p); return;
+      if(overResult){
+        p.pdResult=overResult;
+        p.pdLine=overResult.line;
+        p.pdGap=overResult.gap;
+        p.pdConfidence=overResult.confidence;
+        p.pdConfAtBook=overResult.confAtBook;
+        p.hitRate14=+(overResult.confidence*100).toFixed(1);
+        p.value=Math.round(overResult.confidence*100);
+      } else {
+        // No shifted line clears 62% — show raw hit rate at book line
+        var rawOverConf=compositeConf(vals,bookLine,true);
+        if(rawOverConf===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
+        p.pdResult={line:bookLine,confidence:rawOverConf,gap:0,confAtBook:rawOverConf};
+        p.pdLine=bookLine;
+        p.pdGap=0;
+        p.pdConfidence=rawOverConf;
+        p.pdConfAtBook=rawOverConf;
+        p.hitRate14=+(rawOverConf*100).toFixed(1);
+        p.value=Math.round(rawOverConf*100);
       }
-
-      var best, bestScore;
-      if(overScore>=underScore){ best=overResult; bestScore=overScore; p.pdSide="Over"; }
-      else                     { best=underResult; bestScore=underScore; p.pdSide="Under"; }
-
-      p.pdResult=best;
-      p.pdLine=best.line;
-      p.pdGap=best.gap;
-      p.pdConfidence=best.confidence;
-      p.pdConfAtBook=best.confAtBook;
-      p.hitRate14=+(best.confidence*100).toFixed(1);
-      p.value=bestScore;
       p.enriched=true;
     }
 
@@ -1215,12 +1227,25 @@ async function enrichWithConfidence(p){
 function updatePropValueDisplay(p){
   var node=document.getElementById("vsc-"+p._id);
   if(!node) return;
-  var tier=tierOf(p.value);
-  var cur=parseInt(node.textContent,10)||0;
-  node.className=tier.c;
   var vt=node.nextElementSibling;
-  if(vt&&vt.classList&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
-  countUp(node,p.value,0,cur);
+  if(p.pdNoValue){
+    node.textContent="—"; node.className="t-pass";
+    if(vt&&vt.classList.contains("vt")){ vt.textContent=""; vt.className="vt t-pass"; }
+    applyPropFlags(p); return;
+  }
+  var isConf=p.pdConfidence!=null;
+  if(isConf){
+    var pct=Math.round(p.pdConfidence*100);
+    var tier=confTierOf(pct);
+    var cur=parseInt(node.textContent)||0;
+    node.className=tier.c;
+    if(vt&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
+    countUp(node,pct,0,cur,"%");
+  } else {
+    // Phase-1 only — show dash (enrichment pending)
+    node.textContent="—"; node.className="t-pass";
+    if(vt&&vt.classList.contains("vt")){ vt.textContent=""; vt.className="vt t-pass"; }
+  }
   applyPropFlags(p);
 }
 
@@ -1255,7 +1280,6 @@ function updatePropPDDisplay(p){
         (bookLabel&&bookLabel!==pdLabel?'<span class="pd-book-strike">'+esc(bookLabel)+'</span><span class="pd-arrow">→</span>':'')+
         '<span class="pd-line-val '+sideLow+'">'+esc(pdLabel)+'</span>'+
       '</div>'+
-      '<span class="conf-badge '+cbCls+'">'+confPct+'% confidence</span>'+
       gapHtml+
     '</div>';
   // Also update the mini stat row if visible
@@ -1727,7 +1751,7 @@ function renderTable(silent){
   var props=filteredProps();
   var cols=bookColumns();
   $("resCount").textContent=props.length+" prop"+(props.length===1?"":"s");
-  var thead='<tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>L5 / Szn</th><th>EV%</th><th>Value</th>';
+  var thead='<tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>L5 / Szn</th><th>EV%</th><th>Confidence</th>';
   cols.forEach(function(b){ thead+='<th>'+esc(b)+'</th>'; });
   thead+='</tr>';
   var tb="";
@@ -1736,10 +1760,25 @@ function renderTable(silent){
   if(!silent){
     props.forEach(function(p,idx){
       var node=document.getElementById("vsc-"+p._id);
-      if(node) setTimeout(function(){ countUp(node,p.value,0); }, idx*28+60);
+      if(!node) return;
+      var isConf=p.pdConfidence!=null&&!p.pdNoValue;
+      if(isConf){
+        var pct=Math.round(p.pdConfidence*100);
+        setTimeout(function(){ countUp(node,pct,0,null,"%"); }, idx*28+60);
+      } else {
+        // show dash until async enrichment resolves
+        node.textContent="—";
+        var vt=node.nextElementSibling;
+        if(vt&&vt.classList.contains("vt")){ vt.textContent=""; vt.className="vt t-pass"; }
+      }
     });
   } else {
-    props.forEach(function(p){ var node=document.getElementById("vsc-"+p._id); if(node) node.textContent=p.value; });
+    props.forEach(function(p){
+      var node=document.getElementById("vsc-"+p._id);
+      if(!node) return;
+      var isConf=p.pdConfidence!=null&&!p.pdNoValue;
+      node.textContent=isConf?(Math.round(p.pdConfidence*100)+"%"):(p.pdNoValue?"—":String(p.value));
+    });
   }
   /* re-apply meta, quick stats, value flags, and PropDesk cells already loaded */
   props.forEach(function(p){ if(p._meta!=null) applyMeta(p); });
@@ -1769,17 +1808,13 @@ function rowHtml(p,cols,idx,silent){
   // PropDesk Line cell — populated by updatePropPDDisplay once enriched
   var pdCellContent;
   if(p.pdResult){
-    // Already have enriched result — render immediately
-    var confPct=Math.round(p.pdConfidence*100);
+    // Already have enriched result — render immediately (no conf-badge; % lives in Confidence column)
     var side=p.pdSide||"Over";
     var sideLow=side.toLowerCase();
-    var cbCls=isThresh
-      ?(p.pdConfidence>=0.65?"cb-strong":p.pdConfidence>=0.50?"cb-mod":"cb-none")
-      :(p.pdConfidence>=0.65?"cb-strong":p.pdConfidence>=0.62?"cb-mod":"cb-none");
     // For threshold markets: show "Book: 1+ → PD: 2+" format; otherwise normal
     var pdLineLabel=isThresh?threshLabel(p.pdLine,p._market):(side+' '+p.pdLine);
     var bookLineLabel=isThresh?(bookLine!==""?threshLabel(bookLine,p._market):""):""+bookLine;
-    // Threshold: no gap badge — line never shifts, always at book line
+    // Threshold: no gap badge — line never shifts; O/U: show gap if line shifted
     var gapHtml=isThresh?"":(p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>');
     pdCellContent=
       '<div class="pd-cell">'+
@@ -1787,13 +1822,12 @@ function rowHtml(p,cols,idx,silent){
           (bookLineLabel&&bookLineLabel!==pdLineLabel?'<span class="pd-book-strike">'+esc(bookLineLabel)+'</span><span class="pd-arrow">→</span>':'')+
           '<span class="pd-line-val '+sideLow+'">'+esc(pdLineLabel)+'</span>'+
         '</div>'+
-        '<span class="conf-badge '+cbCls+'">'+confPct+'% confidence</span>'+
         gapHtml+
       '</div>';
   } else if(p.pdNoValue){
-    pdCellContent='<span class="pd-line-val no-val">NO VALUE</span>';
+    pdCellContent='<span class="pd-line-val no-val">—</span>';
   } else {
-    pdCellContent='<span class="pd-loading">analyzing…</span>';
+    pdCellContent='<span class="pd-loading">—</span>';
   }
 
   var h='<tr class="'+rcls+'" '+style+' data-pid="'+p._id+'">'+
@@ -1818,8 +1852,13 @@ function rowHtml(p,cols,idx,silent){
         (p.seasonAvgEnrich!=null?'<span><span class="ps-lbl">Szn:</span><span class="ps-val">'+p.seasonAvgEnrich.toFixed(1)+'</span></span>':'')+
       '</div>'+
     '</td>'+
-    '<td>'+evHtml+'</td>'+
-    '<td><span class="vs"><b id="vsc-'+p._id+'" class="'+tier.c+'">'+(silent?p.value:0)+'</b><span class="vt '+tier.c+'">'+tier.t+'</span></span></td>';
+    '<td>'+evHtml+'</td>';
+  // Confidence column — show X% when enriched, — while pending
+  var isConf=p.pdConfidence!=null&&!p.pdNoValue;
+  var confPct=isConf?Math.round(p.pdConfidence*100):null;
+  var ct=isConf?confTierOf(confPct):{c:"t-pass",t:""};
+  var dispStr=silent?(isConf?(confPct+"%"):(p.pdNoValue?"—":String(p.value))):"—";
+  h+='<td><span class="vs"><b id="vsc-'+p._id+'" class="'+ct.c+'">'+dispStr+'</b><span class="vt '+ct.c+'">'+ct.t+'</span></span></td>';
   cols.forEach(function(bk){ h+='<td>'+bookCellHtml(p,bk)+'</td>'; });
   h+='</tr>';
   return h;
@@ -2162,9 +2201,9 @@ function lazyLoadPlayerMeta(){
         getQuickStatsData(p.player, m).then(function(qs){
           p._quickStats=qs&&qs.length?qs:[];
           applyQuickStats(p);
-          // Enrich score with real player data for top 15 props (avoids spamming APIs for full board)
+          // Enrich all props — stagger by rank so API calls don't all fire at once
           var rank=byValue.indexOf(p);
-          if(rank<15 && !p.enriched) enrichWithConfidence(p);
+          if(!p.enriched){ setTimeout(function(){ if(!p.enriched) enrichWithConfidence(p); }, rank*50); }
         }).catch(function(){ p._quickStats=[]; });
       }
     }).catch(function(){ p._meta=""; applyMeta(p); });
