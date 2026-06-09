@@ -2619,12 +2619,22 @@ function mlbGameLogGrid(splits,group){
   var cols,keys;
   if(group==="pitching"){ cols=["Date","Opp","IP","H","ER","SO","BB"]; keys=["__date","__opp","inningsPitched","hits","earnedRuns","strikeOuts","baseOnBalls"]; }
   else { cols=["Date","Opp","AB","H","HR","RBI","R","TB"]; keys=["__date","__opp","atBats","hits","homeRuns","rbi","runs","totalBases"]; }
+  // Sort most-recent first — MLB API returns ascending by date
+  var sorted=splits.slice().sort(function(a,b){
+    return (b.date||b.gamePk||"").localeCompare(a.date||a.gamePk||"");
+  });
   var rows=[];
-  splits.slice(0,10).forEach(function(sp){
+  sorted.slice(0,10).forEach(function(sp){
     var st=sp.stat||{};
     rows.push(keys.map(function(k){
-      if(k==="__date") return sp.date? sp.date.slice(5):"-";
-      if(k==="__opp") return sp.opponent? (sp.opponent.abbreviation||sp.opponent.name||"-"):"-";
+      if(k==="__date") return fmtEspnDate(sp.date||"");
+      if(k==="__opp"){
+        if(!sp.opponent) return "-";
+        // MLB API has no abbreviation — use last word of team name as short form
+        var nm=sp.opponent.name||"-";
+        var short=nm.split(" ").pop(); // "New York Yankees" → "Yankees", "Athletics" → "Athletics"
+        return (sp.isHome===false?"@ ":"vs ")+short;
+      }
       return st[k]!=null? st[k]:"-";
     }));
   });
