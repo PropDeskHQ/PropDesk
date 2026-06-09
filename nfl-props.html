@@ -2504,22 +2504,26 @@ async function getFullStats(name){
 
 /* ============ NHL OFFICIAL API STATS ============ */
 async function nhlSearch(name){
-  var tries=[name, name.replace(/\s+(Jr\.|Sr\.|II|III|IV)\.?$/i,"").trim()];
-  for(var i=0;i<tries.length;i++){
-    try{
-      var r=await fetch("https://api-web.nhle.com/v1/player-search?q="+encodeURIComponent(tries[i])+"&culture=en-CA",{signal:AbortSignal.timeout(6000)});
-      if(!r.ok) continue;
-      var d=await r.json();
-      var players=d.players||[];
-      if(!players.length) continue;
-      var target=tries[i].toLowerCase();
-      var best=players[0];
-      players.forEach(function(p){
-        var fn=((p.firstName||{}).default||"")+" "+((p.lastName||{}).default||"");
-        if(fn.trim().toLowerCase()===target) best=p;
-      });
-      return best.playerId||best.id||null;
-    }catch(e){ continue; }
+  // api-web.nhle.com/v1/player-search is 404 — use stats REST API instead
+  // Supports exact full-name filter via skaterFullName / goalieFullName
+  var clean=name.trim().replace(/\s+(Jr\.|Sr\.|II|III|IV)\.?$/i,"").trim();
+  var yr=new Date().getFullYear();
+  var seasons=[(yr-1)+""+yr,(yr-2)+""+(yr-1)]; // current season first, then prior
+  var types=[{cat:"skater",nf:"skaterFullName",sort:"points"},{cat:"goalie",nf:"goalieFullName",sort:"wins"}];
+  for(var si=0;si<seasons.length;si++){
+    for(var ti=0;ti<types.length;ti++){
+      try{
+        var t=types[ti];
+        var url="https://api.nhle.com/stats/rest/en/"+t.cat+"/summary?limit=3&sort="+t.sort+
+          "&cayenneExp="+t.nf+"%3D%22"+encodeURIComponent(clean)+"%22+and+seasonId%3D"+seasons[si]+
+          "&isAggregate=false&isGame=false";
+        var r=await fetch(url,{signal:AbortSignal.timeout(6000)});
+        if(!r.ok) continue;
+        var d=await r.json();
+        var hits=d.data||[];
+        if(hits.length) return hits[0].playerId||null;
+      }catch(e){ continue; }
+    }
   }
   return null;
 }
