@@ -4329,34 +4329,69 @@ function renderTop10(picks){
   });
 }
 
+async function fetchAllOddsForSport(sportKey,markets){
+  try{
+    var r=await fetch(apiUrl("/sports/"+sportKey+"/odds",{
+      regions:"us,us2",markets:markets,oddsFormat:"american",dateFormat:"iso"
+    }));
+    if(!r.ok) return [];
+    var data=await r.json();
+    var now=Date.now();
+    // Keep games already in progress (up to 3h ago) and upcoming games today
+    var todayEnd=new Date(); todayEnd.setHours(23,59,59,999);
+    return (data||[]).filter(function(e){
+      var t=new Date(e.commence_time).getTime();
+      return t>now-3*3600*1000 && t<=todayEnd.getTime();
+    });
+  }catch(e){return [];}
+}
+
 async function loadTop10(){
   var mount=$("t10Mount"); if(!mount) return;
 
-  // Collect every prop already loaded across all sport tabs (live refs — no extra API calls)
-  var allCandidates=[];
-  var sportsSeen=[];
-  Object.keys(_propStore).forEach(function(key){
-    var parts=key.split("|");
-    var sportKey=parts[0], mk=parts[1];
-    var arr=_propStore[key]||[];
-    if(sportsSeen.indexOf(sportKey)<0) sportsSeen.push(sportKey);
-    arr.forEach(function(p){
-      // Tag sport/market on the prop if not already set
-      if(!p._sport) p._sport=sportKey;
-      if(!p._market) p._market=mk;
-      allCandidates.push(p);
-    });
-  });
-
-  if(!allCandidates.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>No props loaded yet. Load any sport on the <strong>Props</strong> tab first, then come back.</p></div>';
+  if(!getKey()){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Connect your API key on the <strong>Props</strong> tab first.</p></div>';
     return;
   }
 
-  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Ranking props from '+allCandidates.length+' loaded across '+sportsSeen.length+' sport'+(sportsSeen.length!==1?"s":"")+'&hellip;</p></div>';
+  // 30-minute cache — skip re-fetch if results are fresh
+  if(_top10Time&&(Date.now()-_top10Time)<TOP10_TTL&&_top10Data.length){
+    renderTop10(_top10Data); return;
+  }
 
-  // Deduplicate: one entry per player+sport+market (props are live refs — already enriched ones come free)
-  var seen={}, unique=[];
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Scanning all sports for today\'s best props&hellip;</p></div>';
+
+  // Fetch all 4 sports in parallel — one bulk call per sport covers every game today
+  var sports=Object.keys(LOTD_MARKETS);
+  var allCandidates=[];
+  var totalGames=0;
+  var sportResults=await Promise.allSettled(sports.map(async function(sportKey){
+    var mks=LOTD_MARKETS[sportKey];
+    var events=await fetchAllOddsForSport(sportKey,mks.join(","));
+    totalGames+=events.length;
+    var out=[];
+    events.forEach(function(ev){
+      var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
+      mks.forEach(function(mk){
+        parseProps(ev,mk).forEach(function(p){
+          p._market=mk; p._sport=sportKey; p._game=gameLabel;
+          out.push(p);
+        });
+      });
+    });
+    return out;
+  }));
+  sportResults.forEach(function(r){if(r.status==="fulfilled") allCandidates=allCandidates.concat(r.value);});
+
+  if(!allCandidates.length){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No games found across any sport today. Check back later or verify your API key is active.</p></div>';
+    return;
+  }
+
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Found '+totalGames+' game'+(totalGames!==1?"s":"")+' today — enriching top candidates&hellip;</p></div>';
+
+  // Deduplicate: one prop per player+sport+market (highest pre-enrich value wins)
+  var seen={},unique=[];
   allCandidates
     .filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null&&p.value>=50;})
     .sort(function(a,b){return b.value-a.value;})
@@ -4365,23 +4400,21 @@ async function loadTop10(){
       if(!seen[k]){seen[k]=1;unique.push(p);}
     });
 
-  // Enrich any that haven't been enriched yet (top 30 by pre-enrichment score)
-  var needEnrich=unique.filter(function(p){return !p.enriched;}).slice(0,30);
-  if(needEnrich.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching '+needEnrich.length+' prop'+(needEnrich.length!==1?"s":"")+'&hellip;</p></div>';
-    var savedSport=ST.sport, savedMkt=ST.market;
-    for(var ei=0;ei<needEnrich.length;ei++){
-      var ep=needEnrich[ei];
-      ST.sport=ep._sport; ST.market=ep._market;
-      try{await enrichWithConfidence(ep);}catch(e){}
-    }
-    ST.sport=savedSport; ST.market=savedMkt;
+  // Enrich top 30 — save/restore ST.sport+ST.market so getGameLog hits the right sport API
+  var toEnrich=unique.slice(0,30);
+  var savedSport=ST.sport,savedMkt=ST.market;
+  for(var ei=0;ei<toEnrich.length;ei++){
+    var ep=toEnrich[ei];
+    ST.sport=ep._sport; ST.market=ep._market;
+    try{await enrichWithConfidence(ep);}catch(e){}
   }
+  ST.sport=savedSport; ST.market=savedMkt;
 
-  // Filter ≥55% enriched confidence, sort, take top 10
-  var qualified=unique.filter(function(p){
+  // ≥55% confidence: use enriched score when available, fall back to pre-enrich value
+  var qualified=toEnrich.filter(function(p){
     if(p.enriched&&!p.pdNoValue&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
-    return p.value>=55; // fall back to pre-enrichment score for unenriched props
+    if(p.enriched&&p.pdNoValue) return false; // model says no value
+    return p.value>=55; // pre-enrichment floor for unenriched props
   });
   qualified.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
   _top10Data=qualified.slice(0,10);
