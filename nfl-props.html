@@ -422,6 +422,46 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .td-share-big{width:100%;padding:12px;background:rgba(0,232,122,.12);border:1px solid rgba(0,232,122,.35);border-radius:10px;color:#00e87a;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;letter-spacing:.3px}
 .td-share-big:hover{background:rgba(0,232,122,.2)}
 
+/* TOP 10 TODAY */
+.t10-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.t10-hdr h2{font-size:22px;font-weight:800;margin-bottom:4px}
+.t10-date{font-size:15px;font-weight:400;color:var(--mut);margin-left:8px}
+.t10-summary{font-size:13px;color:var(--mut);line-height:1.5;margin-top:4px}
+.t10-note{font-size:11px;color:var(--mut2);text-align:center;margin-bottom:14px;letter-spacing:.2px}
+.t10-card{display:flex;gap:16px;background:var(--surf);border:1px solid #1e1e1e;border-radius:16px;padding:20px 18px;margin-bottom:13px;transition:border-color .15s}
+.t10-card:hover{border-color:#2c2c2c}
+.t10-top1{border-color:rgba(0,255,135,.2)!important;box-shadow:0 0 0 1px rgba(0,255,135,.08),0 0 28px rgba(0,255,135,.07)}
+.t10-rank{font-size:26px;font-weight:900;color:var(--mut2);flex-shrink:0;width:30px;text-align:center;padding-top:2px;font-variant-numeric:tabular-nums;line-height:1.1}
+.t10-top1 .t10-rank{color:var(--accent)}
+.t10-content{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+.t10-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.t10-sport{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+.t10-sport-mlb{background:rgba(255,115,30,.12);color:#ff7820;border:1px solid rgba(255,115,30,.22)}
+.t10-sport-nba{background:rgba(66,153,255,.12);color:#4299ff;border:1px solid rgba(66,153,255,.22)}
+.t10-sport-nhl{background:rgba(0,195,175,.12);color:#00c3af;border:1px solid rgba(0,195,175,.22)}
+.t10-sport-nfl{background:rgba(0,200,90,.12);color:#00c85a;border:1px solid rgba(0,200,90,.22)}
+.t10-tier{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+.t10-tier.t-lock{background:rgba(255,215,0,.1);color:#ffd700;border:1px solid rgba(255,215,0,.22)}
+.t10-tier.t-elite{background:rgba(0,255,135,.08);color:var(--accent);border:1px solid rgba(0,255,135,.18)}
+.t10-tier.t-good{background:rgba(127,230,168,.06);color:#7fe6a8;border:1px solid rgba(127,230,168,.18)}
+.t10-player{font-size:18px;font-weight:800;color:var(--text);line-height:1.2}
+.t10-prop{font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.2px}
+.t10-lines{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:2px 0}
+.t10-book-line{font-size:12px;color:var(--mut2);text-decoration:line-through}
+.t10-arrow{font-size:11px;color:var(--mut2)}
+.t10-pd-line{font-size:15px;font-weight:700}
+.t10-pd-line.over{color:var(--accent)}.t10-pd-line.under{color:var(--blue)}
+.t10-conf{font-size:34px;font-weight:900;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums}
+.t10-conf-lbl{font-size:13px;font-weight:700;color:var(--mut)}
+.t10-analysis{font-size:12.5px;color:#bbb;line-height:1.75;background:#141414;border-radius:10px;padding:13px 15px;border-left:2px solid #1e1e1e}
+.t10-top1 .t10-analysis{border-left-color:rgba(0,255,135,.25)}
+.t10-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
+.t10-parlay-btn{font-size:11px;font-weight:700;color:var(--accent);background:rgba(0,255,135,.07);border:1px solid rgba(0,255,135,.22);border-radius:6px;padding:5px 13px;cursor:pointer;transition:.15s}
+.t10-parlay-btn:hover{background:rgba(0,255,135,.15)}
+.t10-parlay-btn.added{color:var(--mut);border-color:var(--bd2);background:transparent}
+.t10-share-btn{font-size:11px;font-weight:700;color:var(--mut);background:#1a1a1a;border:1px solid #252525;border-radius:6px;padding:5px 13px;cursor:pointer;transition:.15s}
+.t10-share-btn:hover{color:var(--text);background:#222}
+
 /* MOBILE BOTTOM NAV */
 .botnav{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:70;display:none;align-items:stretch}
 .botnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:var(--mut)}
@@ -472,6 +512,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   <nav class="drawer-nav" id="drawerNav">
     <button data-page="props" class="active">Props</button>
     <button data-page="trends">Trends</button>
+    <button data-page="top10">Top 10</button>
     <button data-page="history">History</button>
     <button data-page="how">How It Works</button>
     <button data-page="disclaimer">Disclaimer</button>
@@ -576,6 +617,21 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     </div>
   </div>
 
+  <!-- TOP 10 TODAY PAGE -->
+  <div class="page" id="page-top10">
+    <div class="t10-hdr">
+      <div>
+        <h2>Top 10 Today<span class="t10-date" id="t10Date"></span></h2>
+        <div class="t10-summary" id="t10Summary">Best props across all sports, ranked by confidence.</div>
+      </div>
+      <button class="btn" id="t10RefreshBtn">Refresh</button>
+    </div>
+    <div class="t10-note">Requires an active API key. Props ranked by PropDesk confidence score.</div>
+    <div id="t10Mount">
+      <div class="tc-no-data"><div class="nd-icon">🏆</div><p>Tap <strong>Refresh</strong> to scan all sports and rank today's best props.</p></div>
+    </div>
+  </div>
+
   <!-- DISCLAIMER -->
   <div class="page" id="page-disclaimer">
     <div class="doc">
@@ -624,6 +680,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 <nav class="botnav" id="botnav">
   <button data-nav="props" class="active"><span class="bn-ic">#</span>Props</button>
   <button data-nav="trends"><span class="bn-ic">~</span>Trends</button>
+  <button data-nav="top10"><span class="bn-ic">10</span>Top 10</button>
   <button data-nav="history"><span class="bn-ic">*</span>History</button>
   <button data-nav="parlay"><span class="bn-ic">+</span>Parlay</button>
 </nav>
@@ -3491,6 +3548,7 @@ function showPage(name){
   $("botnav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-nav")===name); });
   if(name==="history") renderHistory();
   if(name==="trends") loadTrends();
+  if(name==="top10") loadTop10();
   window.scrollTo(0,0);
 }
 
@@ -3544,6 +3602,7 @@ function init(){
     };
   });
   $("trendsRefreshBtn").onclick=function(){ _trendsData=[]; loadTrends(); };
+  $("t10RefreshBtn").onclick=function(){ _top10Data=[]; _top10Time=null; loadTop10(); };
 
   $("showNoValueBtn").onclick=function(){
     ST_showNoValue=!ST_showNoValue;
@@ -4136,6 +4195,210 @@ async function loadTrends(){
     renderTrends(_trendsData);
     if(ct) ct.textContent="Last calculated: "+_trendsTime.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+" · "+_trendsData.length+" trend"+(_trendsData.length!==1?"s":"")+" found";
   }
+}
+
+/* ============ TOP 10 TODAY ============ */
+var _top10Data=[],_top10Time=null;
+var TOP10_TTL=30*60*1000;
+
+async function fetchEventsForSport(sportKey){
+  try{
+    var r=await fetch(apiUrl("/sports/"+sportKey+"/events",{dateFormat:"iso"}));
+    if(!r.ok) return null;
+    var data=await r.json();
+    var now=Date.now();
+    var today=(data||[]).filter(function(e){
+      return new Date(e.commence_time).getTime()>now-3*3600*1000;
+    });
+    return today.length?today[0]:null;
+  }catch(e){return null;}
+}
+
+async function fetchOddsForSport(sportKey,eventId,markets){
+  try{
+    var r=await fetch(apiUrl("/sports/"+sportKey+"/events/"+eventId+"/odds",{
+      regions:"us,us2",markets:markets,oddsFormat:"american",dateFormat:"iso"
+    }));
+    if(!r.ok) return null;
+    return r.json();
+  }catch(e){return null;}
+}
+
+function buildTop10Analysis(p,mktName){
+  var parts=[];
+  var conf=getEffectiveConf(p);
+  var side=p.pdSide||"Over";
+  var line=p.pdLine!=null?p.pdLine:p.bestLine;
+  var isO=side==="Over";
+  if(p.seasonAvgEnrich!=null){
+    parts.push(p.player+" is averaging "+p.seasonAvgEnrich.toFixed(1)+" "+mktName.toLowerCase()+" per game this season.");
+  }
+  if(p._vals&&p._vals.length>=5&&line!=null){
+    var hits5=p._vals.slice(0,5).filter(function(v){return isO?v>line:v<line;}).length;
+    parts.push("In the last 5 games, the "+(isO?"Over":"Under")+" has hit "+hits5+" of 5 times at "+line+".");
+  }
+  if(p.pdLine!=null&&p.bestLine!=null&&Math.abs(p.pdLine-p.bestLine)>=0.5){
+    var dir=p.pdLine>p.bestLine?"higher":"lower";
+    parts.push("PropDesk edges the line at "+p.pdLine+" ("+dir+" than the book line of "+p.bestLine+").");
+  }
+  parts.push("Our model rates this "+conf+"% confidence — "+confTierOf(conf).t+" tier.");
+  return parts.join(" ");
+}
+
+function buildTop10ShareItem(rank,p,mktName,sportKey){
+  var conf=getEffectiveConf(p);
+  var tier=confTierOf(conf).t;
+  var emoji=tier==="LOCK"?"🔒":tier==="ELITE"?"⭐":"✅";
+  var sp={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"}[sportKey]||"";
+  var side=p.pdSide||"Over";
+  var line=p.pdLine!=null?p.pdLine:p.bestLine;
+  return "#"+rank+" "+emoji+" ["+sp+"] "+p.player+" "+mktName+" "+side+" "+line+" ("+conf+"%)";
+}
+
+function renderTop10(picks){
+  var mount=$("t10Mount"); if(!mount) return;
+  var dateEl=$("t10Date");
+  if(dateEl) dateEl.textContent=" — "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  var sumEl=$("t10Summary");
+  if(!picks.length){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🏆</div><p>Not enough qualifying props found today (55%+ confidence required).</p></div>';
+    if(sumEl) sumEl.textContent="Best props across all sports, ranked by confidence.";
+    return;
+  }
+  var lockCt=picks.filter(function(p){return getEffectiveConf(p)>=72;}).length;
+  var eliteCt=picks.filter(function(p){var c=getEffectiveConf(p);return c>=67&&c<72;}).length;
+  if(sumEl) sumEl.textContent=picks.length+" props ranked today — "+lockCt+" LOCK"+(lockCt!==1?"s":"")+", "+eliteCt+" ELITE";
+  var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
+  var html='<button class="btn btn-accent" id="t10CopyAll" style="width:100%;padding:11px;margin-bottom:16px">Copy All Picks ↗</button>';
+  picks.forEach(function(p,i){
+    var rank=i+1;
+    var conf=getEffectiveConf(p);
+    var tier=confTierOf(conf);
+    var sportKey=p._sport||"";
+    var sportLabel=spLbls[sportKey]||sportKey.toUpperCase();
+    var sportCls="t10-sport-"+sportLabel.toLowerCase();
+    var tierCls="t-"+tier.t.toLowerCase();
+    var mktArr=MARKETS[sportKey]||[];
+    var mktDef=null;
+    for(var mi=0;mi<mktArr.length;mi++){if(mktArr[mi].k===(p._market||"")){mktDef=mktArr[mi];break;}}
+    var mktName=mktDef?mktDef.n:(p._market||"").replace(/_/g," ");
+    var side=p.pdSide||"Over";
+    var pdLine=p.pdLine!=null?p.pdLine:p.bestLine;
+    var differ=pdLine!=null&&p.bestLine!=null&&Math.abs(pdLine-p.bestLine)>=0.5;
+    var lineCls=side==="Over"?"over":"under";
+    var linesHtml=differ?
+      '<div class="t10-lines"><span class="t10-book-line">'+p.bestLine+'</span><span class="t10-arrow">→</span><span class="t10-pd-line '+lineCls+'">'+pdLine+' '+side+'</span></div>':
+      '<div class="t10-lines"><span class="t10-pd-line '+lineCls+'">'+(pdLine||p.bestLine)+' '+side+'</span></div>';
+    var analysis=buildTop10Analysis(p,mktName);
+    html+='<div class="t10-card'+(rank===1?" t10-top1":"")+'">'+
+      '<div class="t10-rank">'+rank+'</div>'+
+      '<div class="t10-content">'+
+        '<div class="t10-badges">'+
+          '<span class="t10-sport '+sportCls+'">'+sportLabel+'</span>'+
+          '<span class="t10-tier '+tierCls+'">'+tier.t+'</span>'+
+        '</div>'+
+        '<div class="t10-player">'+esc(p.player)+'</div>'+
+        '<div class="t10-prop">'+esc(mktName)+'</div>'+
+        linesHtml+
+        '<div style="display:flex;align-items:baseline;gap:6px">'+
+          '<div class="t10-conf">'+conf+'%</div>'+
+          '<div class="t10-conf-lbl">confidence</div>'+
+        '</div>'+
+        '<div class="t10-analysis">'+esc(analysis)+'</div>'+
+        '<div class="t10-actions">'+
+          '<button class="t10-parlay-btn" data-t10add="'+i+'">+ Add to Parlay</button>'+
+          '<button class="t10-share-btn" data-t10share="'+i+'">Share ↗</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  });
+  mount.innerHTML=html;
+  var copyBtn=$("t10CopyAll");
+  if(copyBtn) copyBtn.onclick=function(){
+    var lines=["🏆 PropDesk Top 10 Props — "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}),""];
+    picks.forEach(function(p,i){
+      var sk=p._sport||"";
+      var ma=MARKETS[sk]||[];
+      var md=null; for(var x=0;x<ma.length;x++){if(ma[x].k===(p._market||"")){md=ma[x];break;}}
+      lines.push(buildTop10ShareItem(i+1,p,md?md.n:(p._market||"").replace(/_/g," "),sk));
+    });
+    lines.push("","📊 PropDesk.app");
+    copyText(lines.join("\n")); toast("All picks copied!");
+  };
+  mount.querySelectorAll("[data-t10add]").forEach(function(btn){
+    btn.onclick=function(){
+      var idx=parseInt(btn.getAttribute("data-t10add"),10);
+      var p=picks[idx]; if(!p) return;
+      if(ST.parlay.some(function(x){return x.player===p.player;})){toast("Already in parlay");return;}
+      ST.parlay.push(p);
+      btn.textContent="✓ Added"; btn.classList.add("added");
+      toast(p.player+" added to parlay!");
+    };
+  });
+  mount.querySelectorAll("[data-t10share]").forEach(function(btn){
+    btn.onclick=function(){
+      var idx=parseInt(btn.getAttribute("data-t10share"),10);
+      var p=picks[idx]; if(!p) return;
+      var sk=p._sport||"";
+      var ma=MARKETS[sk]||[];
+      var md=null; for(var x=0;x<ma.length;x++){if(ma[x].k===(p._market||"")){md=ma[x];break;}}
+      copyText(buildTop10ShareItem(idx+1,p,md?md.n:(p._market||"").replace(/_/g," "),sk));
+      toast("Copied!");
+    };
+  });
+}
+
+async function loadTop10(){
+  var mount=$("t10Mount"); if(!mount) return;
+  if(!getKey()){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Connect your API key on the <strong>Props</strong> tab to use Top 10 Today.</p></div>';
+    return;
+  }
+  if(_top10Time&&(Date.now()-_top10Time)<TOP10_TTL&&_top10Data.length){
+    renderTop10(_top10Data); return;
+  }
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Scanning all sports for today\'s best props&hellip;</p></div>';
+  var sports=Object.keys(LOTD_MARKETS);
+  var allCandidates=[];
+  var sportResults=await Promise.allSettled(sports.map(async function(sportKey){
+    var ev=await fetchEventsForSport(sportKey);
+    if(!ev) return [];
+    var mks=LOTD_MARKETS[sportKey];
+    var data=await fetchOddsForSport(sportKey,ev.id,mks.join(","));
+    if(!data) return [];
+    var out=[];
+    mks.forEach(function(mk){
+      parseProps(data,mk).forEach(function(p){ p._market=mk; p._sport=sportKey; out.push(p); });
+    });
+    return out;
+  }));
+  sportResults.forEach(function(r){if(r.status==="fulfilled") allCandidates=allCandidates.concat(r.value);});
+  // Deduplicate: one prop per player+sport, highest value wins
+  var seen={},unique=[];
+  allCandidates
+    .filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null&&p.value>=50;})
+    .sort(function(a,b){return b.value-a.value;})
+    .forEach(function(p){
+      var k=p.player.toLowerCase()+"|"+p._sport;
+      if(!seen[k]){seen[k]=1;unique.push(p);}
+    });
+  // Enrich top 20 — save/restore ST.sport + ST.market so game log fetches the right data
+  var toEnrich=unique.slice(0,20);
+  var savedSport=ST.sport,savedMkt=ST.market;
+  for(var ei=0;ei<toEnrich.length;ei++){
+    var ep=toEnrich[ei];
+    ST.sport=ep._sport; ST.market=ep._market;
+    try{await enrichWithConfidence(ep);}catch(e){}
+  }
+  ST.sport=savedSport; ST.market=savedMkt;
+  // Filter ≥55% post-enrichment, sort, take top 10
+  var qualified=toEnrich.filter(function(p){
+    return p.enriched&&!p.pdNoValue&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=55;
+  });
+  qualified.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
+  _top10Data=qualified.slice(0,10);
+  _top10Time=Date.now();
+  renderTop10(_top10Data);
 }
 
 /* --- Trend Detail Panel ------------------------------------------- */
