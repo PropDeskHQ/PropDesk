@@ -348,44 +348,71 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .trends-sub{font-size:13px;color:var(--mut);line-height:1.5;max-width:560px}
 .trends-calc-time{font-size:11px;color:var(--mut2);margin-top:5px}
 .trend-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.trend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:13px;margin-top:4px}
-.tcard{background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:17px;display:flex;flex-direction:column;gap:10px;transition:.15s}
-.tcard:hover{border-color:#2a2a2a;background:var(--surf2)}
-.tc-streak{border-left:3px solid var(--accent)}
-.tc-linevalue{border-left:3px solid var(--blue)}
-.tc-movement{border-left:3px solid var(--yellow)}
-.tc-totals{border-left:3px solid var(--purple)}
-.tc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.tc-badges{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
-.tc-type{font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:3px 8px;border-radius:5px}
-.tc-type.streak{background:rgba(0,255,135,.15);color:var(--accent)}
-.tc-type.linevalue{background:rgba(79,159,255,.15);color:var(--blue)}
-.tc-type.movement{background:rgba(255,204,0,.15);color:var(--yellow)}
-.tc-type.totals{background:rgba(167,139,250,.15);color:var(--purple)}
-.tc-live{font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:3px 8px;border-radius:5px;background:rgba(0,255,135,.1);color:var(--accent);border:1px solid rgba(0,255,135,.2);animation:livepulse 2s ease-in-out infinite}
+/* Grid: equal-height cards */
+.trend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-top:4px;align-items:start}
+.tcard{background:var(--surf);border:1px solid #1e1e1e;border-radius:16px;padding:20px 20px 16px;display:flex;flex-direction:column;cursor:pointer;transition:border-color .15s,background .15s;min-height:210px}
+.tcard:hover{border-color:#2c2c2c;background:var(--surf2)}
+/* No left border — clean uniform cards */
+.tc-tags{display:flex;gap:5px;align-items:center;margin-bottom:14px}
+.tc-type{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:2px 7px;border-radius:4px;color:var(--mut);background:#1f1f1f;border:1px solid #2a2a2a}
+.tc-live{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:2px 7px;border-radius:4px;color:var(--accent);background:rgba(0,255,135,.08);border:1px solid rgba(0,255,135,.18);animation:livepulse 2.5s ease-in-out infinite}
 @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.5}}
-.tc-conf{text-align:right;flex-shrink:0}
-.tc-conf-num{font-size:28px;font-weight:900;line-height:1;display:block}
-.tc-conf-lbl{font-size:9px;font-weight:700;letter-spacing:.8px;color:var(--mut);display:block;text-transform:uppercase;text-align:right}
-.tc-title{font-size:14px;font-weight:800;line-height:1.4}
-.tc-record{font-size:24px;font-weight:900;color:var(--accent);letter-spacing:-.5px;font-variant-numeric:tabular-nums;line-height:1}
-.tc-record.under{color:var(--blue)}
-.tc-record.neutral{color:var(--yellow)}
-.tc-streak-bar{display:flex;gap:3px;flex-wrap:wrap}
-.tc-bar-game{width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;cursor:default}
-.tc-bar-hit{background:rgba(0,255,135,.18);color:var(--accent);border:1px solid rgba(0,255,135,.3)}
-.tc-bar-miss{background:rgba(255,79,79,.12);color:var(--red);border:1px solid rgba(255,79,79,.25)}
-.tc-detail{font-size:12.5px;color:#bbb;line-height:1.6}
-.tc-footer{display:flex;align-items:center;gap:8px;border-top:1px solid var(--bd);padding-top:9px;flex-wrap:wrap}
-.tc-source{font-size:10px;color:var(--mut2);font-weight:600;letter-spacing:.3px}
-.tc-time{font-size:10px;color:var(--mut2);margin-left:auto;white-space:nowrap}
-.tc-share{font-size:11px;font-weight:700;color:var(--accent);background:rgba(0,255,135,.1);border:1px solid rgba(0,255,135,.25);border-radius:6px;padding:4px 11px;cursor:pointer;transition:.15s;white-space:nowrap}
-.tc-share:hover{background:rgba(0,255,135,.22)}
+.tc-player{font-size:13px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:4px}
+.tc-record{font-size:32px;font-weight:900;color:var(--accent);letter-spacing:-.8px;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:10px}
+/* Hit rate progress bar — clean, no squares */
+.tc-hitbar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.tc-hitbar-track{flex:1;height:5px;background:#222;border-radius:3px;overflow:hidden}
+.tc-hitbar-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .4s ease}
+.tc-hitbar-pct{font-size:10px;font-weight:700;color:var(--accent);white-space:nowrap;flex-shrink:0}
+.tc-detail{font-size:12px;color:#999;line-height:1.6;flex:1}
+.tc-footer{display:flex;align-items:center;gap:6px;margin-top:14px;padding-top:10px;border-top:1px solid #1e1e1e}
+.tc-source{font-size:10px;color:var(--mut2);letter-spacing:.2px}
+.tc-conf-sm{font-size:10px;font-weight:700;color:var(--mut);margin-left:auto;white-space:nowrap}
+.tc-conf-sm.t-lock{color:#ffd700}.tc-conf-sm.t-elite{color:var(--accent)}.tc-conf-sm.t-good{color:#7fe6a8}
+.tc-share-sm{font-size:10px;font-weight:700;color:var(--accent);background:none;border:1px solid rgba(0,255,135,.25);border-radius:5px;padding:3px 8px;cursor:pointer;transition:.15s}
+.tc-share-sm:hover{background:rgba(0,255,135,.12)}
 .tc-no-data{text-align:center;padding:60px 20px;color:var(--mut)}
 .tc-no-data .nd-icon{font-size:34px;margin-bottom:13px}
 .tc-no-data p{font-size:14px;line-height:1.7}
 .tc-no-data strong{color:var(--text)}
-.trends-empty-note{font-size:12px;color:var(--mut2);text-align:center;padding:18px 0}
+.trends-empty-note{font-size:11px;color:var(--mut2);text-align:center;padding:18px 0;letter-spacing:.2px}
+/* TREND DETAIL PANEL */
+.td-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:150;display:none;justify-content:flex-end}
+.td-overlay.open{display:flex}
+.td-panel{background:var(--surf);width:min(540px,100vw);height:100vh;overflow-y:auto;display:flex;flex-direction:column;border-left:1px solid #252525;transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.td-overlay.open .td-panel{transform:translateX(0)}
+.td-header{padding:22px 22px 14px;border-bottom:1px solid #1e1e1e;flex-shrink:0}
+.td-hdr-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.td-close{font-size:22px;color:var(--mut);padding:0 4px;line-height:1;flex-shrink:0;cursor:pointer;transition:.15s}
+.td-close:hover{color:var(--text)}
+.td-big-record{font-size:42px;font-weight:900;color:var(--accent);letter-spacing:-1.5px;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:4px}
+.td-title{font-size:16px;font-weight:700;color:var(--text);line-height:1.4}
+.td-body{padding:20px 22px;display:flex;flex-direction:column;gap:20px;flex:1}
+.td-section{}
+.td-sect-title{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);margin-bottom:10px}
+.td-log-table{width:100%;font-size:12px;border-collapse:collapse}
+.td-log-table th{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut2);padding:0 0 6px;text-align:left;border-bottom:1px solid #1e1e1e}
+.td-log-table td{padding:6px 0;border-bottom:1px solid #181818;color:#ccc}
+.td-log-table td.hit{color:var(--accent);font-weight:700}
+.td-log-table td.miss{color:var(--red);font-weight:700}
+.td-ctx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.td-ctx-item{background:#1a1a1a;border-radius:10px;padding:10px 12px}
+.td-ctx-lbl{font-size:9px;font-weight:700;color:var(--mut2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
+.td-ctx-val{font-size:18px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+.td-ctx-sub{font-size:10px;color:var(--mut);margin-top:1px}
+.td-ctx-bar{height:3px;background:#222;border-radius:2px;margin-top:5px;overflow:hidden}
+.td-ctx-bar-fill{height:100%;border-radius:2px;background:var(--accent)}
+.td-insight{font-size:13px;color:#ccc;line-height:1.7;background:#1a1a1a;border-radius:10px;padding:14px 16px;border-left:2px solid var(--accent)}
+.td-related{display:flex;flex-direction:column;gap:8px}
+.td-rel-item{background:#1a1a1a;border-radius:10px;padding:11px 14px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:10px}
+.td-rel-item:hover{background:#202020}
+.td-rel-record{font-size:16px;font-weight:800;color:var(--accent);flex-shrink:0;font-variant-numeric:tabular-nums}
+.td-rel-info{flex:1;min-width:0}
+.td-rel-title{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-rel-type{font-size:10px;color:var(--mut2)}
+.td-footer{padding:16px 22px;border-top:1px solid #1e1e1e;flex-shrink:0}
+.td-share-big{width:100%;padding:12px;background:rgba(0,232,122,.12);border:1px solid rgba(0,232,122,.35);border-radius:10px;color:#00e87a;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.td-share-big:hover{background:rgba(0,232,122,.2)}
 
 /* MOBILE BOTTOM NAV */
 .botnav{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:70;display:none;align-items:stretch}
@@ -3829,11 +3856,16 @@ function calcPlayerStreakTrends(){
       player:p.player,
       title:p.player+" "+lineLabel,
       record:hits+"-"+misses+" L"+bestN,
+      hitRate:Math.round(best*100),
       recordCls:isOver?"":"under",
       detail:"Hit this line in "+hits+" of "+bestN+" games ("+Math.round(best*100)+"% hit rate)."+streakNote,
-      bars:bars,
       source:"ESPN / MLB Game Log",
-      shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" | "+hits+"-"+misses+" L"+bestN+" ("+Math.round(best*100)+"%) | "+mktLbl+" | propdeskhq.netlify.app"
+      shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" | "+hits+"-"+misses+" L"+bestN+" ("+Math.round(best*100)+"%) | "+mktLbl+" | propdeskhq.netlify.app",
+      _rawVals:vals.slice(0,15),
+      _rawLine:line,
+      _rawIsOver:isOver,
+      _rawMarket:mktLbl,
+      _r5:r5, _r10:r10, _r15:r15, _rawN:vals.length
     });
   });
   return trends;
@@ -3861,10 +3893,13 @@ function calcLineValueTrends(){
           player:p.player,
           title:"Book undervaluing "+p.player,
           record:"+"+gap.toFixed(1)+" vs szn avg",
+          hitRate:Math.min(95,Math.round(55+gapPct*1.4)),
           recordCls:"",
           detail:"Book line "+line+" is "+gapPct.toFixed(0)+"% below "+p.player+"'s season average of "+fmtStat(sznAvg)+" in "+mktLbl+". The line is set below historical production — Over has a statistical edge.",
           source:"Season Stats",
-          shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct.toFixed(0)+"% below season avg of "+fmtStat(sznAvg)+" ("+mktLbl+") → Over value | propdeskhq.netlify.app"
+          shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct.toFixed(0)+"% below season avg of "+fmtStat(sznAvg)+" ("+mktLbl+") → Over value | propdeskhq.netlify.app",
+          _rawVals:p._vals?p._vals.slice(0,15):null,
+          _rawLine:line, _rawIsOver:true, _rawMarket:mktLbl
         });
       }
     }
@@ -3880,10 +3915,13 @@ function calcLineValueTrends(){
           player:p.player,
           title:"Book overvaluing "+p.player,
           record:"-"+gap2.toFixed(1)+" vs L5 avg",
+          hitRate:Math.min(88,Math.round(55+gapPct2*1.2)),
           recordCls:"under",
           detail:"Book line "+line+" is "+gapPct2.toFixed(0)+"% above "+p.player+"'s L5 average of "+fmtStat(l5Avg)+" in "+mktLbl+". Recent production is running below the line.",
           source:"L5 Game Log",
-          shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct2.toFixed(0)+"% above L5 avg of "+fmtStat(l5Avg)+" ("+mktLbl+") → Under value | propdeskhq.netlify.app"
+          shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct2.toFixed(0)+"% above L5 avg of "+fmtStat(l5Avg)+" ("+mktLbl+") → Under value | propdeskhq.netlify.app",
+          _rawVals:p._vals?p._vals.slice(0,15):null,
+          _rawLine:line, _rawIsOver:false, _rawMarket:mktLbl
         });
       }
     }
@@ -3913,6 +3951,7 @@ function calcOddsMovementTrends(){
         player:p.player,
         title:"Sharp Money: "+p.player+" Under",
         record:upBooks.length+" books moved up",
+        hitRate:conf,
         recordCls:"under",
         detail:"Line rose at "+upBooks.join(", ")+" since loading — suggests sharp money on the Under or market adjustment. Betting into a rising line reduces Over value.",
         source:"Live Line Movement",
@@ -3928,6 +3967,7 @@ function calcOddsMovementTrends(){
         player:p.player,
         title:"Sharp Money: "+p.player+" Over",
         record:downBooks.length+" books moved down",
+        hitRate:conf3,
         recordCls:"",
         detail:"Line dropped at "+downBooks.join(", ")+" since loading — suggests sharp money on the Over or news adjustment. Falling line improves Over value.",
         source:"Live Line Movement",
@@ -3947,6 +3987,7 @@ function calcOddsMovementTrends(){
         player:p.player,
         title:"Sharp Split: "+p.player,
         record:sp+" pt spread",
+        hitRate:conf4,
         recordCls:"neutral",
         detail:p.player+" has a "+sp+"-point spread across "+p.bookCount+" sportsbooks in "+marketName(ST.market)+". Wide disagreement signals sharp positioning — take the best number available.",
         source:"Cross-Book Analysis",
@@ -4005,6 +4046,7 @@ async function calcTotalsTrends(){
       player:teams,
       title:"Game Total: "+teams,
       record:mainLine+" O/U",
+      hitRate:conf,
       recordCls:betterSide==="Under"?"under":"",
       detail:betterSide+" has better market pricing: "+fmtOdds(betterOdds)+" ("+Math.round(impliedProb(betterOdds)*100)+"% implied). EV: "+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"%. Vig: "+vigAmt.toFixed(1)+"%. "+tot.over.length+" books posting.",
       source:"The Odds API — Totals Market",
@@ -4016,26 +4058,26 @@ async function calcTotalsTrends(){
 
 /* --- Render -------------------------------------------------------- */
 function renderTrendCard(t){
-  var typeCls=t.type==="streak"?"streak":t.type==="linevalue"?"linevalue":t.type==="movement"?"movement":"totals";
   var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":"GAME TOTAL";
   var tcls=trendTierCls(t.conf);
-  var tsince=_trendsTime?_trendsTime.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"just now";
-  return '<div class="tcard tc-'+t.type+'">'+
-    '<div class="tc-top">'+
-      '<div class="tc-badges">'+
-        '<span class="tc-type '+typeCls+'">'+typeLabel+'</span>'+
-        '<span class="tc-live">LIVE DATA</span>'+
-      '</div>'+
-      '<div class="tc-conf"><span class="tc-conf-num '+tcls+'">'+t.conf+'</span><span class="tc-conf-lbl">CONF</span></div>'+
+  var hr=t.hitRate!=null?t.hitRate:t.conf;
+  var barFill=Math.round(Math.max(0,Math.min(100,hr)));
+  return '<div class="tcard" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
+    '<div class="tc-tags">'+
+      '<span class="tc-type">'+typeLabel+'</span>'+
+      '<span class="tc-live">LIVE</span>'+
     '</div>'+
-    '<div class="tc-title">'+esc(t.title)+'</div>'+
+    '<div class="tc-player">'+esc(t.player)+'</div>'+
     '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
-    (t.bars?'<div class="tc-streak-bar">'+t.bars+'</div>':'')+
+    '<div class="tc-hitbar">'+
+      '<div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+barFill+'%"></div></div>'+
+      '<span class="tc-hitbar-pct">'+barFill+'%</span>'+
+    '</div>'+
     '<div class="tc-detail">'+esc(t.detail)+'</div>'+
     '<div class="tc-footer">'+
       '<span class="tc-source">'+esc(t.source)+'</span>'+
-      '<span class="tc-time">'+tsince+'</span>'+
-      '<button class="tc-share" data-share="'+esc(t.shareText)+'">Share ↗</button>'+
+      '<span class="tc-conf-sm '+tcls+'">'+t.conf+' CONF</span>'+
+      '<button class="tc-share-sm" data-share="'+esc(t.shareText)+'">Share ↗</button>'+
     '</div>'+
   '</div>';
 }
@@ -4043,7 +4085,6 @@ function renderTrendCard(t){
 function renderTrends(trends){
   var mount=$("trendsMount"); if(!mount) return;
   var visible=(_trendsFilter==="all")?trends:trends.filter(function(t){return t.type===_trendsFilter;});
-  // Update tab active state
   document.querySelectorAll("#trendTabs .pill").forEach(function(b){
     b.classList.toggle("active", b.getAttribute("data-ttype")===_trendsFilter);
   });
@@ -4055,9 +4096,17 @@ function renderTrends(trends){
     return;
   }
   mount.innerHTML='<div class="trend-grid">'+visible.map(renderTrendCard).join("")+'</div>'+
-    '<p class="trends-empty-note">'+visible.length+' trend'+(visible.length!==1?"s":"")+'&nbsp;&nbsp;·&nbsp;&nbsp;Sample sizes shown in each card&nbsp;&nbsp;·&nbsp;&nbsp;All data live</p>';
-  mount.querySelectorAll(".tc-share").forEach(function(btn){
-    btn.onclick=function(){ copyText(btn.getAttribute("data-share")); toast("Copied!"); };
+    '<p class="trends-empty-note">'+visible.length+' trend'+(visible.length!==1?"s":"")+'&nbsp;&nbsp;·&nbsp;&nbsp;Click any card for details&nbsp;&nbsp;·&nbsp;&nbsp;All data live</p>';
+  mount.querySelectorAll(".tc-share-sm").forEach(function(btn){
+    btn.onclick=function(e){ e.stopPropagation(); copyText(btn.getAttribute("data-share")); toast("Copied!"); };
+  });
+  mount.querySelectorAll(".tcard").forEach(function(card){
+    card.onclick=function(e){
+      if(e.target.classList.contains("tc-share-sm")) return;
+      var idx=parseInt(card.getAttribute("data-tidx"),10);
+      var t=_trendsData[idx];
+      if(t) openTrendDetail(t);
+    };
   });
 }
 
@@ -4088,10 +4137,162 @@ async function loadTrends(){
   }
 }
 
+/* --- Trend Detail Panel ------------------------------------------- */
+function openTrendDetail(t){
+  var ov=$("trendDetailOverlay"); if(!ov) return;
+  var body=$("tdBody"); if(!body) return;
+  body.innerHTML=buildDetailContent(t);
+  var hdr=$("tdHeaderContent"); if(hdr) hdr.innerHTML=
+    '<div class="td-big-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
+    '<div class="td-title">'+esc(t.player)+' &mdash; '+
+      (t.type==="streak"?"Player Streak":t.type==="linevalue"?"Line Value":t.type==="movement"?"Sharp Money":"Game Total")+
+    '</div>';
+  var shareBtn=$("tdShareBtn");
+  if(shareBtn){ shareBtn.onclick=function(){ copyText(t.shareText); toast("Copied!"); }; }
+  ov.classList.add("open");
+  document.body.style.overflow="hidden";
+}
+
+function closeTrendDetail(){
+  var ov=$("trendDetailOverlay"); if(ov) ov.classList.remove("open");
+  document.body.style.overflow="";
+}
+
+function buildDetailContent(t){
+  var html="";
+
+  // Game log table (streak type with raw vals)
+  if(t._rawVals&&t._rawVals.length&&t._rawLine!=null){
+    var vals=t._rawVals, line=t._rawLine, isOver=t._rawIsOver;
+    html+='<div class="td-section"><div class="td-sect-title">Last '+vals.length+' Games</div>';
+    html+='<table class="td-log-table"><thead><tr>'+
+      '<th>#</th><th>Result</th><th>Line</th><th>Hit?</th></tr></thead><tbody>';
+    for(var i=0;i<vals.length;i++){
+      var v=vals[i];
+      var hit=isOver?v>line:v<line;
+      html+='<tr>'+
+        '<td style="color:var(--mut2)">G'+(i+1)+'</td>'+
+        '<td>'+v+'</td>'+
+        '<td style="color:var(--mut)">'+line+'</td>'+
+        '<td class="'+(hit?"hit":"miss")+'">'+(hit?"HIT":"MISS")+'</td>'+
+      '</tr>';
+    }
+    html+='</tbody></table></div>';
+
+    // Context breakdown: L5 / L10 / L15
+    html+='<div class="td-section"><div class="td-sect-title">Hit Rate by Sample</div>';
+    html+='<div class="td-ctx-grid">';
+    var ctxSizes=[5,10,15];
+    ctxSizes.forEach(function(n){
+      if(vals.length<n) return;
+      var sl=vals.slice(0,n);
+      var hits=sl.filter(function(v){ return isOver?v>line:v<line; }).length;
+      var hr=Math.round(hits/n*100);
+      html+='<div class="td-ctx-item">'+
+        '<div class="td-ctx-lbl">L'+n+'</div>'+
+        '<div class="td-ctx-val">'+hr+'%</div>'+
+        '<div class="td-ctx-sub">'+hits+'/'+n+' games</div>'+
+        '<div class="td-ctx-bar"><div class="td-ctx-bar-fill" style="width:'+hr+'%"></div></div>'+
+      '</div>';
+    });
+    html+='</div></div>';
+  }
+
+  // Key insight
+  var insight=buildInsight(t);
+  if(insight){
+    html+='<div class="td-section"><div class="td-sect-title">Key Insight</div>'+
+      '<div class="td-insight">'+insight+'</div></div>';
+  }
+
+  // Similar trends
+  var similar=_trendsData.filter(function(x){
+    return x!==t&&(x.player===t.player||x.type===t.type);
+  }).slice(0,3);
+  if(similar.length){
+    html+='<div class="td-section"><div class="td-sect-title">Similar Trends</div><div class="td-related">';
+    similar.forEach(function(s,si){
+      var typeLabel=s.type==="streak"?"Player Streak":s.type==="linevalue"?"Line Value":s.type==="movement"?"Sharp Money":"Game Total";
+      html+='<div class="td-rel-item" data-relidx="'+_trendsData.indexOf(s)+'">'+
+        '<div class="td-rel-record'+(s.recordCls?" "+s.recordCls:"")+'">'+esc(s.record)+'</div>'+
+        '<div class="td-rel-info">'+
+          '<div class="td-rel-title">'+esc(s.player)+'</div>'+
+          '<div class="td-rel-type">'+typeLabel+'</div>'+
+        '</div>'+
+      '</div>';
+    });
+    html+='</div></div>';
+  }
+
+  // Wire related clicks after a tick
+  setTimeout(function(){
+    var body=$("tdBody"); if(!body) return;
+    body.querySelectorAll(".td-rel-item").forEach(function(el){
+      el.onclick=function(){
+        var idx=parseInt(el.getAttribute("data-relidx"),10);
+        var rel=_trendsData[idx];
+        if(rel) openTrendDetail(rel);
+      };
+    });
+  },50);
+
+  return html;
+}
+
+function buildInsight(t){
+  if(t.type==="streak"&&t._rawVals&&t._rawVals.length&&t._rawLine!=null){
+    var vals=t._rawVals, line=t._rawLine, isOver=t._rawIsOver;
+    var n=vals.length;
+    var hits=vals.filter(function(v){ return isOver?v>line:v<line; }).length;
+    var pct=Math.round(hits/n*100);
+    var dir=isOver?"Over":"Under";
+    var streak=0;
+    for(var i=0;i<vals.length;i++){
+      var h=isOver?vals[i]>line:vals[i]<line;
+      if(i===0){streak=h?1:-1;continue;}
+      if(h&&streak>0)streak++; else if(!h&&streak<0)streak--; else break;
+    }
+    var s="";
+    if(pct>=80) s=t.player+" has hit the "+dir+" "+line+" in "+pct+"% of tracked games — one of the stronger trends in today's slate.";
+    else if(pct>=65) s=t.player+" is hitting the "+dir+" "+line+" at a "+pct+"% clip across "+n+" games, above the threshold for a statistically meaningful edge.";
+    else s=t.player+" is hitting the "+dir+" "+line+" at "+pct+"% — borderline but worth monitoring alongside other signals.";
+    if(streak>=3) s+=" Currently on a "+streak+"-game hit streak.";
+    else if(streak<=-3) s+=" Warning: "+Math.abs(streak)+" consecutive misses recently.";
+    return s;
+  }
+  if(t.type==="linevalue"){
+    var dir2=t.recordCls==="under"?"Under":"Over";
+    return "The book line appears mispriced relative to "+t.player+"'s recent production. The "+dir2+" has a statistical edge until the line corrects.";
+  }
+  if(t.type==="movement"){
+    return "Line movement across multiple sportsbooks signals coordinated positioning. Take the most favorable number available before lines converge.";
+  }
+  if(t.type==="totals"){
+    return "Market pricing shows one side of the total has better value after accounting for vig. This is based on current live odds from multiple books.";
+  }
+  return "";
+}
+
 /* END TRENDS TAB */
 
 document.addEventListener("DOMContentLoaded",init);
 </script>
+
+<!-- TREND DETAIL OVERLAY -->
+<div id="trendDetailOverlay" class="td-overlay" onclick="if(event.target===this)closeTrendDetail()">
+  <div class="td-panel">
+    <div class="td-header">
+      <div class="td-hdr-top">
+        <div id="tdHeaderContent"></div>
+        <button class="td-close" onclick="closeTrendDetail()">✕</button>
+      </div>
+    </div>
+    <div class="td-body" id="tdBody"></div>
+    <div class="td-footer">
+      <button class="td-share-big" id="tdShareBtn">Share This Trend ↗</button>
+    </div>
+  </div>
+</div>
 
 <!-- MANUAL PARLAY BUILDER BAR -->
 <div id="myParlayBar" class="mpbar" role="region" aria-label="My Parlay Builder">
