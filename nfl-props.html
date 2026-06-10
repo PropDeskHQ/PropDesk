@@ -214,7 +214,8 @@ tbody tr.prow:hover{background:var(--surf2)}
 .cb-mod{background:rgba(255,204,0,.12);color:var(--yellow);border:1px solid rgba(255,204,0,.3)}
 .cb-none{background:rgba(255,79,79,.1);color:#ff6b6b;border:1px solid rgba(255,79,79,.25)}
 .gap-badge{font-size:11px;font-weight:700;color:var(--accent)}
-.gap-zero{color:var(--mut2)}
+.gap-badge.gap-down{color:var(--blue)}
+.gap-zero{color:var(--mut);font-size:10px}
 .pd-stats{font-size:11px;color:var(--mut2);display:flex;flex-direction:column;gap:2px}
 .pd-stats span{display:flex;gap:4px;align-items:center}
 .ps-lbl{color:var(--mut2)}
@@ -1120,22 +1121,39 @@ function compositeConf(vals, line, isOver){
   return ((r5||0)*w5+(r10||0)*w10+(rAll||0)*wA)/tot;
 }
 
-// Find PropDesk Line: shift until confidence ≥62% or 2.0 max from book
-// Over → shift DOWN (lower threshold = easier to exceed)
-// Under → shift UP  (higher threshold = easier to stay under)
+// Find PropDesk Line: always seek a line different from the book line.
+// If already ≥62% at book: shift HARDER (up for Over) to find the sharpest qualifying line.
+// If below 62% at book: shift EASIER (down for Over) to find the first qualifying line.
+// Over → harder = higher line; Under → harder = lower line.
 function findPropDeskLine(vals, bookLine, isOver){
   var TARGET=0.62;
   var confAtBook=compositeConf(vals,bookLine,isOver);
   if(confAtBook===null) return null;
-  if(confAtBook>=TARGET) return {line:bookLine,confidence:confAtBook,gap:0,confAtBook:confAtBook};
-  var dir=isOver?-0.5:0.5;
-  for(var step=1;step<=4;step++){
-    var testLine=Math.round((bookLine+dir*step)*2)/2;
-    if(testLine<0.5) break; // never go below 0.5 — minimum valid line
-    var conf=compositeConf(vals,testLine,isOver);
-    if(conf!==null&&conf>=TARGET) return {line:testLine,confidence:conf,gap:step*0.5,confAtBook:confAtBook};
+
+  if(confAtBook>=TARGET){
+    // Book line already qualifies. Try stepping HARDER to find the tightest line with edge.
+    var hardDir=isOver?0.5:-0.5;
+    var bestLine=bookLine, bestConf=confAtBook;
+    for(var step=1;step<=4;step++){
+      var testLine=Math.round((bookLine+hardDir*step)*2)/2;
+      if(testLine<0.5||testLine>99) break;
+      var conf=compositeConf(vals,testLine,isOver);
+      if(conf!==null&&conf>=TARGET){ bestLine=testLine; bestConf=conf; }
+      else break; // first step that fails stops the search
+    }
+    var gap=+(Math.abs(bestLine-bookLine).toFixed(1));
+    return {line:bestLine,confidence:bestConf,gap:gap,confAtBook:confAtBook};
+  } else {
+    // Below 62% — shift EASIER until we find edge, or NO VALUE.
+    var easyDir=isOver?-0.5:0.5;
+    for(var step2=1;step2<=4;step2++){
+      var testLine2=Math.round((bookLine+easyDir*step2)*2)/2;
+      if(testLine2<0.5) break;
+      var conf2=compositeConf(vals,testLine2,isOver);
+      if(conf2!==null&&conf2>=TARGET) return {line:testLine2,confidence:conf2,gap:step2*0.5,confAtBook:confAtBook};
+    }
+    return null; // NO VALUE — no qualifying line within 2.0 shift
   }
-  return null; // NO VALUE — never reached 62% within 2.0 shift
 }
 
 // Value score: gap is primary driver, confidence above 62% adds premium
@@ -1435,8 +1453,10 @@ function updatePropPDDisplay(p){
   // Build line labels — threshold markets use "1+ Goals" format
   var pdLabel=thresh?threshLabel(pdLine,p._market):(side+' '+pdLine);
   var bookLabel=thresh&&rawBookLine!=null?threshLabel(rawBookLine,p._market):(rawBookLine!=null?""+rawBookLine:"");
-  // Threshold: no gap badge (line never shifts); Over/Under: show gap if shifted
-  var gapHtml=thresh?"":(p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>');
+  // Threshold: no gap badge; Over/Under: show direction of shift
+  var shiftedUp=!thresh&&pdLine!=null&&rawBookLine!=null&&pdLine>rawBookLine;
+  var shiftedDown=!thresh&&pdLine!=null&&rawBookLine!=null&&pdLine<rawBookLine;
+  var gapHtml=thresh?"":(shiftedUp?'<span class="gap-badge" title="PropDesk raised line — player still hits it at this harder threshold">▲ +'+p.pdGap.toFixed(1)+'</span>':shiftedDown?'<span class="gap-badge gap-down" title="PropDesk lowered line to find the edge">▼ −'+p.pdGap.toFixed(1)+'</span>':'<span class="gap-zero">confirmed ✓</span>');
   cell.innerHTML=
     '<div class="pd-cell">'+
       '<div style="display:flex;gap:6px;align-items:baseline">'+
@@ -1654,40 +1674,32 @@ async function loadPropOfDay(){
 
   if(ST.eventId!==eid) return; // stale   game changed
 
-  if(bestProp && bestMkt){
-    _potgCache[eid]={prop:bestProp, mkt:bestMkt};
-    renderPropOfDay(bestProp, bestMkt);
-    return;
-  }
-
-  // No phase-1 winner — enrich the top 5 unique players and pick the best result ≥ POTD_MIN_SCORE.
-  // Sorted descending by phase-1 score so the most promising candidates go first.
+  // Always enrich top candidates — never short-circuit on phase-1 score alone.
+  // Enrich top 8 unique players by phase-1 score; pick the highest confidence result ≥ 62%.
   altPool.sort(function(a,b){ return b.compScore-a.compScore; });
-  // De-duplicate by player name (same player can appear in multiple markets)
   var potdSeen={}, toEnrich=[];
-  for(var ai=0; ai<altPool.length && toEnrich.length<5; ai++){
+  for(var ai=0; ai<altPool.length && toEnrich.length<8; ai++){
     var key=altPool[ai].prop.player.toLowerCase();
     if(!potdSeen[key]){ potdSeen[key]=1; toEnrich.push(altPool[ai]); }
   }
 
-  var bestEnriched=null, bestEnrichedScore=-1;
+  var bestEnriched=null, bestEnrichedConf=-1;
   for(var ei=0; ei<toEnrich.length; ei++){
-    if(ST.eventId!==eid) return; // abort if user changed game mid-enrichment
+    if(ST.eventId!==eid) return;
     var cand=toEnrich[ei];
-    // Temporarily set ST.market so getGameLog fetches the correct stat keys for this market
     var _savedMkt=ST.market;
     ST.market=cand.mkt;
     try{ await enrichWithConfidence(cand.prop); }catch(e){}
     ST.market=_savedMkt;
     if(ST.eventId!==eid) return;
-    // Threshold props: value = hit-rate % (e.g. 77 for a player who gets 1+ hit 77% of the time)
-    if(!cand.prop.pdNoValue && cand.prop.value>=POTD_MIN_SCORE && cand.prop.value>bestEnrichedScore){
-      bestEnrichedScore=cand.prop.value;
-      bestEnriched=cand;
+    if(!cand.prop.pdNoValue && cand.prop.pdConfidence!=null){
+      var candConf=cand.prop.pdConfidence;
+      if(candConf>bestEnrichedConf){ bestEnrichedConf=candConf; bestEnriched=cand; }
     }
   }
 
-  if(bestEnriched){
+  // Show anything ≥ 62% (GOOD tier); tier label in renderPropOfDay handles LOCK/ELITE/GOOD distinction
+  if(bestEnriched && bestEnrichedConf>=0.62){
     _potgCache[eid]={prop:bestEnriched.prop, mkt:bestEnriched.mkt};
     renderPropOfDay(bestEnriched.prop, bestEnriched.mkt);
   } else {
@@ -1704,11 +1716,11 @@ function renderNoPropOfDay(){
       '<span class="market" style="color:var(--mut2)">No pick today</span>'+
     '</div>'+
     '<div class="pname" style="color:var(--mut2);font-weight:400;font-size:14px">'+
-      'Our data didn\'t identify a Prop of the Day today.'+
+      'No prop cleared 62% confidence today.'+
     '</div>'+
     '<div class="analysis">'+
-      'No prop cleared our '+POTD_MIN_SCORE+'/100 confidence threshold. This can happen on slow lines, thin markets, '+
-      'or early in the day before books sharpen. Check back as lines update throughout the day.'+
+      'This happens on thin markets or early lines before game logs are factored in. '+
+      'Check back as lines sharpen — or browse the individual props above for context.'+
     '</div>';
   mount.innerHTML="";
   mount.appendChild(c);
@@ -1717,55 +1729,52 @@ function renderNoPropOfDay(){
 function renderPropOfDay(p, mkt){
   var mount=$("potgMount");
   if(!mount||!p) return;
-  // Safety floor — never surface below POTD_MIN_SCORE as flagship pick
-  if(p.value<POTD_MIN_SCORE){ renderNoPropOfDay(); return; }
+  var confPct=p.pdConfidence!=null?Math.round(p.pdConfidence*100):p.value;
+  if(confPct<62){ renderNoPropOfDay(); return; }
+
   var mktLabel=marketName(mkt);
-  var bet=p.side+(p.bestLine!=null?" "+p.bestLine:"");
-  var sidecls=p.side==="Under"?"under":"over";
-  var t=tierOf(p.value).t;
+  var isThresh=isThreshProp(p);
+  var pdSide=p.pdSide||p.side;
+  var pdLine=p.pdLine!=null?p.pdLine:p.bestLine;
+  var sidecls=pdSide==="Under"?"under":"over";
+  var betLabel=isThresh?threshLabel(pdLine,p._market):(pdSide+(pdLine!=null?" "+pdLine:""));
   var sharp=(p.lineSpread>=1.5);
 
-  // PropDesk Line context
-  var hasPD = p.pdLine!=null && p.pdConfidence!=null;
-  var confPct = hasPD ? Math.round(p.pdConfidence*100) : null;
-  var pdSide = p.pdSide||p.side;
-  var pdLine = p.pdLine!=null ? p.pdLine : p.bestLine;
-  var isThresh = isThreshProp(p);
-  var betLabel = isThresh
-    ? threshLabel(pdLine, p._market)
-    : (pdSide + (pdLine!=null?" "+pdLine:""));
-  // Analysis: 3 sentences explaining why this is the best prop across all markets
-  var s1="Out of every prop available for this game across all markets, "+esc(p.player)+"'s "+esc(mktLabel)+" line earns Prop of the Day with a value score of "+p.value+"/100 ("+t+") - the highest edge found anywhere on the board.";
-  var s2;
-  if(hasPD && confPct!=null){
-    var gapNote=p.pdGap>0?" — PropDesk shifted the line "+p.pdGap.toFixed(1)+" pts from the "+p.bestLine+" book line to find the edge":"";
-    s2="PropDesk confidence: <b>"+confPct+"%</b> — "+esc(betLabel)+gapNote+". The best available odds are "+fmtOdds(p.bestOdds)+" at "+(p.bestBook?esc(p.bestBook.book):"your top book")+".";
-  } else if(p.yesNo){
-    s2="The best available price is "+fmtOdds(p.bestOdds)+" on this Yes market - a standout number relative to the rest of the field.";
-  } else {
-    var edgePts=(p.edge||0).toFixed(1);
-    s2="The "+p.side+(p.bestLine!=null?" "+p.bestLine:"")+" is the call, with "+edgePts+" point(s) of free value versus the consensus line of "+(p.consensus!=null?p.consensus:"the market")+", giving you a mathematical edge before a single game plays out.";
-  }
-  var s3=(sharp?
-    "The "+(p.lineSpread||0).toFixed(1)+"-point spread across books signals sharp positioning is already in play - lock in the best available number before further movement narrows the gap.":
-    "Market consensus is tight and the vig runs near "+(p.vig||0).toFixed(1)+"%, so the pricing is clean - this edge is real, not a fluke of one outlier book."
-  );
+  // Tier label — drives the card header badge and analysis tone
+  var tierInfo=confTierOf(confPct);
+  var isGoodOnly=(confPct>=62&&confPct<67);
+  var cardTitle=isGoodOnly?"Best Available Today":"Prop of the Day";
+  var tierNote=isGoodOnly?'<div class="warn" style="margin:6px 0 4px;font-size:11px">No LOCK or ELITE pick today — showing best available (GOOD tier)</div>':"";
+
+  // Line shift note
+  var shiftedUp=pdLine!=null&&p.bestLine!=null&&pdLine>p.bestLine;
+  var shiftedDown=pdLine!=null&&p.bestLine!=null&&pdLine<p.bestLine;
+  var gapNote="";
+  if(shiftedUp) gapNote=" — PropDesk raised the line "+p.pdGap.toFixed(1)+" pts from the book's "+p.bestLine+": player still hits it "+confPct+"% of the time";
+  else if(shiftedDown) gapNote=" — PropDesk dropped the line "+p.pdGap.toFixed(1)+" pts from the book's "+p.bestLine+" to find the edge";
+
+  var s1="Out of every prop available for this game, "+esc(p.player)+"'s "+esc(mktLabel)+" is the "+tierInfo.t+" pick — "+confPct+"% confidence based on recent game logs.";
+  var s2="PropDesk line: <b>"+esc(betLabel)+"</b>"+gapNote+". Best odds: "+fmtOdds(p.bestOdds)+" at "+(p.bestBook?esc(p.bestBook.book):"your top book")+".";
+  var s3=sharp?
+    "The "+(p.lineSpread||0).toFixed(1)+"-pt spread across books signals sharp action — get the best number before lines move.":
+    "Vig runs near "+(p.vig||0).toFixed(1)+"% and consensus is tight — the edge is real, not a fluke of one outlier book.";
 
   var c=el("div","card card-potg");
   c.innerHTML=
     '<div class="card-h">'+
-      '<span class="tag tag-g">Prop of the Day</span>'+
+      '<span class="tag tag-g">'+esc(cardTitle)+'</span>'+
       '<span class="market">'+esc(mktLabel)+'</span>'+
       (sharp?'<span class="badge-sharp" style="margin-left:8px">Sharp Action</span>':'')+
-      '<div class="vscore"><b id="potgScore">0</b><span>SCORE</span></div>'+
+      '<div class="vscore '+tierInfo.c+'"><b id="potgScore">0</b><span>%</span></div>'+
     '</div>'+
+    tierNote+
     '<div class="pname">'+esc(p.player)+'</div>'+
     '<div class="pbet '+sidecls+'">'+esc(betLabel)+'</div>'+
-    (confPct!=null?'<div class="conf-badge cb-strong" style="width:fit-content;margin:4px 0 8px">'+confPct+'% confidence</div>':'')+
+    '<div class="conf-badge cb-strong" style="width:fit-content;margin:4px 0 8px">'+confPct+'% confidence · '+tierInfo.t+'</div>'+
     '<div class="analysis">'+s1+" "+s2+" "+s3+'</div>';
   mount.innerHTML="";
   mount.appendChild(c);
-  countUp($("potgScore"),p.value,0);
+  countUp($("potgScore"),confPct,0);
 }
 
 /* ============ LAY OF THE DAY ============ */
@@ -1884,19 +1893,16 @@ function filteredProps(){
   var results=ST.props.filter(function(p){
     var qOk=!q||p.player.toLowerCase().indexOf(q)>=0;
     if(!qOk) return false;
-    // Pitcher K props: guardrails hide unless "Show Hidden" is on
-    if(p._market==="pitcher_strikeouts"){
-      if(p.enriched&&p.pdNoValue&&!ST_showNoValue) return false;
-      return true;
-    }
     // All enriched no-value rows: hidden by default, revealed by toggle
-    if(p.enriched&&p.pdNoValue){
-      return ST_showNoValue;
-    }
-    // Pre-enrichment: hide very low phase-1 scores
-    if(!p.enriched&&p.value<44) return false;
-    // Hide <55% confidence rows (shown only when "Show Hidden" is on)
+    if(p.enriched&&p.pdNoValue){ return ST_showNoValue; }
+    // Pre-enrichment: hide low phase-1 scores
+    if(!p.enriched&&p.value<50) return false;
+    // Hide <55% confidence — always invisible unless "Show All" is on
     if(p.enriched&&p.pdConfidence!=null&&!p.pdNoValue&&Math.round(p.pdConfidence*100)<55&&!ST_showNoValue) return false;
+    // L5 avg ice-cold filter: if L5 avg is >40% below the book line, player is ice cold — hide
+    if(!ST_showNoValue&&p.enriched&&p.l5Avg!=null&&p.bestLine!=null&&p.bestLine>0){
+      if(p.l5Avg < p.bestLine*0.6) return false;
+    }
     // "Best Bets Only" filter — LOCK+ELITE only (≥67%)
     if(ST_bestOnly&&p.enriched&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)<67) return false;
     return true;
