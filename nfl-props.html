@@ -178,8 +178,8 @@ thead th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:upper
 tbody td{padding:11px 12px;border-bottom:1px solid var(--bd);vertical-align:top;font-size:13px;color:var(--text)}
 tbody tr.prow{transition:background .15s}
 tbody tr.prow:hover{background:var(--surf2)}
-.pl-name{font-weight:700;font-size:14px}
-.pl-meta{font-size:11px;color:var(--mut);margin-top:2px}
+.pl-name{font-weight:800;font-size:16px}
+.pl-meta{font-size:12px;color:var(--mut);margin-top:3px}
 .pl-acts{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px;margin-top:7px}
 .mini{font-size:10px;font-weight:600;padding:4px 8px;border-radius:6px;background:var(--surf2);border:1px solid var(--bd2);color:var(--mut);width:fit-content;transition:.12s}
 .mini:hover{color:var(--text);border-color:#3a3a3a}
@@ -192,8 +192,8 @@ tbody tr.prow:hover{background:var(--surf2)}
 .ev.pos{color:var(--accent)}
 .ev.neg{color:var(--red)}
 .vs{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px}
-.vs b{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
-.vs .vt{font-size:9px;font-weight:800;letter-spacing:.5px}
+.vs b{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;opacity:.8}
+.vs .vt{font-size:20px;font-weight:800;letter-spacing:-.5px;line-height:1;order:-1}
 .t-lock{color:#ffd700} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:#b8f5d4} .t-fair{color:var(--mut2)} .t-pass{color:var(--mut2)}
 /* PropDesk Line display */
 .pd-cell{display:flex;flex-direction:column;gap:3px}
@@ -220,16 +220,39 @@ tbody tr.prow:hover{background:var(--surf2)}
 .mv.up{color:var(--accent)} .mv.down{color:var(--red)}
 
 /* INLINE QUICK STATS — stretch to fill row width */
-.pl-qstats{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px}
-.pl-qstats .qs{flex:1 1 68px;min-width:60px;background:rgba(255,255,255,.04);border:1px solid var(--bd2);border-radius:7px;padding:4px 6px 5px;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center;text-align:center;gap:1px}
-.pl-qstats .qs-l{color:var(--mut2);font-weight:700;font-size:8.5px;letter-spacing:.6px;text-transform:uppercase;line-height:1.1}
-.pl-qstats .qs-v{color:var(--text);font-weight:800;font-size:12px;line-height:1.2}
-.pl-flags{display:flex;flex-wrap:wrap;gap:3px;margin:3px 0 2px}
-.pl-flags .vf{font-size:9px;font-weight:700;letter-spacing:.4px;padding:2px 6px;border-radius:4px;text-transform:uppercase;cursor:default}
+.pl-qstats{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 5px}
+.pl-qstats .qs{flex:1 1 76px;min-width:68px;background:rgba(255,255,255,.04);border:1px solid var(--bd2);border-radius:8px;padding:7px 10px 8px;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}
+.pl-qstats .qs-l{color:var(--mut2);font-weight:700;font-size:10px;letter-spacing:.7px;text-transform:uppercase;line-height:1.1}
+.pl-qstats .qs-v{color:var(--text);font-weight:800;font-size:15px;line-height:1.2}
+.pl-flags{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 3px}
+.pl-flags .vf{font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:5px;text-transform:uppercase;cursor:default}
 .vf-val{background:rgba(0,255,135,.12);color:#00ff87;border:1px solid rgba(0,255,135,.25)}
 .vf-sharp{background:rgba(255,204,0,.12);color:#ffcc00;border:1px solid rgba(255,204,0,.25)}
 .vf-hot{background:rgba(255,107,0,.14);color:#ff8c42;border:1px solid rgba(255,107,0,.28)}
 .vf-guard{background:rgba(255,79,79,.1);color:#ff6b6b;border:1px solid rgba(255,79,79,.25)}
+
+/* TIER ROW BORDERS */
+tbody tr.prow.tier-lock{border-left:3px solid #ffd700}
+tbody tr.prow.tier-elite{border-left:3px solid var(--accent)}
+/* column breathing room */
+table th:nth-child(2),table td:nth-child(2){min-width:130px}
+table th:nth-child(3),table td:nth-child(3){min-width:140px;padding-left:14px;padding-right:14px}
+table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
+
+/* SUMMARY BAR */
+.summary-bar{display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--bd);border-radius:12px;padding:10px 14px;margin:10px 0;flex-wrap:wrap;position:sticky;top:52px;z-index:4}
+.sb-label{font-size:12px;color:var(--mut);font-weight:600;white-space:nowrap}
+.sb-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;padding:5px 12px;border-radius:8px;white-space:nowrap;letter-spacing:.3px}
+.sb-lock{background:rgba(255,215,0,.12);color:#ffd700;border:1px solid rgba(255,215,0,.3)}
+.sb-elite{background:rgba(0,255,135,.12);color:var(--accent);border:1px solid rgba(0,255,135,.25)}
+.sb-good{background:rgba(127,230,168,.12);color:#7fe6a8;border:1px solid rgba(127,230,168,.2)}
+.sb-spacer{flex:1}
+.btn-best{background:var(--surf2);border:1px solid var(--bd2);border-radius:8px;padding:6px 13px;font-size:12px;font-weight:700;color:var(--mut);transition:.15s;white-space:nowrap}
+.btn-best:hover{border-color:#3a3a3a;color:var(--text)}
+.btn-best.on{background:rgba(0,255,135,.12);border-color:rgba(0,255,135,.4);color:var(--accent)}
+.btn-toggle{background:var(--surf2);border:1px solid var(--bd2);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--mut);transition:.15s;white-space:nowrap}
+.btn-toggle:hover{border-color:#3a3a3a;color:var(--text)}
+.btn-toggle.on{border-color:rgba(255,204,0,.4);color:var(--yellow)}
 
 /* EXPAND */
 .expand td{background:var(--surf2);padding:0;border-bottom:1px solid var(--bd2)}
@@ -391,11 +414,23 @@ tbody tr.prow:hover{background:var(--surf2)}
       <span class="fb-lbl">My Book:</span>
       <select id="bookSel"><option value="">All Books</option></select>
       <button class="btn" id="parlayBtn">Build Parlay</button>
+      <button class="btn-toggle" id="showNoValueBtn" title="Show props with no clear edge">Show Hidden</button>
       <span class="count" id="resCount"></span>
     </div>
 
     <div id="potgMount"></div>
     <div id="lotdMount"></div>
+
+    <div id="summaryBar" style="display:none">
+      <div class="summary-bar">
+        <span class="sb-label" id="sb-total">0 props</span>
+        <span class="sb-chip sb-lock" id="sb-lock">LOCK: 0</span>
+        <span class="sb-chip sb-elite" id="sb-elite">ELITE: 0</span>
+        <span class="sb-chip sb-good" id="sb-good">GOOD: 0</span>
+        <span class="sb-spacer"></span>
+        <button class="btn-best" id="bestBetsBtn">Best Bets Only</button>
+      </div>
+    </div>
 
     <div id="tableMount"></div>
   </div>
@@ -735,6 +770,8 @@ var ST = {
   charts:[],
   parlayCart:[]
 };
+var ST_showNoValue=false; // show pdNoValue / hidden rows
+var ST_bestOnly=false;    // show only LOCK + ELITE (≥67%)
 
 /* ============ MATH ============ */
 function impliedProb(o){ o=Number(o); if(o>0) return 100/(o+100); return Math.abs(o)/(Math.abs(o)+100); }
@@ -765,10 +802,9 @@ function tierOf(s){
 }
 // Confidence-based tier (used after phase-2 enrichment to display X%)
 function confTierOf(pct){ // pct is 0-100
-  if(pct>=75) return {c:"t-lock",  t:"LOCK"};
-  if(pct>=65) return {c:"t-elite", t:"ELITE"};
-  if(pct>=60) return {c:"t-strong",t:"STRONG"};
-  if(pct>=55) return {c:"t-good",  t:"GOOD"};
+  if(pct>=72) return {c:"t-lock",  t:"LOCK"};
+  if(pct>=67) return {c:"t-elite", t:"ELITE"};
+  if(pct>=62) return {c:"t-good",  t:"GOOD"};
   return       {c:"t-pass",  t:"···"};
 }
 function sportLabel(k){ for(var i=0;i<SPORTS.length;i++) if(SPORTS[i].key===k) return SPORTS[i].label; return k; }
@@ -968,6 +1004,7 @@ function computeBestBet(p,marketKey){
    ═══════════════════════════════════════════════════════════════════════ */
 
 // Weighted composite confidence player hits the prop at a given line
+// L5=40% (recent form), L10=30% (medium trend), season=30% (baseline)
 // isOver=true → "hit" means val > line; isOver=false → val < line
 function compositeConf(vals, line, isOver){
   if(!vals||vals.length<3) return null;
@@ -976,10 +1013,10 @@ function compositeConf(vals, line, isOver){
     if(!sl.length) return null;
     return sl.filter(function(v){ return isOver?v>line:v<line; }).length/sl.length;
   }
-  var r5=vals.length>=5?sliceHR(5):null;
-  var r10=vals.length>=7?sliceHR(10):null;
-  var rAll=sliceHR(vals.length);
-  var w5=r5!=null?0.40:0, w10=r10!=null?0.35:0, wA=0.25;
+  var r5=vals.length>=3?sliceHR(5):null;   // L5 recent form  (40%)
+  var r10=vals.length>=7?sliceHR(10):null; // L10 trend       (30%)
+  var rAll=sliceHR(vals.length);           // season baseline (30%)
+  var w5=r5!=null?0.40:0, w10=r10!=null?0.30:0, wA=0.30;
   var tot=w5+w10+wA;
   if(!tot) return null;
   return ((r5||0)*w5+(r10||0)*w10+(rAll||0)*wA)/tot;
@@ -1051,7 +1088,7 @@ async function enrichWithConfidence(p){
     p._vals=vals;
     p._dates=gl.dates||[];
 
-    if(vals.length<8&&p.guardrailFlags.indexOf("THIN_DATA")<0)
+    if(vals.length<10&&p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
 
     // ── Special: Pitcher strikeout props ─────────────────────────────────
@@ -1214,6 +1251,30 @@ async function enrichWithConfidence(p){
     // LINE_ADJ flag if PropDesk line differs from book line
     if(p.pdGap>0&&p.valueFlags.indexOf("LINE_ADJ")<0) p.valueFlags.push("LINE_ADJ");
 
+    // ── Post-enrichment confidence adjustments ────────────────────────────
+    // Matchup (20%): market signals — free points edge + sharp split
+    var matchupAdj=0;
+    if((p.edge||0)>=1.0) matchupAdj+=0.03;
+    else if((p.edge||0)>=0.5) matchupAdj+=0.015;
+    if((p.lineSpread||0)>=2.0) matchupAdj+=0.02;
+    else if((p.lineSpread||0)>=1.0) matchupAdj+=0.01;
+    // Streak/trend (10%): consecutive hits or misses at current line
+    var streakAdj=0;
+    var s=p.streak||0;
+    if(s>=4) streakAdj=0.04; else if(s>=3) streakAdj=0.025;
+    else if(s>=2) streakAdj=0.01;
+    else if(s<=-4) streakAdj=-0.04; else if(s<=-3) streakAdj=-0.025;
+    else if(s<=-2) streakAdj=-0.01;
+    // Thin data penalty (sample size <10)
+    var thinPenalty=vals.length<5?-0.07:(vals.length<10?-0.04:0);
+    // Apply all adjustments to pdConfidence (clamp 0.01–0.97)
+    if(p.pdConfidence!=null){
+      p.pdConfidence=Math.max(0.01,Math.min(0.97,p.pdConfidence+matchupAdj+streakAdj+thinPenalty));
+      p.pdResult.confidence=p.pdConfidence;
+      p.hitRate14=+(p.pdConfidence*100).toFixed(1);
+      p.value=Math.round(p.pdConfidence*100);
+    }
+
     updatePropValueDisplay(p);
     updatePropPDDisplay(p);
   }catch(e){
@@ -1241,6 +1302,10 @@ function updatePropValueDisplay(p){
     node.className=tier.c;
     if(vt&&vt.classList.contains("vt")){ vt.textContent=tier.t; vt.className="vt "+tier.c; }
     countUp(node,pct,0,cur,"%");
+    // Apply row-level tier border class
+    var row=node.closest("tr");
+    if(row){ row.classList.remove("tier-lock","tier-elite"); if(tier.c==="t-lock") row.classList.add("tier-lock"); else if(tier.c==="t-elite") row.classList.add("tier-elite"); }
+    renderSummaryBar();
   } else {
     // Phase-1 only — show dash (enrichment pending)
     node.textContent="—"; node.className="t-pass";
@@ -1714,19 +1779,33 @@ function lotdText(legs){
 /* ============ MAIN TABLE ============ */
 function filteredProps(){
   var q=($("searchIn").value||"").toLowerCase().trim();
-  return ST.props.filter(function(p){
-    // Pitcher K props: guardrails can hide them (short rest, contact team)
+  var results=ST.props.filter(function(p){
+    var qOk=!q||p.player.toLowerCase().indexOf(q)>=0;
+    if(!qOk) return false;
+    // Pitcher K props: guardrails hide unless "Show Hidden" is on
     if(p._market==="pitcher_strikeouts"){
-      if(p.enriched && p.pdNoValue) return false;
-      return !q || p.player.toLowerCase().indexOf(q)>=0;
+      if(p.enriched&&p.pdNoValue&&!ST_showNoValue) return false;
+      return true;
     }
-    // Other threshold markets (NHL goals, MLB hits…): always show, confidence is informational
-    if(isThreshProp(p)) return !q || p.player.toLowerCase().indexOf(q)>=0;
-    // True over/under markets: only show with valid PropDesk Line once enriched
-    if(p.enriched && p.pdNoValue) return false;
-    if(!p.enriched && p.value<44) return false;
-    return !q || p.player.toLowerCase().indexOf(q)>=0;
+    // All enriched no-value rows: hidden by default, revealed by toggle
+    if(p.enriched&&p.pdNoValue){
+      return ST_showNoValue;
+    }
+    // Pre-enrichment: hide very low phase-1 scores
+    if(!p.enriched&&p.value<44) return false;
+    // Hide <55% confidence rows (shown only when "Show Hidden" is on)
+    if(p.enriched&&p.pdConfidence!=null&&!p.pdNoValue&&Math.round(p.pdConfidence*100)<55&&!ST_showNoValue) return false;
+    // "Best Bets Only" filter — LOCK+ELITE only (≥67%)
+    if(ST_bestOnly&&p.enriched&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)<67) return false;
+    return true;
   });
+  // Sort highest confidence first
+  results.sort(function(a,b){
+    var ca=a.pdConfidence!=null&&!a.pdNoValue?a.pdConfidence:(a.value/100);
+    var cb=b.pdConfidence!=null&&!b.pdNoValue?b.pdConfidence:(b.value/100);
+    return cb-ca;
+  });
+  return results;
 }
 function bookColumns(){
   // Only show book columns when the user has explicitly selected their book
@@ -1734,6 +1813,27 @@ function bookColumns(){
   var has=false;
   ST.props.forEach(function(p){ p.books.forEach(function(b){ if(b.book===ST.book) has=true; }); });
   return has ? [ST.book] : [];
+}
+
+function renderSummaryBar(){
+  var bar=$("summaryBar");
+  if(!bar) return;
+  // Use ALL enriched props (not filtered) for accurate counts
+  var allEnriched=ST.props.filter(function(p){return p.enriched&&!p.pdNoValue&&p.pdConfidence!=null;});
+  var locks=0,elites=0,goods=0;
+  allEnriched.forEach(function(p){
+    var pct=Math.round(p.pdConfidence*100);
+    if(pct>=72) locks++; else if(pct>=67) elites++; else if(pct>=62) goods++;
+  });
+  var total=allEnriched.length;
+  bar.style.display=total?"block":"none";
+  if(!total) return;
+  $("sb-total").textContent=total+" prop"+(total!==1?"s":"")+" analyzed";
+  $("sb-lock").textContent="LOCK: "+locks;
+  $("sb-elite").textContent="ELITE: "+elites;
+  $("sb-good").textContent="GOOD: "+goods;
+  var bb=$("bestBetsBtn");
+  if(bb){ bb.className="btn-best"+(ST_bestOnly?" on":""); bb.textContent=ST_bestOnly?"Best Bets ✓":"Best Bets Only"; }
 }
 
 function renderTable(silent){
@@ -1775,6 +1875,7 @@ function renderTable(silent){
   props.forEach(function(p){ if(p.valueFlags) applyPropFlags(p); });
   props.forEach(function(p){ if(p.enriched) updatePropPDDisplay(p); });
   bindRowActions();
+  renderSummaryBar();
 }
 
 function rowHtml(p,cols,idx,silent){
@@ -1790,7 +1891,11 @@ function rowHtml(p,cols,idx,silent){
   var ev=p.evOver;
   var evHtml=(ev==null)?'<span class="ev">-</span>':'<span class="ev '+(ev>=0?"pos":"neg")+'">'+(ev>=0?"+":"")+ev.toFixed(1)+'%</span>';
   var meta=p._metaLoaded?(p._meta?esc(p._meta):''):'';
-  var rcls="prow"+(silent?"":" rowin");
+  // Pre-compute tier class for row left border
+  var _isConfRow=p.pdConfidence!=null&&!p.pdNoValue;
+  var _ctRow=_isConfRow?confTierOf(Math.round(p.pdConfidence*100)):{c:"t-pass",t:""};
+  var _tierCls=_ctRow.c==="t-lock"?"tier-lock":_ctRow.c==="t-elite"?"tier-elite":"";
+  var rcls="prow"+(_tierCls?" "+_tierCls:"")+(silent?"":" rowin");
   var delayMs=silent?0:(idx===0?16:idx*28);
   var style=silent?"":'style="animation-delay:'+delayMs+'ms"';
 
@@ -3335,6 +3440,16 @@ function init(){
   $("bookSel").addEventListener("change",function(){ ST.book=$("bookSel").value; localStorage.setItem("pe_book",ST.book); if(ST.props.length) renderTable(false); });
   if(ST.book) $("bookSel").value=ST.book;
   $("parlayBtn").onclick=openParlay;
+  $("showNoValueBtn").onclick=function(){
+    ST_showNoValue=!ST_showNoValue;
+    this.classList.toggle("on",ST_showNoValue);
+    this.textContent=ST_showNoValue?"Hide Hidden":"Show Hidden";
+    if(ST.props.length){ renderTable(true); renderSummaryBar(); }
+  };
+  $("bestBetsBtn").onclick=function(){
+    ST_bestOnly=!ST_bestOnly;
+    if(ST.props.length){ renderTable(true); renderSummaryBar(); }
+  };
 
   $("parlayClose").onclick=closeParlay;
   $("parlayModal").addEventListener("click",function(e){ if(e.target===$("parlayModal")) closeParlay(); });
