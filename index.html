@@ -4201,19 +4201,22 @@ async function loadTrends(){
 var _top10Data=[],_top10Time=null;
 var TOP10_TTL=30*60*1000;
 
-async function fetchEventsForSport(sportKey){
+// Returns ALL today's games for a sport with odds already embedded — one API call
+async function fetchAllOddsForSport(sportKey,markets){
   try{
-    var r=await fetch(apiUrl("/sports/"+sportKey+"/events",{dateFormat:"iso"}));
-    if(!r.ok) return null;
+    var r=await fetch(apiUrl("/sports/"+sportKey+"/odds",{
+      regions:"us,us2",markets:markets,oddsFormat:"american",dateFormat:"iso"
+    }));
+    if(!r.ok) return [];
     var data=await r.json();
     var now=Date.now();
-    var today=(data||[]).filter(function(e){
+    return (data||[]).filter(function(e){
       return new Date(e.commence_time).getTime()>now-3*3600*1000;
     });
-    return today.length?today[0]:null;
-  }catch(e){return null;}
+  }catch(e){return [];}
 }
 
+// Kept for backward-compat (used by existing callers if any)
 async function fetchOddsForSport(sportKey,eventId,markets){
   try{
     var r=await fetch(apiUrl("/sports/"+sportKey+"/events/"+eventId+"/odds",{
@@ -4298,7 +4301,7 @@ function renderTop10(picks){
           '<span class="t10-tier '+tierCls+'">'+tier.t+'</span>'+
         '</div>'+
         '<div class="t10-player">'+esc(p.player)+'</div>'+
-        '<div class="t10-prop">'+esc(mktName)+'</div>'+
+        '<div class="t10-prop">'+esc(mktName)+(p._game?'<span style="color:var(--mut2);font-weight:400"> &middot; '+esc(p._game)+'</span>':'')+'</div>'+
         linesHtml+
         '<div style="display:flex;align-items:baseline;gap:6px">'+
           '<div class="t10-conf">'+conf+'%</div>'+
@@ -4360,30 +4363,39 @@ async function loadTop10(){
   mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Scanning all sports for today\'s best props&hellip;</p></div>';
   var sports=Object.keys(LOTD_MARKETS);
   var allCandidates=[];
+  var totalGames=0;
+  // One bulk request per sport — returns ALL today's games with odds embedded
   var sportResults=await Promise.allSettled(sports.map(async function(sportKey){
-    var ev=await fetchEventsForSport(sportKey);
-    if(!ev) return [];
     var mks=LOTD_MARKETS[sportKey];
-    var data=await fetchOddsForSport(sportKey,ev.id,mks.join(","));
-    if(!data) return [];
+    var events=await fetchAllOddsForSport(sportKey,mks.join(","));
+    if(!events.length) return [];
+    totalGames+=events.length;
     var out=[];
-    mks.forEach(function(mk){
-      parseProps(data,mk).forEach(function(p){ p._market=mk; p._sport=sportKey; out.push(p); });
+    events.forEach(function(ev){
+      var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
+      mks.forEach(function(mk){
+        parseProps(ev,mk).forEach(function(p){
+          p._market=mk; p._sport=sportKey; p._game=gameLabel;
+          out.push(p);
+        });
+      });
     });
     return out;
   }));
   sportResults.forEach(function(r){if(r.status==="fulfilled") allCandidates=allCandidates.concat(r.value);});
-  // Deduplicate: one prop per player+sport, highest value wins
+  // Update loading message now that we know scope
+  if(totalGames>0) mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching top candidates from '+totalGames+' game'+(totalGames!==1?"s":"")+'&hellip;</p></div>';
+  // Deduplicate: one prop per player+sport (same player can appear in multiple games), highest value wins
   var seen={},unique=[];
   allCandidates
     .filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null&&p.value>=50;})
     .sort(function(a,b){return b.value-a.value;})
     .forEach(function(p){
-      var k=p.player.toLowerCase()+"|"+p._sport;
+      var k=p.player.toLowerCase()+"|"+p._sport+"|"+(p._market||"");
       if(!seen[k]){seen[k]=1;unique.push(p);}
     });
-  // Enrich top 20 — save/restore ST.sport + ST.market so game log fetches the right data
-  var toEnrich=unique.slice(0,20);
+  // Enrich top 30 — more games = more candidates, still cap to avoid excess API use
+  var toEnrich=unique.slice(0,30);
   var savedSport=ST.sport,savedMkt=ST.market;
   for(var ei=0;ei<toEnrich.length;ei++){
     var ep=toEnrich[ei];
