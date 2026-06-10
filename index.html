@@ -342,6 +342,51 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 
 .empty{text-align:center;color:var(--mut);padding:50px 20px;font-size:14px}
 
+/* TRENDS PAGE */
+.trends-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.trends-hdr h2{font-size:22px;font-weight:800;margin-bottom:4px}
+.trends-sub{font-size:13px;color:var(--mut);line-height:1.5;max-width:560px}
+.trends-calc-time{font-size:11px;color:var(--mut2);margin-top:5px}
+.trend-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.trend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:13px;margin-top:4px}
+.tcard{background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:17px;display:flex;flex-direction:column;gap:10px;transition:.15s}
+.tcard:hover{border-color:#2a2a2a;background:var(--surf2)}
+.tc-streak{border-left:3px solid var(--accent)}
+.tc-linevalue{border-left:3px solid var(--blue)}
+.tc-movement{border-left:3px solid var(--yellow)}
+.tc-totals{border-left:3px solid var(--purple)}
+.tc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.tc-badges{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.tc-type{font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:3px 8px;border-radius:5px}
+.tc-type.streak{background:rgba(0,255,135,.15);color:var(--accent)}
+.tc-type.linevalue{background:rgba(79,159,255,.15);color:var(--blue)}
+.tc-type.movement{background:rgba(255,204,0,.15);color:var(--yellow)}
+.tc-type.totals{background:rgba(167,139,250,.15);color:var(--purple)}
+.tc-live{font-size:9px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:3px 8px;border-radius:5px;background:rgba(0,255,135,.1);color:var(--accent);border:1px solid rgba(0,255,135,.2);animation:livepulse 2s ease-in-out infinite}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.5}}
+.tc-conf{text-align:right;flex-shrink:0}
+.tc-conf-num{font-size:28px;font-weight:900;line-height:1;display:block}
+.tc-conf-lbl{font-size:9px;font-weight:700;letter-spacing:.8px;color:var(--mut);display:block;text-transform:uppercase;text-align:right}
+.tc-title{font-size:14px;font-weight:800;line-height:1.4}
+.tc-record{font-size:24px;font-weight:900;color:var(--accent);letter-spacing:-.5px;font-variant-numeric:tabular-nums;line-height:1}
+.tc-record.under{color:var(--blue)}
+.tc-record.neutral{color:var(--yellow)}
+.tc-streak-bar{display:flex;gap:3px;flex-wrap:wrap}
+.tc-bar-game{width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;flex-shrink:0;cursor:default}
+.tc-bar-hit{background:rgba(0,255,135,.18);color:var(--accent);border:1px solid rgba(0,255,135,.3)}
+.tc-bar-miss{background:rgba(255,79,79,.12);color:var(--red);border:1px solid rgba(255,79,79,.25)}
+.tc-detail{font-size:12.5px;color:#bbb;line-height:1.6}
+.tc-footer{display:flex;align-items:center;gap:8px;border-top:1px solid var(--bd);padding-top:9px;flex-wrap:wrap}
+.tc-source{font-size:10px;color:var(--mut2);font-weight:600;letter-spacing:.3px}
+.tc-time{font-size:10px;color:var(--mut2);margin-left:auto;white-space:nowrap}
+.tc-share{font-size:11px;font-weight:700;color:var(--accent);background:rgba(0,255,135,.1);border:1px solid rgba(0,255,135,.25);border-radius:6px;padding:4px 11px;cursor:pointer;transition:.15s;white-space:nowrap}
+.tc-share:hover{background:rgba(0,255,135,.22)}
+.tc-no-data{text-align:center;padding:60px 20px;color:var(--mut)}
+.tc-no-data .nd-icon{font-size:34px;margin-bottom:13px}
+.tc-no-data p{font-size:14px;line-height:1.7}
+.tc-no-data strong{color:var(--text)}
+.trends-empty-note{font-size:12px;color:var(--mut2);text-align:center;padding:18px 0}
+
 /* MOBILE BOTTOM NAV */
 .botnav{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:70;display:none;align-items:stretch}
 .botnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:var(--mut)}
@@ -391,6 +436,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   </div>
   <nav class="drawer-nav" id="drawerNav">
     <button data-page="props" class="active">Props</button>
+    <button data-page="trends">Trends</button>
     <button data-page="history">History</button>
     <button data-page="how">How It Works</button>
     <button data-page="disclaimer">Disclaimer</button>
@@ -473,6 +519,28 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     </div>
   </div>
 
+  <!-- TRENDS PAGE -->
+  <div class="page" id="page-trends">
+    <div class="trends-hdr">
+      <div>
+        <h2>Trends</h2>
+        <p class="trends-sub">Real trends calculated from live stats and market data. Every trend is backed by actual numbers — no mock data.</p>
+        <div class="trends-calc-time" id="trendsCalcTime"></div>
+      </div>
+      <button class="btn" id="trendsRefreshBtn">Refresh</button>
+    </div>
+    <div class="trend-tabs" id="trendTabs">
+      <button class="pill active" data-ttype="all">All Trends</button>
+      <button class="pill" data-ttype="streak">Streaks</button>
+      <button class="pill" data-ttype="linevalue">Line Value</button>
+      <button class="pill" data-ttype="movement">Sharp Money</button>
+      <button class="pill" data-ttype="totals">Totals</button>
+    </div>
+    <div id="trendsMount">
+      <div class="tc-no-data"><div class="nd-icon">📊</div><p>Load props on the <strong>Props</strong> tab, then come back to see trends.</p></div>
+    </div>
+  </div>
+
   <!-- DISCLAIMER -->
   <div class="page" id="page-disclaimer">
     <div class="doc">
@@ -525,6 +593,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 <!-- MOBILE BOTTOM NAV -->
 <nav class="botnav" id="botnav">
   <button data-nav="props" class="active"><span class="bn-ic">#</span>Props</button>
+  <button data-nav="trends"><span class="bn-ic">~</span>Trends</button>
   <button data-nav="history"><span class="bn-ic">*</span>History</button>
   <button data-nav="parlay"><span class="bn-ic">+</span>Parlay</button>
 </nav>
@@ -3395,6 +3464,7 @@ function showPage(name){
   $("drawerNav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-page")===name); });
   $("botnav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-nav")===name); });
   if(name==="history") renderHistory();
+  if(name==="trends") loadTrends();
   window.scrollTo(0,0);
 }
 
@@ -3440,6 +3510,15 @@ function init(){
   $("bookSel").addEventListener("change",function(){ ST.book=$("bookSel").value; localStorage.setItem("pe_book",ST.book); if(ST.props.length) renderTable(false); });
   if(ST.book) $("bookSel").value=ST.book;
   $("parlayBtn").onclick=openParlay;
+  // Trend type filter tabs
+  document.querySelectorAll("#trendTabs .pill").forEach(function(b){
+    b.onclick=function(){
+      _trendsFilter=b.getAttribute("data-ttype")||"all";
+      renderTrends(_trendsData);
+    };
+  });
+  $("trendsRefreshBtn").onclick=function(){ _trendsData=[]; loadTrends(); };
+
   $("showNoValueBtn").onclick=function(){
     ST_showNoValue=!ST_showNoValue;
     this.classList.toggle("on",ST_showNoValue);
@@ -3681,6 +3760,335 @@ function saveManualParlay(){
 }
 
 /* END MANUAL PARLAY CART */
+
+/* ============================================================
+   TRENDS TAB
+   ============================================================ */
+
+var _trendsTime=null;
+var _trendsFilter="all";
+var _trendsData=[];
+
+// Confidence score from hit-rate + sample quality
+function trendConf(hitRate, n){
+  var h=hitRate*100;
+  var sq=Math.min(1,Math.max(0,(n-5)/10)); // 0 at n=5, 1 at n=15
+  return Math.round(Math.min(95,Math.max(55, h*0.65+30*sq)));
+}
+function trendTierCls(conf){
+  if(conf>=72) return "t-lock";
+  if(conf>=67) return "t-elite";
+  if(conf>=62) return "t-good";
+  return "t-pass";
+}
+
+/* --- TYPE 1: Player Streak Trends --------------------------------- */
+function calcPlayerStreakTrends(){
+  var trends=[];
+  ST.props.forEach(function(p){
+    var vals=p._vals;
+    if(!vals||vals.length<5) return;
+    var line=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:null);
+    if(line==null) return;
+    var isOver=(p.pdSide||"Over")==="Over";
+    function hr(n){
+      var sl=vals.slice(0,Math.min(n,vals.length));
+      if(sl.length<5) return null;
+      return sl.filter(function(v){ return isOver?v>line:v<line; }).length/sl.length;
+    }
+    var r5=hr(5), r10=hr(10), r15=hr(15);
+    // Pick the best record with ≥65% hit rate and widest sample
+    var best=null, bestN=0;
+    if(r15!=null&&r15>=0.65&&vals.length>=15){ best=r15; bestN=Math.min(vals.length,15); }
+    else if(r10!=null&&r10>=0.65&&vals.length>=10){ best=r10; bestN=Math.min(vals.length,10); }
+    else if(r5!=null&&r5>=0.65){ best=r5; bestN=5; }
+    if(best==null) return;
+    var hits=Math.round(best*bestN), misses=bestN-hits;
+    var conf=trendConf(best,bestN);
+    // Streak direction
+    var streak=0;
+    for(var i=0;i<vals.length;i++){
+      var h2=isOver?vals[i]>line:vals[i]<line;
+      if(i===0){streak=h2?1:-1;continue;}
+      if(h2&&streak>0)streak++; else if(!h2&&streak<0)streak--; else break;
+    }
+    var mktLbl=marketName(ST.market);
+    var direction=isOver?"Over":"Under";
+    var lineLabel=isThreshProp(p)?threshLabel(line,p._market):(direction+" "+line);
+    var streakNote=streak>=3?" Active streak: "+streak+" consecutive hits.":(streak<=-3?" Caution: "+Math.abs(streak)+" consecutive misses.":"");
+    // Hit/miss visual bar (up to 10 most recent games)
+    var bars="";
+    var barN=Math.min(10,vals.length);
+    for(var bi=0;bi<barN;bi++){
+      var bHit=isOver?vals[bi]>line:vals[bi]<line;
+      bars+='<span class="tc-bar-game '+(bHit?"tc-bar-hit":"tc-bar-miss")+'" title="Game '+(bi+1)+': '+vals[bi]+'">'+(bHit?"✓":"✕")+'</span>';
+    }
+    trends.push({
+      type:"streak",
+      conf:conf,
+      player:p.player,
+      title:p.player+" "+lineLabel,
+      record:hits+"-"+misses+" L"+bestN,
+      recordCls:isOver?"":"under",
+      detail:"Hit this line in "+hits+" of "+bestN+" games ("+Math.round(best*100)+"% hit rate)."+streakNote,
+      bars:bars,
+      source:"ESPN / MLB Game Log",
+      shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" | "+hits+"-"+misses+" L"+bestN+" ("+Math.round(best*100)+"%) | "+mktLbl+" | propdeskhq.netlify.app"
+    });
+  });
+  return trends;
+}
+
+/* --- TYPE 2: Line Value Trends ------------------------------------ */
+function calcLineValueTrends(){
+  var trends=[];
+  ST.props.forEach(function(p){
+    if(!p.enriched||p.pdNoValue) return;
+    var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
+    if(line==null||line===0) return;
+    var sznAvg=p.seasonAvgEnrich;
+    var l5Avg=p.l5Avg;
+    var mktLbl=marketName(ST.market);
+    // Book Undervaluing: line is 15%+ below season average (Over value)
+    if(sznAvg&&sznAvg>0){
+      var gap=sznAvg-line;
+      var gapPct=gap/sznAvg*100;
+      if(gapPct>=15&&gap>=0.5){
+        var conf=Math.round(Math.min(92,55+gapPct*1.4));
+        trends.push({
+          type:"linevalue",
+          conf:conf,
+          player:p.player,
+          title:"Book undervaluing "+p.player,
+          record:"+"+gap.toFixed(1)+" vs szn avg",
+          recordCls:"",
+          detail:"Book line "+line+" is "+gapPct.toFixed(0)+"% below "+p.player+"'s season average of "+fmtStat(sznAvg)+" in "+mktLbl+". The line is set below historical production — Over has a statistical edge.",
+          source:"Season Stats",
+          shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct.toFixed(0)+"% below season avg of "+fmtStat(sznAvg)+" ("+mktLbl+") → Over value | propdeskhq.netlify.app"
+        });
+      }
+    }
+    // Book Overvaluing: line is 15%+ above L5 average (Under value)
+    if(l5Avg&&l5Avg>0&&line>0){
+      var gap2=line-l5Avg;
+      var gapPct2=gap2/line*100;
+      if(gapPct2>=15&&gap2>=0.5){
+        var conf2=Math.round(Math.min(88,55+gapPct2*1.2));
+        trends.push({
+          type:"linevalue",
+          conf:conf2,
+          player:p.player,
+          title:"Book overvaluing "+p.player,
+          record:"-"+gap2.toFixed(1)+" vs L5 avg",
+          recordCls:"under",
+          detail:"Book line "+line+" is "+gapPct2.toFixed(0)+"% above "+p.player+"'s L5 average of "+fmtStat(l5Avg)+" in "+mktLbl+". Recent production is running below the line.",
+          source:"L5 Game Log",
+          shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct2.toFixed(0)+"% above L5 avg of "+fmtStat(l5Avg)+" ("+mktLbl+") → Under value | propdeskhq.netlify.app"
+        });
+      }
+    }
+  });
+  return trends;
+}
+
+/* --- TYPE 3: Sharp Money / Odds Movement -------------------------- */
+function calcOddsMovementTrends(){
+  var trends=[];
+  var seen={};
+  // Line movement across books (from snapshot)
+  ST.props.forEach(function(p){
+    if(!p.snapMove||seen[p.player]) return;
+    var upBooks=[], downBooks=[];
+    Object.keys(p.snapMove).forEach(function(bk){
+      var mv=p.snapMove[bk];
+      if(mv>0) upBooks.push(bk);
+      else if(mv<0) downBooks.push(bk);
+    });
+    if(upBooks.length>=2){
+      seen[p.player]=1;
+      var conf=Math.round(Math.min(82,58+upBooks.length*7));
+      trends.push({
+        type:"movement",
+        conf:conf,
+        player:p.player,
+        title:"Sharp Money: "+p.player+" Under",
+        record:upBooks.length+" books moved up",
+        recordCls:"under",
+        detail:"Line rose at "+upBooks.join(", ")+" since loading — suggests sharp money on the Under or market adjustment. Betting into a rising line reduces Over value.",
+        source:"Live Line Movement",
+        shareText:"PropDesk Trend: Sharp signal on "+p.player+" Under — line moved up at "+upBooks.length+" books | propdeskhq.netlify.app"
+      });
+    }
+    if(downBooks.length>=2){
+      seen[p.player]=1;
+      var conf3=Math.round(Math.min(82,58+downBooks.length*7));
+      trends.push({
+        type:"movement",
+        conf:conf3,
+        player:p.player,
+        title:"Sharp Money: "+p.player+" Over",
+        record:downBooks.length+" books moved down",
+        recordCls:"",
+        detail:"Line dropped at "+downBooks.join(", ")+" since loading — suggests sharp money on the Over or news adjustment. Falling line improves Over value.",
+        source:"Live Line Movement",
+        shareText:"PropDesk Trend: Sharp signal on "+p.player+" Over — line dropped at "+downBooks.length+" books | propdeskhq.netlify.app"
+      });
+    }
+  });
+  // Book spread signal (≥1.5 pts across ≥3 books = sharp vs square disagreement)
+  ST.props.filter(function(p){ return (p.lineSpread||0)>=1.5&&p.bookCount>=3&&!seen[p.player]; })
+    .forEach(function(p){
+      seen[p.player]=1;
+      var sp=+(p.lineSpread||0).toFixed(1);
+      var conf4=Math.round(Math.min(80,60+sp*5));
+      trends.push({
+        type:"movement",
+        conf:conf4,
+        player:p.player,
+        title:"Sharp Split: "+p.player,
+        record:sp+" pt spread",
+        recordCls:"neutral",
+        detail:p.player+" has a "+sp+"-point spread across "+p.bookCount+" sportsbooks in "+marketName(ST.market)+". Wide disagreement signals sharp positioning — take the best number available.",
+        source:"Cross-Book Analysis",
+        shareText:"PropDesk Trend: "+p.player+" has "+sp+"pt spread across "+p.bookCount+" books in "+marketName(ST.market)+" — sharp split | propdeskhq.netlify.app"
+      });
+    });
+  return trends;
+}
+
+/* --- TYPE 4: Game Totals (async) ---------------------------------- */
+async function calcTotalsTrends(){
+  if(!ST.eventId||!getKey()) return [];
+  var trends=[];
+  try{
+    var r=await fetch(apiUrl("/sports/"+ST.sport+"/events/"+ST.eventId+"/odds",{
+      regions:"us,us2", markets:"totals", oddsFormat:"american"
+    }),{signal:AbortSignal.timeout(8000)});
+    if(!r.ok) return [];
+    var d=await r.json();
+    // Aggregate totals by line
+    var totMap={};
+    (d.bookmakers||[]).forEach(function(bm){
+      (bm.markets||[]).forEach(function(mkt){
+        if(mkt.key!=="totals") return;
+        (mkt.outcomes||[]).forEach(function(oc){
+          var pt=oc.point; var side=(oc.name||"").toLowerCase();
+          if(!totMap[pt]) totMap[pt]={over:[],under:[]};
+          if(side==="over"&&oc.price!=null) totMap[pt].over.push(oc.price);
+          else if(side==="under"&&oc.price!=null) totMap[pt].under.push(oc.price);
+        });
+      });
+    });
+    // Find consensus line (most books posting it)
+    var lines=Object.keys(totMap).map(Number).sort(function(a,b){
+      return (totMap[b].over.length+totMap[b].under.length)-(totMap[a].over.length+totMap[a].under.length);
+    });
+    if(!lines.length) return [];
+    var mainLine=lines[0];
+    var tot=totMap[mainLine];
+    if(!tot.over.length||!tot.under.length) return [];
+    var medOver=median(tot.over), medUnder=median(tot.under);
+    var evO=evPct(medOver,medUnder), evU=evPct(medUnder,medOver);
+    var vigAmt=calcVig(medOver,medUnder);
+    // Only surface if one side has a meaningful pricing edge (EV ≥ 1.5%) or vig is unusually low
+    var betterSide=evO>=evU?"Over":"Under";
+    var betterEV=betterSide==="Over"?evO:evU;
+    var betterOdds=betterSide==="Over"?medOver:medUnder;
+    if(Math.abs(betterEV)<1.5&&vigAmt>5) return [];
+    var ev=d; // reuse var name for event
+    var evData=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
+    var teams=evData?(evData.away_team+" @ "+evData.home_team):"Today's Game";
+    var conf=Math.round(Math.min(80,55+Math.abs(betterEV)*5+(5.5-Math.min(5.5,vigAmt))*2));
+    trends.push({
+      type:"totals",
+      conf:conf,
+      player:teams,
+      title:"Game Total: "+teams,
+      record:mainLine+" O/U",
+      recordCls:betterSide==="Under"?"under":"",
+      detail:betterSide+" has better market pricing: "+fmtOdds(betterOdds)+" ("+Math.round(impliedProb(betterOdds)*100)+"% implied). EV: "+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"%. Vig: "+vigAmt.toFixed(1)+"%. "+tot.over.length+" books posting.",
+      source:"The Odds API — Totals Market",
+      shareText:"PropDesk Trend: "+teams+" total "+mainLine+" — "+betterSide+" at "+fmtOdds(betterOdds)+" (EV: "+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"%) | propdeskhq.netlify.app"
+    });
+  }catch(e){}
+  return trends;
+}
+
+/* --- Render -------------------------------------------------------- */
+function renderTrendCard(t){
+  var typeCls=t.type==="streak"?"streak":t.type==="linevalue"?"linevalue":t.type==="movement"?"movement":"totals";
+  var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":"GAME TOTAL";
+  var tcls=trendTierCls(t.conf);
+  var tsince=_trendsTime?_trendsTime.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}):"just now";
+  return '<div class="tcard tc-'+t.type+'">'+
+    '<div class="tc-top">'+
+      '<div class="tc-badges">'+
+        '<span class="tc-type '+typeCls+'">'+typeLabel+'</span>'+
+        '<span class="tc-live">LIVE DATA</span>'+
+      '</div>'+
+      '<div class="tc-conf"><span class="tc-conf-num '+tcls+'">'+t.conf+'</span><span class="tc-conf-lbl">CONF</span></div>'+
+    '</div>'+
+    '<div class="tc-title">'+esc(t.title)+'</div>'+
+    '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
+    (t.bars?'<div class="tc-streak-bar">'+t.bars+'</div>':'')+
+    '<div class="tc-detail">'+esc(t.detail)+'</div>'+
+    '<div class="tc-footer">'+
+      '<span class="tc-source">'+esc(t.source)+'</span>'+
+      '<span class="tc-time">'+tsince+'</span>'+
+      '<button class="tc-share" data-share="'+esc(t.shareText)+'">Share ↗</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderTrends(trends){
+  var mount=$("trendsMount"); if(!mount) return;
+  var visible=(_trendsFilter==="all")?trends:trends.filter(function(t){return t.type===_trendsFilter;});
+  // Update tab active state
+  document.querySelectorAll("#trendTabs .pill").forEach(function(b){
+    b.classList.toggle("active", b.getAttribute("data-ttype")===_trendsFilter);
+  });
+  if(!visible.length){
+    var noDataMsg=!ST.props.length||!ST.eventId
+      ? '<div class="tc-no-data"><div class="nd-icon">📊</div><p>Load props on the <strong>Props</strong> tab first, then return here.</p></div>'
+      : '<div class="tc-no-data"><div class="nd-icon">🔍</div><p>Not enough data today — check back as more game data is tracked.<br><small style="color:var(--mut2);font-size:11px">Trends appear once props are enriched with stats data.</small></p></div>';
+    mount.innerHTML=noDataMsg;
+    return;
+  }
+  mount.innerHTML='<div class="trend-grid">'+visible.map(renderTrendCard).join("")+'</div>'+
+    '<p class="trends-empty-note">'+visible.length+' trend'+(visible.length!==1?"s":"")+'&nbsp;&nbsp;·&nbsp;&nbsp;Sample sizes shown in each card&nbsp;&nbsp;·&nbsp;&nbsp;All data live</p>';
+  mount.querySelectorAll(".tc-share").forEach(function(btn){
+    btn.onclick=function(){ copyText(btn.getAttribute("data-share")); toast("Copied!"); };
+  });
+}
+
+async function loadTrends(){
+  var mount=$("trendsMount"); if(!mount) return;
+  if(!ST.eventId||!getKey()){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Connect your API key and select a game on the <strong>Props</strong> tab to see trends.</p></div>';
+    return;
+  }
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Calculating trends from live data...</p></div>';
+  // Synchronous trends from already-loaded data
+  var trends=[];
+  trends=trends.concat(calcPlayerStreakTrends());
+  trends=trends.concat(calcLineValueTrends());
+  trends=trends.concat(calcOddsMovementTrends());
+  trends.sort(function(a,b){ return b.conf-a.conf; });
+  _trendsData=trends;
+  _trendsTime=new Date();
+  renderTrends(trends);
+  var ct=$("trendsCalcTime");
+  if(ct) ct.textContent="Last calculated: "+_trendsTime.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+" · "+trends.length+" trend"+(trends.length!==1?"s":"")+" found";
+  // Async: fetch game totals and append
+  var totTrends=await calcTotalsTrends();
+  if(totTrends.length){
+    _trendsData=_trendsData.concat(totTrends).sort(function(a,b){return b.conf-a.conf;});
+    renderTrends(_trendsData);
+    if(ct) ct.textContent="Last calculated: "+_trendsTime.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+" · "+_trendsData.length+" trend"+(_trendsData.length!==1?"s":"")+" found";
+  }
+}
+
+/* END TRENDS TAB */
 
 document.addEventListener("DOMContentLoaded",init);
 </script>
