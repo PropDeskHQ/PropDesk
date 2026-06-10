@@ -157,7 +157,14 @@ input:focus,select:focus{border-color:var(--accent)}
 .mpb-add{color:var(--accent)!important;border-color:rgba(0,255,135,.3)!important;transition:.15s}
 .mpb-add.in-cart{color:var(--mut)!important;border-color:var(--bd2)!important}
 /* ---- END MANUAL PARLAY BAR ---- */
-
+.leg-reason{font-size:11px;color:var(--mut);margin-top:3px;line-height:1.4}
+.leg-conf{font-size:12px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;align-self:flex-start}
+.leg-conf.t-lock{color:#ffd700;background:rgba(255,215,0,.1)}
+.leg-conf.t-elite{color:var(--accent);background:rgba(0,255,135,.1)}
+.leg-conf.t-good{color:#7fe6a8;background:rgba(127,230,168,.08)}
+.parlay-empty{background:#141414;border-radius:12px;padding:24px 20px;text-align:center;color:var(--mut);font-size:14px;line-height:1.7}
+.parlay-empty strong{color:var(--text);display:block;margin-bottom:6px;font-size:15px}
+.parlay-leg-note{font-size:12px;color:var(--yellow);margin-top:8px;text-align:center}
 .warn{font-size:12px;color:var(--yellow);margin-top:8px;background:rgba(255,204,0,.08);border:1px solid rgba(255,204,0,.25);border-radius:8px;padding:7px 10px}
 
 /* TOP VALUE BANNER */
@@ -357,8 +364,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tc-type{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:2px 7px;border-radius:4px;color:var(--mut);background:#1f1f1f;border:1px solid #2a2a2a}
 .tc-live{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:2px 7px;border-radius:4px;color:var(--accent);background:rgba(0,255,135,.08);border:1px solid rgba(0,255,135,.18);animation:livepulse 2.5s ease-in-out infinite}
 @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.5}}
-.tc-player{font-size:13px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:4px}
-.tc-record{font-size:32px;font-weight:900;color:var(--accent);letter-spacing:-.8px;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:10px}
+.tc-player{font-size:15px;font-weight:700;color:var(--text);line-height:1.5;margin-bottom:10px}
+.tc-record{font-size:18px;font-weight:800;color:var(--accent);letter-spacing:-.3px;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:12px}
 /* Hit rate progress bar — clean, no squares */
 .tc-hitbar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .tc-hitbar-track{flex:1;height:5px;background:#222;border-radius:3px;overflow:hidden}
@@ -589,12 +596,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   <div class="modal-box">
     <button class="modal-close drawer-close" id="parlayClose">&times;</button>
     <h2>Build a Parlay</h2>
-    <p class="sub">Assemble the highest-value legs from the current board into one ticket.</p>
-    <div class="frow"><label>Number of legs</label>
-      <div class="legcount" id="legCount"></div>
-    </div>
-    <div class="frow"><label>Target odds (American, optional)</label>
-      <input id="targetOdds" placeholder="e.g. 400" type="number"></div>
+    <p class="sub">Only legs rated 68%+ confidence qualify. We'll build the best 2 or 3-leg parlay automatically.</p>
     <button class="btn btn-accent" id="genParlay" style="width:100%;padding:11px">Generate Parlay</button>
     <div id="parlayResult" style="margin-top:16px"></div>
   </div>
@@ -1785,8 +1787,8 @@ async function loadLOTD(){
     (LOTD_MARKETS[ST.sport]||[getMarket()]).forEach(function(mk){
       parseProps(data,mk).forEach(function(p){ p._lotdMk=mk; pool.push(p); });
     });
-    // Exclude yes/no markets and props without a valid book line; use PARLAY_MIN_SCORE not POTD_MIN_SCORE
-    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null && p.value>=PARLAY_MIN_SCORE; });
+    // LOCK + ELITE only (≥67) — never show GOOD or below in Lay of the Day
+    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null && p.value>=67; });
     // De-duplicate by player — one player can't appear in multiple legs
     var lotdSeen={}, poolDedup=[];
     pool.sort(function(a,b){ return b.value-a.value; }).forEach(function(p){
@@ -1841,21 +1843,25 @@ async function loadLOTD(){
     if(!legs) legs=pool.slice(0,2);
 
     if(!legs||legs.length<2){ return; }
+    var avgScore=Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length);
+    if(avgScore<70){ return; } // overall quality gate
     var legHtml=legs.map(function(l,i){
       var bet=isThreshProp(l)?threshLabel(l.bestLine,l._lotdMk):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
       var bcls=l.side==="Under"?"under":(l.side==="Yes"?"yes":"over");
+      var tcls=confTierOf(l.value).c;
+      var tierLbl=confTierOf(l.value).t;
       return '<div class="leg"><div class="leg-n">'+(i+1)+'</div>'+
         '<div style="flex:1"><div class="ln">'+esc(l.player)+'</div>'+
-        '<div class="lm">'+esc(marketName(l._lotdMk))+'</div></div>'+
+        '<div class="lm">'+esc(marketName(l._lotdMk))+'</div>'+
+        '<div class="leg-reason">'+tierLbl+' ('+l.value+'%) — qualifies on our value model.</div></div>'+
         '<div class="lb '+bcls+'">'+esc(bet)+'</div>'+
-        '<div class="ls">'+l.value+'/100</div></div>';
+        '<div class="leg-conf '+tcls+'">'+l.value+'%</div></div>';
     }).join("");
-    var avgScore=Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length);
     var c=el("div","card card-lotd");
     c.innerHTML=
       '<div class="card-h"><span class="tag tag-p">Lay of the Day</span>'+
         '<span class="market">'+legs.length+'-leg parlay</span>'+
-        '<div class="vscore" style="margin-left:auto"><b style="color:var(--purple)">'+avgScore+'/100</b></div></div>'+
+        '<div class="vscore" style="margin-left:auto"><b style="color:var(--purple)">'+avgScore+'% avg</b></div></div>'+
       '<div class="legs">'+legHtml+'</div>'+
       '<div class="analysis">'+lotdText(legs)+'</div>';
     mount.innerHTML="";
@@ -1865,11 +1871,11 @@ async function loadLOTD(){
 
 function lotdText(legs){
   var names=legs.map(function(l){return l.player;}).join(", ");
-  var diverse=(ST.sport!=="americanfootball_nfl")?" across different stat categories so the legs are independent":"";
+  var diverse=(ST.sport!=="americanfootball_nfl")?" across different stat categories so the legs stay independent":"";
   var avgConf=Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length);
   return "Today's Lay of the Day combines "+esc(names)+diverse+
-    ". Every leg scored "+PARLAY_MIN_SCORE+" or better on our value model — PropDesk's avg confidence is "+avgConf+"/100."+
-    " Size this as a swing bet: every leg must hit, so keep stakes modest and consider playing the legs individually if your book restricts correlated props.";
+    ". Every leg is rated LOCK or ELITE (67%+) — PropDesk's avg confidence is "+avgConf+"%."+
+    " Size this as a swing bet: keep stakes modest and consider playing legs individually if your book restricts correlated props.";
 }
 
 /* ============ MAIN TABLE ============ */
@@ -3264,47 +3270,53 @@ async function silentRefresh(){
 }
 
 /* ============ PARLAY MODAL ============ */
-var parlayLegs=3;
-function initParlayModal(){
-  var lc=$("legCount"); lc.innerHTML="";
-  [2,3,4,5,6,8,10].forEach(function(n){
-    var b=el("button",n===parlayLegs?"active":"",""+n);
-    b.onclick=function(){ parlayLegs=n; lc.querySelectorAll("button").forEach(function(x){x.classList.remove("active");}); b.classList.add("active"); };
-    lc.appendChild(b);
-  });
+var PARLAY_LEG_MIN_CONF=68; // each leg must be ≥68% confidence
+var PARLAY_OVERALL_MIN=70;  // average confidence across all legs must be ≥70
+
+function getEffectiveConf(p){
+  if(p.enriched&&p.pdConfidence!=null&&!p.pdNoValue)
+    return Math.round(p.pdConfidence*100);
+  return p.value;
 }
-function openParlay(){ initParlayModal(); $("parlayResult").innerHTML=""; $("parlayModal").classList.add("open"); }
+
+function legReason(l){
+  var conf=getEffectiveConf(l);
+  var tier=confTierOf(conf).t;
+  if(l.enriched&&l.pdConfidence!=null&&!l.pdNoValue){
+    var vals=l._vals;
+    if(vals&&vals.length>=5&&l.pdLine!=null){
+      var isO=(l.pdSide||"Over")==="Over";
+      var ln=l.pdLine;
+      var hits5=vals.slice(0,5).filter(function(v){return isO?v>ln:v<ln;}).length;
+      return tier+" ("+conf+"%) — hit the "+(isO?"Over":"Under")+" in "+hits5+" of his last 5 games.";
+    }
+    return tier+" ("+conf+"%) confidence on our model.";
+  }
+  return tier+" ("+conf+"%) on our pre-game value model.";
+}
+
+function openParlay(){ $("parlayResult").innerHTML=""; $("parlayModal").classList.add("open"); }
 function closeParlay(){ $("parlayModal").classList.remove("open"); }
 function generateParlay(){
+  var NO_PARLAY='<div class="parlay-empty"><strong>No parlay today.</strong>Our data couldn\'t find enough high-confidence legs. Check back tomorrow or play the individual props instead.</div>';
   if(!ST.props.length){ $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Load a game and prop market first.</div>'; return; }
-  var target=parseFloat($("targetOdds").value);
-  var hasTarget=(!isNaN(target)&&target>0);
 
-  // Pool: valid odds + minimum value score (PARLAY_MIN_SCORE, not the stricter POTD floor)
-  // De-duplicate by player name so one player can't appear twice
+  // Pool: ≥68% confidence, has odds, one player per leg
   var seenPl={}, pool=[];
   ST.props
-    .filter(function(p){ return p.bestOdds!=null && p.value>=PARLAY_MIN_SCORE; })
-    .sort(function(a,b){ return b.value-a.value; })
+    .filter(function(p){ return p.bestOdds!=null && getEffectiveConf(p)>=PARLAY_LEG_MIN_CONF; })
+    .sort(function(a,b){ return getEffectiveConf(b)-getEffectiveConf(a); })
     .forEach(function(p){
       var k=p.player.toLowerCase();
       if(!seenPl[k]){ seenPl[k]=1; pool.push(p); }
     });
 
-  // "No Parlay Today" is reserved for truly empty boards — if props exist, we always build
-  if(pool.length<2){
-    $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Not enough props (score ≥'+PARLAY_MIN_SCORE+') to build a parlay. Load more markets or wait for lines to open.</div>';
-    return;
-  }
+  if(pool.length<2){ $("parlayResult").innerHTML=NO_PARLAY; return; }
 
-  var MAX_DEC=5.0; // +400 cap for the combination search
-  var n=Math.min(parlayLegs, pool.length);
-  // Cap search pool for performance: C(30,3)=4060, C(30,4)=27405 — both fast
-  var searchCap=n<=4?30:pool.length;
-  var searchPool=pool.slice(0, Math.min(pool.length, searchCap));
+  var MAX_DEC=5.0;
+  var targetN=pool.length>=3?3:2;
+  var legNote=pool.length<3?"Only 2 legs met our confidence threshold today.":"";
 
-  // Exhaustive combination search: find the best n-leg combo within MAX_DEC
-  // Returns highest-avg-value set; null if no combo fits under MAX_DEC
   function findBestCombo(legCount, candidates){
     if(candidates.length<legCount) return null;
     var best=null, bestScore=-Infinity;
@@ -3312,90 +3324,71 @@ function generateParlay(){
       if(chosen.length===legCount){
         var dec=1;
         for(var ii=0;ii<chosen.length;ii++) dec*=aToDec(chosen[ii].bestOdds);
-        if(dec>MAX_DEC) return; // over cap, skip
+        if(dec>MAX_DEC) return;
         var sc=0;
-        for(var jj=0;jj<chosen.length;jj++) sc+=chosen[jj].value;
-        var avg2=sc/legCount;
-        // Bonus for landing in the sweet spot (+150 to +400)
-        var bonus=(dec>=aToDec(150))?10:0;
-        var rank=avg2+bonus;
+        for(var jj=0;jj<chosen.length;jj++) sc+=getEffectiveConf(chosen[jj]);
+        var rank=sc/legCount+(dec>=aToDec(150)?8:0);
         if(rank>bestScore){ bestScore=rank; best=chosen.slice(); }
         return;
       }
       var remaining=legCount-chosen.length;
       for(var i=start;i<=candidates.length-remaining;i++){
-        chosen.push(candidates[i]);
-        choose(i+1, chosen);
-        chosen.pop();
+        chosen.push(candidates[i]); choose(i+1,chosen); chosen.pop();
       }
     }
     choose(0,[]);
     return best;
   }
 
-  var legs=null;
-  if(n<=4){
-    // For 2-4 legs: try combination search within +400
-    legs=findBestCombo(n, searchPool);
-    // If n>2 and no combo fits under +400, try 2-leg fallback
-    if(!legs && n>2) legs=findBestCombo(2, searchPool);
-    // If still nothing, take top-n by value regardless of odds cap
-    // (props at normal prices will rarely exceed +400 for 2 legs anyway)
-    if(!legs) legs=pool.slice(0, n);
-  } else {
-    // Large leg counts (5+): combination search impractical — greedy top-N is fine
-    // Users selecting 5+ legs understand the parlay will be a longshot
-    legs=pool.slice(0, n);
+  var searchPool=pool.slice(0,30);
+  var legs=findBestCombo(targetN,searchPool);
+  if(!legs&&targetN>2){
+    legs=findBestCombo(2,searchPool);
+    legNote="Only 2 legs fit within our odds cap today.";
   }
+  if(!legs) legs=pool.slice(0,targetN);
+  if(!legs||legs.length<2){ $("parlayResult").innerHTML=NO_PARLAY; return; }
 
-  if(!legs||legs.length<2){
-    $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Not enough distinct players for this market. Try a different prop type.</div>';
-    return;
-  }
-
-  // Apply target-odds adjustment if user specified one
-  if(hasTarget){
-    var targetDec=aToDec(target);
-    var curDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-    var maxPasses=20;
-    while(maxPasses-->0 && curDec>targetDec*1.25 && legs.length>1){
-      var worstIdx=0;
-      for(var j=1;j<legs.length;j++){ if(aToDec(legs[j].bestOdds)>aToDec(legs[worstIdx].bestOdds)) worstIdx=j; }
-      var replaced=false;
-      for(var k=0;k<pool.length;k++){
-        var cand=pool[k];
-        var already=false; for(var mm=0;mm<legs.length;mm++) if(legs[mm].player===cand.player) already=true;
-        if(already) continue;
-        if(aToDec(cand.bestOdds)<aToDec(legs[worstIdx].bestOdds)){
-          legs[worstIdx]=cand;
-          curDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-          replaced=true; break;
-        }
-      }
-      if(!replaced) break;
-    }
-  }
+  // Overall quality gate: avg confidence must be ≥70
+  var avgConf=Math.round(avg(legs.map(function(l){return getEffectiveConf(l);})));
+  if(avgConf<PARLAY_OVERALL_MIN){ $("parlayResult").innerHTML=NO_PARLAY; return; }
 
   var finalDec=legs.reduce(function(acc,l){return acc*aToDec(l.bestOdds);},1);
-  renderParlayResult(legs,finalDec,decToA(finalDec),target);
+  renderParlayResult(legs,finalDec,decToA(finalDec),legNote);
 }
-function renderParlayResult(legs,dec,am,target){
-  var avgConf=Math.round(avg(legs.map(function(l){return l.value;})));
+
+function renderParlayResult(legs,dec,am,legNote){
+  var avgConf=Math.round(avg(legs.map(function(l){return getEffectiveConf(l);})));
   var legHtml="";
-  legs.forEach(function(l){
+  legs.forEach(function(l,i){
     var isThresh=isThreshProp(l);
     var bet=isThresh?threshLabel(l.bestLine,l._market):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
-    legHtml+='<div class="leg"><div><div class="ln">'+esc(l.player)+'</div><div class="lm">'+esc(marketName(ST.market))+' - '+esc(l.bestBook?l.bestBook.book:"")+'</div></div>'+
-      '<div class="lb">'+esc(bet)+'</div><div class="ls">'+l.value+'/100</div></div>';
+    var bcls=l.side==="Under"?"under":(l.side==="Yes"?"yes":"over");
+    var conf=getEffectiveConf(l);
+    var tcls=confTierOf(conf).c;
+    var reason=legReason(l);
+    legHtml+='<div class="leg">'+
+      '<div class="leg-n">'+(i+1)+'</div>'+
+      '<div style="flex:1">'+
+        '<div class="ln">'+esc(l.player)+'</div>'+
+        '<div class="lm">'+esc(marketName(ST.market))+'</div>'+
+        '<div class="leg-reason">'+esc(reason)+'</div>'+
+      '</div>'+
+      '<div class="lb '+bcls+'">'+esc(bet)+'</div>'+
+      '<div class="leg-conf '+tcls+'">'+conf+'%</div>'+
+    '</div>';
   });
   $("parlayResult").innerHTML=
     '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
-      '<span class="parlay-odds" style="font-size:26px">'+avgConf+'/100</span>'+
-      '<span class="payout">PropDesk avg confidence &nbsp;·&nbsp; '+legs.length+' legs</span>'+
+      '<span class="parlay-odds" style="font-size:26px">'+fmtOdds(am)+'</span>'+
+      '<span class="payout">'+legs.length+'-leg parlay &nbsp;·&nbsp; avg confidence '+avgConf+'%</span>'+
     '</div>'+
     '<div class="legs">'+legHtml+'</div>'+
-    '<button class="btn" id="saveParlay" style="margin-right:8px">Save Parlay</button>'+
-    '<button class="btn btn-accent" id="rebuildParlay">Rebuild</button>';
+    (legNote?'<p class="parlay-leg-note">'+esc(legNote)+'</p>':'')+
+    '<div style="display:flex;gap:8px;margin-top:12px">'+
+      '<button class="btn" id="saveParlay">Save Parlay</button>'+
+      '<button class="btn btn-accent" id="rebuildParlay">Rebuild</button>'+
+    '</div>';
   $("rebuildParlay").onclick=generateParlay;
   $("saveParlay").onclick=function(){ saveParlay(legs,am); };
 }
@@ -3850,10 +3843,14 @@ function calcPlayerStreakTrends(){
       var bHit=isOver?vals[bi]>line:vals[bi]<line;
       bars+='<span class="tc-bar-game '+(bHit?"tc-bar-hit":"tc-bar-miss")+'" title="Game '+(bi+1)+': '+vals[bi]+'">'+(bHit?"✓":"✕")+'</span>';
     }
+    var headline=p.player+" has hit the "+lineLabel+" in "+hits+" of his last "+bestN+" games";
+    if(streak>=3) headline+=" and is on a "+streak+"-game hitting streak";
+    else if(streak<=-3) headline+=" — warning, "+Math.abs(streak)+" consecutive misses recently";
     trends.push({
       type:"streak",
       conf:conf,
       player:p.player,
+      headline:headline,
       title:p.player+" "+lineLabel,
       record:hits+"-"+misses+" L"+bestN,
       hitRate:Math.round(best*100),
@@ -3891,6 +3888,7 @@ function calcLineValueTrends(){
           type:"linevalue",
           conf:conf,
           player:p.player,
+          headline:"The book has set "+p.player+"'s line "+gapPct.toFixed(0)+"% below his season average of "+fmtStat(sznAvg)+" — the Over has value",
           title:"Book undervaluing "+p.player,
           record:"+"+gap.toFixed(1)+" vs szn avg",
           hitRate:Math.min(95,Math.round(55+gapPct*1.4)),
@@ -3913,6 +3911,7 @@ function calcLineValueTrends(){
           type:"linevalue",
           conf:conf2,
           player:p.player,
+          headline:p.player+"'s last 5 games are running "+gapPct2.toFixed(0)+"% below the current book line — the Under has value",
           title:"Book overvaluing "+p.player,
           record:"-"+gap2.toFixed(1)+" vs L5 avg",
           hitRate:Math.min(88,Math.round(55+gapPct2*1.2)),
@@ -3949,6 +3948,7 @@ function calcOddsMovementTrends(){
         type:"movement",
         conf:conf,
         player:p.player,
+        headline:upBooks.length+" sportsbooks have moved "+p.player+"'s line up since we started tracking — sharp money appears to be on the Under",
         title:"Sharp Money: "+p.player+" Under",
         record:upBooks.length+" books moved up",
         hitRate:conf,
@@ -3965,6 +3965,7 @@ function calcOddsMovementTrends(){
         type:"movement",
         conf:conf3,
         player:p.player,
+        headline:downBooks.length+" sportsbooks have dropped "+p.player+"'s line since we started tracking — sharp money appears to be on the Over",
         title:"Sharp Money: "+p.player+" Over",
         record:downBooks.length+" books moved down",
         hitRate:conf3,
@@ -3985,6 +3986,7 @@ function calcOddsMovementTrends(){
         type:"movement",
         conf:conf4,
         player:p.player,
+        headline:p.player+"'s line varies by "+sp+" points across "+p.bookCount+" books — shop for the best number before you bet",
         title:"Sharp Split: "+p.player,
         record:sp+" pt spread",
         hitRate:conf4,
@@ -4044,6 +4046,7 @@ async function calcTotalsTrends(){
       type:"totals",
       conf:conf,
       player:teams,
+      headline:"The "+betterSide+" on the "+mainLine+" total has better pricing across "+tot.over.length+" books — EV edge of "+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"%",
       title:"Game Total: "+teams,
       record:mainLine+" O/U",
       hitRate:conf,
@@ -4059,24 +4062,16 @@ async function calcTotalsTrends(){
 /* --- Render -------------------------------------------------------- */
 function renderTrendCard(t){
   var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":"GAME TOTAL";
-  var tcls=trendTierCls(t.conf);
-  var hr=t.hitRate!=null?t.hitRate:t.conf;
-  var barFill=Math.round(Math.max(0,Math.min(100,hr)));
+  var headline=t.headline||t.title;
   return '<div class="tcard" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
     '<div class="tc-tags">'+
       '<span class="tc-type">'+typeLabel+'</span>'+
       '<span class="tc-live">LIVE</span>'+
     '</div>'+
-    '<div class="tc-player">'+esc(t.player)+'</div>'+
+    '<div class="tc-player">'+esc(headline)+'</div>'+
     '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
-    '<div class="tc-hitbar">'+
-      '<div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+barFill+'%"></div></div>'+
-      '<span class="tc-hitbar-pct">'+barFill+'%</span>'+
-    '</div>'+
-    '<div class="tc-detail">'+esc(t.detail)+'</div>'+
+    '<div class="tc-detail">'+esc(t.source)+'</div>'+
     '<div class="tc-footer">'+
-      '<span class="tc-source">'+esc(t.source)+'</span>'+
-      '<span class="tc-conf-sm '+tcls+'">'+t.conf+' CONF</span>'+
       '<button class="tc-share-sm" data-share="'+esc(t.shareText)+'">Share ↗</button>'+
     '</div>'+
   '</div>';
