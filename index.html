@@ -1021,6 +1021,14 @@ async function fetchEvents(){
     var now=Date.now();
     ST.events=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime() > now-3*3600*1000; }).slice(0,24);
     renderGames();
+    // Auto-restore last selected game if it's still in today's slate
+    if(ST.eventId && ST.events.some(function(e){return e.id===ST.eventId;})){
+      if(ST.market) loadBoard();
+      loadPropOfDay();
+    } else {
+      ST.eventId=null;
+      localStorage.removeItem("pe_event");
+    }
   }catch(e){ setStatus("err",""); row.innerHTML='<div class="empty">Network error loading games.</div>'; }
 }
 
@@ -1585,7 +1593,9 @@ function renderSportTabs(){
   SPORTS.forEach(function(sp){
     var b=el("button","pill"+(sp.key===ST.sport?" active":""),sp.label);
     b.onclick=function(){ if(ST.sport===sp.key) return; ST.sport=sp.key; ST.eventId=null; ST.props=[]; ST.snapshot={};
-      ST.market=MARKETS[sp.key][0].k; renderSportTabs(); renderPropTabs(); clearParlay(); clearBoard(); fetchEvents();
+      ST.market=MARKETS[sp.key][0].k;
+      localStorage.setItem("pe_sport",sp.key); localStorage.setItem("pe_market",ST.market); localStorage.removeItem("pe_event");
+      renderSportTabs(); renderPropTabs(); clearParlay(); clearBoard(); fetchEvents();
     };
     c.appendChild(b);
   });
@@ -1594,7 +1604,7 @@ function renderPropTabs(){
   var c=$("propTabs"); c.innerHTML="";
   (MARKETS[ST.sport]||[]).forEach(function(m){
     var b=el("button","pill"+(m.k===ST.market?" active":""),m.n);
-    b.onclick=function(){ ST.market=m.k; renderPropTabs(); if(ST.eventId) loadBoard(); };
+    b.onclick=function(){ ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); if(ST.eventId) loadBoard(); };
     c.appendChild(b);
   });
 }
@@ -1608,7 +1618,7 @@ function renderGames(){
     var when=dt.toLocaleDateString([], {month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
     var b=el("button","game"+(ev.id===ST.eventId?" active":""));
     b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
-    b.onclick=function(){ ST.eventId=ev.id; _glCache={}; _qsCache={}; renderGames(); if(ST.market) loadBoard(); loadPropOfDay(); };
+    b.onclick=function(){ ST.eventId=ev.id; localStorage.setItem("pe_event",ev.id); _glCache={}; _qsCache={}; renderGames(); if(ST.market) loadBoard(); loadPropOfDay(); };
     c.appendChild(b);
   });
 }
@@ -1659,6 +1669,8 @@ async function loadBoard(){
     renderTable(false);
     lazyLoadPlayerMeta();
     loadLOTD();
+    // Re-arm Live if it was on before a reload
+    if(localStorage.getItem("pe_live")==="1" && !ST.live) toggleLive();
   }catch(e){
     $("tableMount").innerHTML='<div class="empty">Could not load props. '+esc(e.message||"Error")+'</div>';
   }
@@ -3304,6 +3316,7 @@ function applyMovement(){
 }
 function toggleLive(){
   ST.live=!ST.live;
+  localStorage.setItem("pe_live", ST.live?"1":"0");
   var btn=$("liveBtn"), cd=$("countdown");
   if(ST.live){
     btn.textContent="Live ON"; btn.classList.add("on");
@@ -3573,6 +3586,20 @@ function doConnect(key){
 /* ============ INIT ============ */
 function init(){
   $("hdrDate").textContent=new Date().toLocaleDateString([], {weekday:"short",month:"short",day:"numeric"});
+
+  // Restore persisted session state before anything renders
+  var savedSport=localStorage.getItem("pe_sport");
+  var savedMarket=localStorage.getItem("pe_market");
+  var savedEvent=localStorage.getItem("pe_event");
+  if(savedSport && MARKETS[savedSport]) ST.sport=savedSport;
+  if(savedMarket && (MARKETS[ST.sport]||[]).some(function(m){return m.k===savedMarket;})) ST.market=savedMarket;
+  if(savedEvent) ST.eventId=savedEvent;
+
+  // Restore Live button visual immediately — timer re-arms in loadBoard once a game loads
+  if(localStorage.getItem("pe_live")==="1"){
+    $("liveBtn").textContent="Live ON"; $("liveBtn").classList.add("on");
+  }
+
   var k=getKey();
   if(k){ $("keyInput").value=k; setStatus("on",""); }
 
