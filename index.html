@@ -3270,8 +3270,8 @@ async function silentRefresh(){
 }
 
 /* ============ PARLAY MODAL ============ */
-var PARLAY_LEG_MIN_CONF=68; // each leg must be ≥68% confidence
-var PARLAY_OVERALL_MIN=70;  // average confidence across all legs must be ≥70
+var PARLAY_LEG_MIN_CONF=62; // each leg must hit the GOOD tier floor (≥62%) to qualify
+var PARLAY_OVERALL_MIN=70;  // average confidence across all legs must be ≥70 (ELITE-level parlay)
 
 function getEffectiveConf(p){
   if(p.enriched&&p.pdConfidence!=null&&!p.pdNoValue)
