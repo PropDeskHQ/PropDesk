@@ -622,13 +622,15 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     <div class="t10-hdr">
       <div>
         <h2>Top 10 Today<span class="t10-date" id="t10Date"></span></h2>
-        <div class="t10-summary" id="t10Summary">Best props across all sports, ranked by confidence.</div>
+        <div class="t10-summary" id="t10Summary">Pick a sport and game to rank today's top props.</div>
       </div>
       <button class="btn" id="t10RefreshBtn">Refresh</button>
     </div>
-    <div id="t10Mount">
-      <div class="tc-no-data"><div class="nd-icon">🏆</div><p>Tap <strong>Refresh</strong> to scan all sports and rank today's best props.</p></div>
-    </div>
+    <div class="lbl">Sport</div>
+    <div class="tabrow" id="t10SportTabs"></div>
+    <div class="lbl">Game</div>
+    <div class="games" id="t10GamesRow"><div class="empty" style="padding:18px">Select a sport above.</div></div>
+    <div id="t10Mount"></div>
   </div>
 
   <!-- DISCLAIMER -->
@@ -3576,7 +3578,7 @@ function showPage(name){
   $("botnav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-nav")===name); });
   if(name==="history") renderHistory();
   if(name==="trends") loadTrends();
-  if(name==="top10") loadTop10();
+  if(name==="top10") initTop10();
   window.scrollTo(0,0);
 }
 
@@ -3644,7 +3646,7 @@ function init(){
     };
   });
   $("trendsRefreshBtn").onclick=function(){ _trendsData=[]; loadTrends(); };
-  $("t10RefreshBtn").onclick=function(){ _top10Data=[]; _top10Time=null; loadTop10(); };
+  $("t10RefreshBtn").onclick=function(){ _t10Data=[]; if(_t10EventId) t10LoadGame(); else t10LoadSport(); };
 
   $("showNoValueBtn").onclick=function(){
     ST_showNoValue=!ST_showNoValue;
@@ -4240,8 +4242,10 @@ async function loadTrends(){
 }
 
 /* ============ TOP 10 TODAY ============ */
-var _top10Data=[],_top10Time=null;
-var TOP10_TTL=30*60*1000;
+var _t10Sport="basketball_nba";
+var _t10Events=[];
+var _t10EventId=null;
+var _t10Data=[];
 
 
 function buildTop10Analysis(p,mktName){
@@ -4368,154 +4372,122 @@ function renderTop10(picks){
   });
 }
 
-// ── Top 10 fetch helpers ─────────────────────────────────────────────────────
-// Exact same pattern as fetchEvents() / fetchOdds(), just parameterised so
-// Top 10 can call them for any sport without touching ST.sport.
+function t10RenderSportTabs(){
+  var c=$("t10SportTabs"); if(!c) return;
+  c.innerHTML="";
+  SPORTS.forEach(function(sp){
+    var b=el("button","tab-btn"+(sp.key===_t10Sport?" active":""));
+    b.textContent=sp.label;
+    b.onclick=function(){
+      if(_t10Sport===sp.key) return;
+      _t10Sport=sp.key; _t10EventId=null; _t10Events=[]; _t10Data=[];
+      t10RenderSportTabs();
+      t10RenderGamesRow();
+      var m=$("t10Mount"); if(m) m.innerHTML="";
+      var s=$("t10Summary"); if(s) s.textContent="Pick a game to rank today's top props.";
+      t10LoadSport();
+    };
+    c.appendChild(b);
+  });
+}
 
-async function t10FetchEvents(sportKey){
-  console.log("[Top10] t10FetchEvents →", sportKey);
+function t10RenderGamesRow(){
+  var c=$("t10GamesRow"); if(!c) return;
+  c.innerHTML="";
+  if(!_t10Events.length){
+    c.innerHTML='<div class="empty" style="padding:18px">No games today for this sport.</div>'; return;
+  }
+  _t10Events.forEach(function(ev){
+    var dt=new Date(ev.commence_time);
+    var when=dt.toLocaleDateString([],{month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+    var b=el("button","game"+(ev.id===_t10EventId?" active":""));
+    b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
+    b.onclick=function(){ _t10EventId=ev.id; t10RenderGamesRow(); t10LoadGame(); };
+    c.appendChild(b);
+  });
+}
+
+async function t10LoadSport(){
+  var c=$("t10GamesRow"); if(!c) return;
+  if(!getKey()){ c.innerHTML='<div class="empty" style="padding:18px">Enter your API key on the Props tab first.</div>'; return; }
+  c.innerHTML='<div class="empty" style="padding:18px">Loading games&hellip;</div>';
   try{
-    var r=await fetch(apiUrl("/sports/"+sportKey+"/events",{dateFormat:"iso"}));
-    if(!r.ok){ console.warn("[Top10] events failed",sportKey,"status",r.status); return []; }
+    var r=await fetch(apiUrl("/sports/"+_t10Sport+"/events",{dateFormat:"iso"}));
+    if(!r.ok){ c.innerHTML='<div class="empty" style="padding:18px">Failed to load games ('+r.status+').</div>'; return; }
     var data=await r.json();
     var now=Date.now();
-    var evs=(data||[]).filter(function(e){
-      return new Date(e.commence_time).getTime()>now-3*3600*1000;
-    }).slice(0,24);
-    console.log("[Top10]",sportKey,"→",evs.length,"event(s) today");
-    return evs;
-  }catch(e){ console.error("[Top10] t10FetchEvents error",sportKey,e); return []; }
+    _t10Events=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime()>now-3*3600*1000; }).slice(0,24);
+    t10RenderGamesRow();
+  }catch(e){
+    c.innerHTML='<div class="empty" style="padding:18px">Error loading games.</div>';
+  }
 }
 
-async function t10FetchOdds(sportKey,eventId,markets){
-  console.log("[Top10] t10FetchOdds →",sportKey,eventId,"markets:",markets);
-  try{
-    var r=await fetch(apiUrl("/sports/"+sportKey+"/events/"+eventId+"/odds",{
-      regions:"us,us2",markets:markets,oddsFormat:"american",dateFormat:"iso"
-    }));
-    if(!r.ok){ console.warn("[Top10] odds failed",sportKey,eventId,"status",r.status); return null; }
-    return r.json();
-  }catch(e){ console.error("[Top10] t10FetchOdds error",sportKey,eventId,e); return null; }
-}
-
-async function loadTop10(){
+async function t10LoadGame(){
   var mount=$("t10Mount"); if(!mount) return;
-
-  if(!getKey()){
-    console.log("[Top10] No API key — aborting");
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Connect your API key on the <strong>Props</strong> tab first.</p></div>';
-    return;
+  if(!_t10EventId){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🏆</div><p>Select a game above to see today\'s top props.</p></div>'; return;
   }
-
-  // 30-min cache
-  if(_top10Time&&(Date.now()-_top10Time)<TOP10_TTL&&_top10Data.length){
-    console.log("[Top10] Serving from 30-min cache →",_top10Data.length,"picks");
-    renderTop10(_top10Data); return;
-  }
-
-  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Scanning all sports&hellip;</p></div>';
-  console.log("[Top10] ── Starting full scan ──");
-
-  var SPORT_KEYS=["baseball_mlb","basketball_nba","icehockey_nhl","americanfootball_nfl"];
-
-  // ── Step 1: fetch today's event list for all 4 sports in parallel ──────────
-  console.log("[Top10] Step 1: fetching event lists");
-  var eventsPerSport={};
-  var evtResults=await Promise.allSettled(SPORT_KEYS.map(function(sk){
-    return t10FetchEvents(sk).then(function(evs){ eventsPerSport[sk]=evs; });
-  }));
-  evtResults.forEach(function(r,i){
-    if(r.status!=="fulfilled") console.warn("[Top10] Step 1 rejected for",SPORT_KEYS[i],r.reason);
-  });
-
-  // ── Step 2: build a job list — one job per (sport, event) pair ─────────────
-  var jobs=[];
-  SPORT_KEYS.forEach(function(sk){
-    var evs=eventsPerSport[sk]||[];
-    var mks=LOTD_MARKETS[sk];
-    if(!mks||!evs.length){ console.log("[Top10]",sk,"— 0 events, skipping"); return; }
-    evs.forEach(function(ev){
-      jobs.push({sport:sk,event:ev,markets:mks,mkStr:mks.join(",")});
-    });
-  });
-  console.log("[Top10] Step 2:",jobs.length,"odds job(s) across all sports");
-  if(!jobs.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No games found for any sport today. Check back later.</p></div>';
-    return;
-  }
-
-  // Cap to 16 games (4 per sport) to be respectful of API quota
-  jobs=jobs.slice(0,16);
-
-  // ── Step 3: fetch odds for every game in parallel ──────────────────────────
-  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading odds for '+jobs.length+' game'+(jobs.length!==1?"s":"")+'&hellip;</p></div>';
-  console.log("[Top10] Step 3: fetching odds for",jobs.length,"game(s)");
-  var oddsResults=await Promise.allSettled(jobs.map(function(job){
-    return t10FetchOdds(job.sport,job.event.id,job.mkStr)
-      .then(function(data){ return {job:job,data:data}; });
-  }));
-
-  // ── Step 4: parse every prop from every game ───────────────────────────────
-  var allCandidates=[], totalGames=0;
-  oddsResults.forEach(function(r){
-    if(r.status!=="fulfilled"||!r.value||!r.value.data) return;
-    var job=r.value.job, oddsData=r.value.data;
-    var gameLabel=(job.event.home_team||"")+" vs "+(job.event.away_team||"");
-    totalGames++;
-    job.markets.forEach(function(mk){
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading props&hellip;</p></div>';
+  var ev=null;
+  for(var ei=0;ei<_t10Events.length;ei++){ if(_t10Events[ei].id===_t10EventId){ev=_t10Events[ei];break;} }
+  var gameLabel=ev?(ev.home_team+" vs "+ev.away_team):"";
+  var mks=LOTD_MARKETS[_t10Sport]||[];
+  try{
+    var r=await fetch(apiUrl("/sports/"+_t10Sport+"/events/"+_t10EventId+"/odds",{
+      regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
+    }));
+    if(!r.ok){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No lines available for this game yet.</p></div>'; return; }
+    var oddsData=await r.json();
+    var candidates=[];
+    mks.forEach(function(mk){
       parseProps(oddsData,mk).forEach(function(p){
-        p._market=mk; p._sport=job.sport; p._game=gameLabel;
-        allCandidates.push(p);
+        p._market=mk; p._sport=_t10Sport; p._game=gameLabel; candidates.push(p);
       });
     });
-  });
-  console.log("[Top10] Step 4:",allCandidates.length,"raw candidates from",totalGames,"game(s)");
-
-  if(!allCandidates.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available yet. Lines may not be posted — check back closer to game time.</p></div>';
-    return;
-  }
-
-  // ── Step 5: deduplicate (one prop per player+sport+market, best value wins) ─
-  var seen={},unique=[];
-  allCandidates
-    .filter(function(p){ return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null&&p.value>=50; })
-    .sort(function(a,b){ return b.value-a.value; })
-    .forEach(function(p){
-      var k=p.player.toLowerCase()+"|"+(p._sport||"")+"|"+(p._market||"");
-      if(!seen[k]){ seen[k]=1; unique.push(p); }
+    if(!candidates.length){
+      mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines posted for this game yet. Check back closer to tip-off.</p></div>'; return;
+    }
+    // Deduplicate: one per player+market
+    var seen={},unique=[];
+    candidates
+      .filter(function(p){ return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null&&p.value>=50; })
+      .sort(function(a,b){ return b.value-a.value; })
+      .forEach(function(p){
+        var k=p.player.toLowerCase()+"|"+p._market;
+        if(!seen[k]){ seen[k]=1; unique.push(p); }
+      });
+    var toEnrich=unique.slice(0,20);
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching '+toEnrich.length+' candidates&hellip;</p></div>';
+    var savedSport=ST.sport,savedMkt=ST.market;
+    for(var i=0;i<toEnrich.length;i++){
+      ST.sport=toEnrich[i]._sport; ST.market=toEnrich[i]._market;
+      try{ await enrichWithConfidence(toEnrich[i]); }catch(e){}
+    }
+    ST.sport=savedSport; ST.market=savedMkt;
+    var qualified=toEnrich.filter(function(p){
+      if(p.enriched&&p.pdNoValue) return false;
+      if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
+      return p.value>=55;
     });
-  console.log("[Top10] Step 5:",unique.length,"unique candidates after dedupe + value filter");
-
-  // ── Step 6: enrich top 20 — save/restore ST.sport+ST.market so getGameLog ──
-  //    fetches the right sport's player stats API
-  var toEnrich=unique.slice(0,20);
-  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching top '+toEnrich.length+' candidates&hellip;</p></div>';
-  console.log("[Top10] Step 6: enriching",toEnrich.length,"candidates");
-  var savedSport=ST.sport,savedMkt=ST.market;
-  for(var ei=0;ei<toEnrich.length;ei++){
-    var ep=toEnrich[ei];
-    ST.sport=ep._sport; ST.market=ep._market;
-    try{ await enrichWithConfidence(ep); }
-    catch(e){ console.warn("[Top10] enrichment error for",ep.player,e); }
+    qualified.sort(function(a,b){ return getEffectiveConf(b)-getEffectiveConf(a); });
+    _t10Data=qualified.slice(0,10);
+    renderTop10(_t10Data);
+  }catch(e){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Error loading props. Try again.</p></div>';
   }
-  ST.sport=savedSport; ST.market=savedMkt;
+}
 
-  // ── Step 7: filter ≥55% and rank ──────────────────────────────────────────
-  var qualified=toEnrich.filter(function(p){
-    if(p.enriched&&p.pdNoValue) return false;
-    if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
-    return p.value>=55;
-  });
-  qualified.sort(function(a,b){ return getEffectiveConf(b)-getEffectiveConf(a); });
-  console.log("[Top10] Step 7:",qualified.length,"qualified at ≥55%");
-  console.log("[Top10] Final top 10:",qualified.slice(0,10).map(function(p){
-    return p.player+" ("+getEffectiveConf(p)+"%) "+p._sport;
-  }));
-
-  _top10Data=qualified.slice(0,10);
-  _top10Time=Date.now();
-  renderTop10(_top10Data);
+function initTop10(){
+  t10RenderSportTabs();
+  if(!_t10Events.length) t10LoadSport();
+  else t10RenderGamesRow();
+  if(_t10Data.length) renderTop10(_t10Data);
+  else if(_t10EventId) t10LoadGame();
+  else {
+    var m=$("t10Mount");
+    if(m) m.innerHTML='<div class="tc-no-data"><div class="nd-icon">🏆</div><p>Select a game above to see today\'s top props.</p></div>';
+  }
 }
 
 /* --- Trend Detail Panel ------------------------------------------- */
