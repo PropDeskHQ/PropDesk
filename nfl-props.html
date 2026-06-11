@@ -741,10 +741,10 @@ var MARKETS = {
 };
 
 var LOTD_MARKETS = {
-  americanfootball_nfl:["player_pass_yds","player_rush_yds","player_reception_yds","player_receptions"],
-  basketball_nba:["player_points","player_rebounds","player_assists","player_threes"],
-  icehockey_nhl:["player_goals","player_assists","player_shots_on_goal","player_points"],
-  baseball_mlb:["batter_hits","batter_home_runs","pitcher_strikeouts","batter_rbis","batter_total_bases"]
+  americanfootball_nfl:["player_pass_yds","player_rush_yds","player_reception_yds","player_pass_tds","player_receptions"],
+  basketball_nba:["player_points","player_rebounds","player_assists","player_threes","player_steals","player_blocks","player_points_rebounds_assists"],
+  icehockey_nhl:["player_goals","player_shots_on_goal","player_assists","player_points","player_saves"],
+  baseball_mlb:["batter_hits","batter_total_bases","batter_rbis","batter_home_runs","batter_runs_scored","pitcher_strikeouts"]
 };
 
 var ESPN_PATH = {
@@ -1871,10 +1871,10 @@ function renderPropOfDay(p, mkt){
 
 /* ============ LAY OF THE DAY ============ */
 var LOTD_MARKETS = {
-  americanfootball_nfl: ["player_pass_yds","player_rush_yds","player_reception_yds","player_receptions","player_sacks"],
-  basketball_nba:       ["player_points","player_rebounds","player_assists","player_threes"],
-  icehockey_nhl:        ["player_goals","player_assists","player_shots_on_goal","player_points"],
-  baseball_mlb:         ["batter_hits","batter_home_runs","pitcher_strikeouts","batter_rbis","batter_total_bases"]
+  americanfootball_nfl: ["player_pass_yds","player_rush_yds","player_reception_yds","player_pass_tds","player_receptions"],
+  basketball_nba:       ["player_points","player_rebounds","player_assists","player_threes","player_steals","player_blocks","player_points_rebounds_assists"],
+  icehockey_nhl:        ["player_goals","player_shots_on_goal","player_assists","player_points","player_saves"],
+  baseball_mlb:         ["batter_hits","batter_total_bases","batter_rbis","batter_home_runs","batter_runs_scored","pitcher_strikeouts"]
 };
 
 async function loadLOTD(){
