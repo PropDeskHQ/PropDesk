@@ -38,6 +38,8 @@ input:focus,select:focus{border-color:var(--accent)}
 .btn:hover{border-color:#3a3a3a;background:#202020}
 .btn-accent{background:var(--accent);color:#000;border-color:var(--accent)}
 .btn-accent:hover{background:#00e077;border-color:#00e077}
+.btn-disc{font-size:11px;padding:5px 8px;color:var(--mut);background:transparent;border-color:#333}
+.btn-disc:hover{color:#e84f4f;border-color:#5a2525;background:#1a0f0f}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--mut2);flex-shrink:0}
 .dot.on{background:var(--accent);animation:pulse 1.6s infinite}
 .dot.err{background:var(--red)}
@@ -501,6 +503,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     <span class="countdown" id="countdown" style="display:none"></span>
     <input class="keyin" id="keyInput" placeholder="Odds API key" autocomplete="off">
     <button class="btn btn-accent" id="connectBtn">Connect</button>
+    <button class="btn btn-disc" id="disconnectBtn" style="display:none">Disconnect</button>
     <span class="dot" id="statusDot"></span>
     <span class="quota" id="quota"></span>
   </div>
@@ -3609,9 +3612,30 @@ function doConnect(key){
   key=(key||"").trim();
   if(!key){ toast("Enter a valid key"); return; }
   localStorage.setItem("pe_key", key);
-  $("keyInput").value=key;
-  setStatus("on","");
+  $("keyInput").value=key; setStatus("on","");
+  $("disconnectBtn").style.display="inline";
+  if(!ST.live){
+    ST.live=true;
+    $("liveBtn").textContent="Live ON"; $("liveBtn").classList.add("on");
+    $("countdown").style.display="inline";
+    ST.liveSecs=300; tickLive();
+    ST.liveTimer=setInterval(tickLive,1000);
+  }
   fetchEvents();
+}
+
+function doDisconnect(){
+  localStorage.removeItem("pe_key");
+  localStorage.setItem("pe_live","0");
+  $("keyInput").value=""; setStatus("","");
+  $("disconnectBtn").style.display="none";
+  if(ST.live){
+    ST.live=false;
+    $("liveBtn").textContent="Live OFF"; $("liveBtn").classList.remove("on");
+    $("countdown").style.display="none";
+    clearInterval(ST.liveTimer); ST.liveTimer=null;
+  }
+  toast("Disconnected");
 }
 
 /* ============ INIT ============ */
@@ -3626,9 +3650,12 @@ function init(){
   if(savedMarket && (MARKETS[ST.sport]||[]).some(function(m){return m.k===savedMarket;})) ST.market=savedMarket;
   if(savedEvent) ST.eventId=savedEvent;
 
-  // Restore Live state from localStorage — sync ST.live and start the timer immediately
-  // silentRefresh() returns early if ST.eventId is not set, so this is safe before any game loads
-  if(localStorage.getItem("pe_live")==="1"){
+  // Key existence drives Live — if key is saved, auto-connect and start Live immediately
+  var k=getKey();
+  if(k){
+    console.log("API key loaded from localStorage");
+    $("keyInput").value=k; setStatus("on","");
+    $("disconnectBtn").style.display="inline";
     ST.live=true;
     $("liveBtn").textContent="Live ON"; $("liveBtn").classList.add("on");
     $("countdown").style.display="inline";
@@ -3636,14 +3663,12 @@ function init(){
     ST.liveTimer=setInterval(tickLive,1000);
   }
 
-  var k=getKey();
-  if(k){ $("keyInput").value=k; setStatus("on",""); }
-
   renderSportTabs(); renderPropTabs();
 
   $("connectBtn").onclick=function(){ doConnect($("keyInput").value); };
   $("keyInput").addEventListener("keydown",function(e){ if(e.key==="Enter") doConnect($("keyInput").value); });
   $("liveBtn").onclick=toggleLive;
+  $("disconnectBtn").onclick=doDisconnect;
 
   $("hambBtn").onclick=openDrawer;
   $("drawerClose").onclick=closeDrawer;
@@ -3706,6 +3731,7 @@ function init(){
     var key=($("onbKey").value||"").trim();
     if(!key){ toast("Enter your key"); return; }
     localStorage.setItem("pe_key",key); $("keyInput").value=key; setStatus("on","");
+    $("disconnectBtn").style.display="inline";
     $("onbStep1").style.display="none"; $("onbStep2").style.display="block";
     localStorage.setItem("pe_onboarded","1");
     fetchEvents();
