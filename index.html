@@ -3966,9 +3966,10 @@ function calcPlayerStreakTrends(){
       if(i===0){streak=h2?1:-1;continue;}
       if(h2&&streak>0)streak++; else if(!h2&&streak<0)streak--; else break;
     }
-    var mktLbl=marketName(ST.market);
+    var mktLbl=marketName(p._market||ST.market);
     var direction=isOver?"Over":"Under";
-    var lineLabel=isThreshProp(p)?threshLabel(line,p._market):(direction+" "+line);
+    var isThresh=isThreshProp(p);
+    var lineLabel=isThresh?threshLabel(line,p._market):(direction+" "+line);
     var streakNote=streak>=3?" Active streak: "+streak+" consecutive hits.":(streak<=-3?" Caution: "+Math.abs(streak)+" consecutive misses.":"");
     // Hit/miss visual bar (up to 10 most recent games)
     var bars="";
@@ -3977,9 +3978,14 @@ function calcPlayerStreakTrends(){
       var bHit=isOver?vals[bi]>line:vals[bi]<line;
       bars+='<span class="tc-bar-game '+(bHit?"tc-bar-hit":"tc-bar-miss")+'" title="Game '+(bi+1)+': '+vals[bi]+'">'+(bHit?"✓":"✕")+'</span>';
     }
-    var headline=p.player+" has hit the "+lineLabel+" in "+hits+" of his last "+bestN+" games";
-    if(streak>=3) headline+=" and is on a "+streak+"-game hitting streak";
-    else if(streak<=-3) headline+=" — warning, "+Math.abs(streak)+" consecutive misses recently";
+    var headline;
+    if(isThresh){
+      headline=p.player+" has recorded "+lineLabel+" in "+hits+" of his last "+bestN+" games";
+    } else {
+      headline=p.player+" has gone "+direction+" "+line+" "+mktLbl+" in "+hits+" of his last "+bestN+" games";
+    }
+    if(streak>=3) headline+=" — currently on a "+streak+"-game streak";
+    else if(streak<=-3) headline+=" — "+Math.abs(streak)+" consecutive misses recently";
     trends.push({
       type:"streak",
       conf:conf,
@@ -4015,7 +4021,7 @@ function calcLineValueTrends(){
     if(p.avgMins!=null&&p.avgMins<18) return;
     var sznAvg=p.seasonAvgEnrich;
     var l5Avg=p.l5Avg;
-    var mktLbl=marketName(ST.market);
+    var mktLbl=marketName(p._market||ST.market);
     // Book Undervaluing: line is 15%+ below season average (Over value)
     if(sznAvg&&sznAvg>0){
       var gap=sznAvg-line;
@@ -4026,7 +4032,7 @@ function calcLineValueTrends(){
           type:"linevalue",
           conf:conf,
           player:p.player,
-          headline:"The book has set "+p.player+"'s line "+gapPct.toFixed(0)+"% below his season average of "+fmtStat(sznAvg)+" — the Over has value",
+          headline:"The book has set "+p.player+"'s "+mktLbl+" line at "+line+" — "+gapPct.toFixed(0)+"% below his season average of "+fmtStat(sznAvg)+". The Over has value.",
           title:"Book undervaluing "+p.player,
           record:"+"+gap.toFixed(1)+" vs szn avg",
           hitRate:Math.min(95,Math.round(55+gapPct*1.4)),
@@ -4049,7 +4055,7 @@ function calcLineValueTrends(){
           type:"linevalue",
           conf:conf2,
           player:p.player,
-          headline:p.player+"'s last 5 games are running "+gapPct2.toFixed(0)+"% below the current book line — the Under has value",
+          headline:p.player+"'s "+mktLbl+" line is set at "+line+" — his last 5 games average "+fmtStat(l5Avg)+" ("+gapPct2.toFixed(0)+"% below). The Under has value.",
           title:"Book overvaluing "+p.player,
           record:"-"+gap2.toFixed(1)+" vs L5 avg",
           hitRate:Math.min(88,Math.round(55+gapPct2*1.2)),
@@ -4086,7 +4092,7 @@ function calcOddsMovementTrends(){
         type:"movement",
         conf:conf,
         player:p.player,
-        headline:upBooks.length+" sportsbooks have moved "+p.player+"'s line up since we started tracking — sharp money appears to be on the Under",
+        headline:upBooks.length+" books moved "+p.player+"'s "+marketName(p._market||ST.market)+" line ("+p.bestLine+") up — sharp money signals on the Under",
         title:"Sharp Money: "+p.player+" Under",
         record:upBooks.length+" books moved up",
         hitRate:conf,
@@ -4103,7 +4109,7 @@ function calcOddsMovementTrends(){
         type:"movement",
         conf:conf3,
         player:p.player,
-        headline:downBooks.length+" sportsbooks have dropped "+p.player+"'s line since we started tracking — sharp money appears to be on the Over",
+        headline:downBooks.length+" books dropped "+p.player+"'s "+marketName(p._market||ST.market)+" line ("+p.bestLine+") — sharp money signals on the Over",
         title:"Sharp Money: "+p.player+" Over",
         record:downBooks.length+" books moved down",
         hitRate:conf3,
@@ -4124,7 +4130,7 @@ function calcOddsMovementTrends(){
         type:"movement",
         conf:conf4,
         player:p.player,
-        headline:p.player+"'s line varies by "+sp+" points across "+p.bookCount+" books — shop for the best number before you bet",
+        headline:p.player+"'s "+marketName(p._market||ST.market)+" line varies by "+sp+" points across "+p.bookCount+" books ("+p.bestLine+" consensus) — shop for value",
         title:"Sharp Split: "+p.player,
         record:sp+" pt spread",
         hitRate:conf4,
@@ -4184,7 +4190,7 @@ async function calcTotalsTrends(){
       type:"totals",
       conf:conf,
       player:teams,
-      headline:"The "+betterSide+" on the "+mainLine+" total has better pricing across "+tot.over.length+" books — EV edge of "+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"%",
+      headline:teams+" game total is "+mainLine+" — the "+betterSide+" has better pricing across "+tot.over.length+" books ("+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"% EV edge)",
       title:"Game Total: "+teams,
       record:mainLine+" O/U",
       hitRate:conf,
