@@ -1193,26 +1193,33 @@ function compositeConf(vals, line, isOver){
 // Over → harder = higher line; Under → harder = lower line.
 function findPropDeskLine(vals, bookLine, isOver){
   var TARGET=0.62;
-  if(!vals||vals.length<3) return null;
   var confAtBook=compositeConf(vals,bookLine,isOver);
   if(confAtBook===null) return null;
 
-  // Sweep every half-point from bookLine-3.0 to bookLine+3.0.
-  // For Over: PropDesk Line = HIGHEST line still at ≥62% (sharpest qualifying threshold).
-  // For Under: PropDesk Line = LOWEST line still at ≥62%.
-  // No break-early — check every step so we always find the extremal edge.
-  var best=null;
-  for(var step=-6;step<=6;step++){
-    var tl=Math.round((bookLine+step*0.5)*2)/2;
-    if(tl<0.5||tl>99) continue;
-    var conf=compositeConf(vals,tl,isOver);
-    if(conf===null||conf<TARGET) continue;
-    if(best===null){ best={line:tl,conf:conf}; continue; }
-    if(isOver  && tl>best.line) best={line:tl,conf:conf};
-    if(!isOver && tl<best.line) best={line:tl,conf:conf};
+  if(confAtBook>=TARGET){
+    // Book line already qualifies. Try stepping HARDER to find the tightest line with edge.
+    var hardDir=isOver?0.5:-0.5;
+    var bestLine=bookLine, bestConf=confAtBook;
+    for(var step=1;step<=4;step++){
+      var testLine=Math.round((bookLine+hardDir*step)*2)/2;
+      if(testLine<0.5||testLine>99) break;
+      var conf=compositeConf(vals,testLine,isOver);
+      if(conf!==null&&conf>=TARGET){ bestLine=testLine; bestConf=conf; }
+      else break; // first step that fails stops the search
+    }
+    var gap=+(Math.abs(bestLine-bookLine).toFixed(1));
+    return {line:bestLine,confidence:bestConf,gap:gap,confAtBook:confAtBook};
+  } else {
+    // Below 62% — shift EASIER until we find edge, or NO VALUE.
+    var easyDir=isOver?-0.5:0.5;
+    for(var step2=1;step2<=4;step2++){
+      var testLine2=Math.round((bookLine+easyDir*step2)*2)/2;
+      if(testLine2<0.5) break;
+      var conf2=compositeConf(vals,testLine2,isOver);
+      if(conf2!==null&&conf2>=TARGET) return {line:testLine2,confidence:conf2,gap:step2*0.5,confAtBook:confAtBook};
+    }
+    return null; // NO VALUE — no qualifying line within 2.0 shift
   }
-  if(!best) return null;
-  return {line:best.line,confidence:best.conf,gap:+(Math.abs(best.line-bookLine).toFixed(1)),confAtBook:confAtBook};
 }
 
 // Value score: gap is primary driver, confidence above 62% adds premium
@@ -1450,15 +1457,6 @@ async function enrichWithConfidence(p){
       p.value=Math.round(p.pdConfidence*100);
     }
 
-    // Auto-hide: below 55% confidence has no value on the board
-    if(p.pdConfidence!=null && Math.round(p.pdConfidence*100)<55){
-      p.pdNoValue=true;
-    }
-    // Cold L5 on hits/threshold: player averaging near 0 is ice-cold — never surface
-    if(p.l5Avg!=null && p.l5Avg<0.3 && isThreshProp(p)){
-      p.pdNoValue=true;
-    }
-
     updatePropValueDisplay(p);
     updatePropPDDisplay(p);
   }catch(e){
@@ -1476,14 +1474,14 @@ function updatePropValueDisplay(p){
   if(p.pdNoValue){
     node.textContent="—"; node.className="t-pass";
     if(vt&&vt.classList.contains("vt")){ vt.textContent=""; vt.className="vt t-pass"; }
-    // Hide the whole row — no-value props are invisible unless Show Hidden is on
-    var tr=node.closest("tr");
-    if(tr&&!ST_showNoValue) tr.style.display="none";
+    if(!ST_showNoValue){ var nr=node.closest("tr"); if(nr) nr.style.display="none"; }
     applyPropFlags(p); return;
   }
   var isConf=p.pdConfidence!=null;
   if(isConf){
     var pct=Math.round(p.pdConfidence*100);
+    // Below 55% — hide the row just like pdNoValue rows
+    if(pct<55&&!ST_showNoValue){ var hr=node.closest("tr"); if(hr) hr.style.display="none"; return; }
     var tier=confTierOf(pct);
     var cur=parseInt(node.textContent)||0;
     node.className=tier.c;
@@ -1774,8 +1772,8 @@ async function loadPropOfDay(){
     }
   }
 
-  // Also scan ST.props for any already-enriched props that beat the scan results.
-  // This catches the case where the current market has a LOCK that the POTD scan missed.
+  // Also scan ST.props for any already-enriched prop that beats the multi-market scan result.
+  // Catches LOCKs that enriched on the current market tab before POTD ran.
   ST.props.forEach(function(p){
     if(p.enriched&&!p.pdNoValue&&p.pdConfidence!=null&&p.pdConfidence>bestEnrichedConf){
       bestEnrichedConf=p.pdConfidence;
@@ -4370,31 +4368,68 @@ function renderTop10(picks){
   });
 }
 
+async function fetchAllOddsForSport(sportKey,markets){
+  try{
+    var r=await fetch(apiUrl("/sports/"+sportKey+"/odds",{
+      regions:"us,us2",markets:markets,oddsFormat:"american",dateFormat:"iso"
+    }));
+    if(!r.ok) return [];
+    var data=await r.json();
+    var now=Date.now();
+    // Keep games already in progress (up to 3h ago) and upcoming games today
+    var todayEnd=new Date(); todayEnd.setHours(23,59,59,999);
+    return (data||[]).filter(function(e){
+      var t=new Date(e.commence_time).getTime();
+      return t>now-3*3600*1000 && t<=todayEnd.getTime();
+    });
+  }catch(e){return [];}
+}
+
 async function loadTop10(){
   var mount=$("t10Mount"); if(!mount) return;
 
-  // Collect every prop already fetched across all sport/market tab loads
-  var allCandidates=[];
-  var sportsSeen=[];
-  Object.keys(_propStore).forEach(function(key){
-    var parts=key.split("|");
-    var sk=parts[0], mk=parts[1];
-    if(sportsSeen.indexOf(sk)<0) sportsSeen.push(sk);
-    (_propStore[key]||[]).forEach(function(p){
-      if(!p._sport) p._sport=sk;
-      if(!p._market) p._market=mk;
-      allCandidates.push(p);
-    });
-  });
-
-  if(!allCandidates.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>No props loaded yet — select a game on the <strong>Props</strong> tab first, then come back.</p></div>';
+  if(!getKey()){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Connect your API key on the <strong>Props</strong> tab first.</p></div>';
     return;
   }
 
-  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Ranking '+allCandidates.length+' prop'+(allCandidates.length!==1?"s":"")+" across "+sportsSeen.length+' sport'+(sportsSeen.length!==1?"s":"")+'&hellip;</p></div>';
+  // 30-minute cache — skip re-fetch if results are fresh
+  if(_top10Time&&(Date.now()-_top10Time)<TOP10_TTL&&_top10Data.length){
+    renderTop10(_top10Data); return;
+  }
 
-  // Deduplicate: one entry per player+sport+market
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Scanning all sports for today\'s best props&hellip;</p></div>';
+
+  // Fetch all 4 sports in parallel — one bulk call per sport covers every game today
+  var sports=Object.keys(LOTD_MARKETS);
+  var allCandidates=[];
+  var totalGames=0;
+  var sportResults=await Promise.allSettled(sports.map(async function(sportKey){
+    var mks=LOTD_MARKETS[sportKey];
+    var events=await fetchAllOddsForSport(sportKey,mks.join(","));
+    totalGames+=events.length;
+    var out=[];
+    events.forEach(function(ev){
+      var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
+      mks.forEach(function(mk){
+        parseProps(ev,mk).forEach(function(p){
+          p._market=mk; p._sport=sportKey; p._game=gameLabel;
+          out.push(p);
+        });
+      });
+    });
+    return out;
+  }));
+  sportResults.forEach(function(r){if(r.status==="fulfilled") allCandidates=allCandidates.concat(r.value);});
+
+  if(!allCandidates.length){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No games found across any sport today. Check back later or verify your API key is active.</p></div>';
+    return;
+  }
+
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Found '+totalGames+' game'+(totalGames!==1?"s":"")+' today — enriching top candidates&hellip;</p></div>';
+
+  // Deduplicate: one prop per player+sport+market (highest pre-enrich value wins)
   var seen={},unique=[];
   allCandidates
     .filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null&&p.value>=50;})
@@ -4404,24 +4439,21 @@ async function loadTop10(){
       if(!seen[k]){seen[k]=1;unique.push(p);}
     });
 
-  // Enrich anything not yet enriched (top 30 by pre-enrich score)
-  var needEnrich=unique.filter(function(p){return !p.enriched;}).slice(0,30);
-  if(needEnrich.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching '+needEnrich.length+' prop'+(needEnrich.length!==1?"s":"")+'&hellip;</p></div>';
-    var savedSport=ST.sport,savedMkt=ST.market;
-    for(var ei=0;ei<needEnrich.length;ei++){
-      var ep=needEnrich[ei];
-      ST.sport=ep._sport; ST.market=ep._market;
-      try{await enrichWithConfidence(ep);}catch(e){}
-    }
-    ST.sport=savedSport; ST.market=savedMkt;
+  // Enrich top 30 — save/restore ST.sport+ST.market so getGameLog hits the right sport API
+  var toEnrich=unique.slice(0,30);
+  var savedSport=ST.sport,savedMkt=ST.market;
+  for(var ei=0;ei<toEnrich.length;ei++){
+    var ep=toEnrich[ei];
+    ST.sport=ep._sport; ST.market=ep._market;
+    try{await enrichWithConfidence(ep);}catch(e){}
   }
+  ST.sport=savedSport; ST.market=savedMkt;
 
-  // ≥55%: enriched confidence if available, pre-enrich score as fallback
-  var qualified=unique.filter(function(p){
-    if(p.enriched&&p.pdNoValue) return false;
-    if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
-    return p.value>=55;
+  // ≥55% confidence: use enriched score when available, fall back to pre-enrich value
+  var qualified=toEnrich.filter(function(p){
+    if(p.enriched&&!p.pdNoValue&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
+    if(p.enriched&&p.pdNoValue) return false; // model says no value
+    return p.value>=55; // pre-enrichment floor for unenriched props
   });
   qualified.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
   _top10Data=qualified.slice(0,10);
