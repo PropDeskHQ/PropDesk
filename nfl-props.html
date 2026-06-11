@@ -73,7 +73,7 @@ input:focus,select:focus{border-color:var(--accent)}
 .pill.active{background:#00e87a;color:#000;border-color:transparent}
 .tabrow.prop .pill.active{background:var(--blue);color:#fff;border-color:transparent}
 /* Sport-selector tabs (4 buttons) fill the row equally */
-#sportTabs .pill,#t10SportTabs .pill{flex:1;min-width:0}
+#sportTabs .pill,#t10SportTabs .pill,#trendsSportTabs .pill{flex:1;min-width:0}
 .lbl{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--mut2);text-transform:uppercase;margin:14px 0 7px}
 
 /* GAMES */
@@ -607,6 +607,10 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
       </div>
       <button class="btn" id="trendsRefreshBtn">Refresh</button>
     </div>
+    <div class="lbl">Sport</div>
+    <div class="tabrow" id="trendsSportTabs"></div>
+    <div class="lbl">Game</div>
+    <div class="games" id="trendsGamesRow"><div class="empty" style="padding:18px">Select a sport above.</div></div>
     <div class="trend-tabs" id="trendTabs">
       <button class="pill active" data-ttype="all">All Trends</button>
       <button class="pill" data-ttype="streak">Streaks</button>
@@ -615,7 +619,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
       <button class="pill" data-ttype="totals">Totals</button>
     </div>
     <div id="trendsMount">
-      <div class="tc-no-data"><div class="nd-icon">📊</div><p>Load props on the <strong>Props</strong> tab, then come back to see trends.</p></div>
+      <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a sport and game above to see trends.</p></div>
     </div>
   </div>
 
@@ -1273,6 +1277,7 @@ async function enrichWithConfidence(p){
     p.seasonAvgEnrich=gl.seasonAvg!=null?gl.seasonAvg:avg(vals);
     p._vals=vals;
     p._dates=gl.dates||[];
+    if(gl.avgMins!=null) p.avgMins=gl.avgMins;
 
     if(vals.length<10&&p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
@@ -2765,10 +2770,14 @@ function parseEspnGamelog(d,keys){
   var idx=findColIdx(names,keys);
   if(idx<0) idx=findColIdx(labels,keys);
   if(idx<0) return null;
+  // Also look for a minutes column in the same response (NBA/NHL "MIN" column)
+  var minKeys=["min","minutes","avgminutes","mpg","toi","timeonice"];
+  var minIdx=findColIdx(names,minKeys);
+  if(minIdx<0) minIdx=findColIdx(labels,minKeys);
   var events=[];
   if(d.seasonTypes) events=collectEspnEvents(d.seasonTypes);
   if(!events.length && d.events) events=collectEspnEvents(d.events);
-  var vals=[],dates=[];
+  var vals=[],dates=[],minsArr=[];
   events.forEach(function(ev){
     if(ev && ev.stats && idx<ev.stats.length){
       var num=parseFloat(String(ev.stats[idx]).replace(/[^0-9.\-]/g,""));
@@ -2776,14 +2785,20 @@ function parseEspnGamelog(d,keys){
         vals.push(num);
         var dt=ev.gameDate||ev.date||ev.gameDatez||"";
         var mD=dt.match(/(\d{4}-\d{2}-\d{2})/);
-        // Store full ISO "2024-11-15" so date math (e.g. days rest) is accurate;
-        // drawAnalyzeCharts formats to "M/D" for chart labels.
         dates.push(mD?mD[1]:"");
+        // Capture minutes — handle "25:30" (MM:SS) or plain decimal
+        if(minIdx>=0 && minIdx<ev.stats.length){
+          var ms=String(ev.stats[minIdx]);
+          var mmss=ms.match(/^(\d+):(\d+)/);
+          if(mmss) minsArr.push(parseInt(mmss[1])+parseInt(mmss[2])/60);
+          else{ var mn=parseFloat(ms.replace(/[^0-9.]/g,"")); if(!isNaN(mn)&&mn>0) minsArr.push(mn); }
+        }
       }
     }
   });
   if(!vals.length) return null;
-  return {values:vals.slice(0,15), seasonAvg:avg(vals), dates:dates.slice(0,15)};
+  var avgMins=minsArr.length?avg(minsArr):null;
+  return {values:vals.slice(0,15), seasonAvg:avg(vals), dates:dates.slice(0,15), avgMins:avgMins};
 }
 
 /* ============ FULL STATS for Stats expand ============ */
@@ -3579,7 +3594,7 @@ function showPage(name){
   $("drawerNav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-page")===name); });
   $("botnav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-nav")===name); });
   if(name==="history") renderHistory();
-  if(name==="trends") loadTrends();
+  if(name==="trends") initTrends();
   if(name==="top10") initTop10();
   window.scrollTo(0,0);
 }
@@ -3647,7 +3662,7 @@ function init(){
       renderTrends(_trendsData);
     };
   });
-  $("trendsRefreshBtn").onclick=function(){ _trendsData=[]; loadTrends(); };
+  $("trendsRefreshBtn").onclick=function(){ _trendsData=[]; if(_trendsEventId) trendsFetchAndLoad(); else trendsLoadSport(); };
   $("t10RefreshBtn").onclick=function(){ _t10Data=[]; if(_t10EventId) t10LoadGame(); else t10LoadSport(); };
 
   $("showNoValueBtn").onclick=function(){
@@ -3899,6 +3914,9 @@ function saveManualParlay(){
 var _trendsTime=null;
 var _trendsFilter="all";
 var _trendsData=[];
+var _trendsSport="basketball_nba";
+var _trendsEvents=[];
+var _trendsEventId=null;
 
 // Confidence score from hit-rate + sample quality
 function trendConf(hitRate, n){
@@ -3986,6 +4004,9 @@ function calcLineValueTrends(){
     if(!p.enriched||p.pdNoValue) return;
     var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
     if(line==null||line===0) return;
+    // Skip low-usage players — their lines are low because of limited playing time,
+    // not real value. 18 MPG is the cutoff; if no minutes data, use a book-line floor.
+    if(p.avgMins!=null&&p.avgMins<18) return;
     var sznAvg=p.seasonAvgEnrich;
     var l5Avg=p.l5Avg;
     var mktLbl=marketName(ST.market);
@@ -4214,6 +4235,126 @@ function renderTrends(trends){
       if(t) openTrendDetail(t);
     };
   });
+}
+
+/* --- Trends sport / game selectors -------------------------------- */
+function renderTrendsSportTabs(){
+  var c=$("trendsSportTabs"); if(!c) return;
+  c.innerHTML="";
+  SPORTS.forEach(function(sp){
+    var b=el("button","pill"+(sp.key===_trendsSport?" active":""));
+    b.textContent=sp.label;
+    b.onclick=function(){
+      if(_trendsSport===sp.key) return;
+      _trendsSport=sp.key; _trendsEventId=null; _trendsEvents=[]; _trendsData=[];
+      renderTrendsSportTabs(); renderTrendsGamesRow();
+      var m=$("trendsMount"); if(m) m.innerHTML="";
+      trendsLoadSport();
+    };
+    c.appendChild(b);
+  });
+}
+
+function renderTrendsGamesRow(){
+  var c=$("trendsGamesRow"); if(!c) return;
+  c.innerHTML="";
+  if(!_trendsEvents.length){
+    c.innerHTML='<div class="empty" style="padding:18px">No games today for this sport.</div>'; return;
+  }
+  _trendsEvents.forEach(function(ev){
+    var dt=new Date(ev.commence_time);
+    var when=dt.toLocaleDateString([],{month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+    var b=el("button","game"+(ev.id===_trendsEventId?" active":""));
+    b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
+    b.onclick=function(){ _trendsEventId=ev.id; renderTrendsGamesRow(); trendsFetchAndLoad(); };
+    c.appendChild(b);
+  });
+}
+
+async function trendsLoadSport(){
+  var c=$("trendsGamesRow"); if(!c) return;
+  if(!getKey()){ c.innerHTML='<div class="empty" style="padding:18px">Enter your API key on the Props tab first.</div>'; return; }
+  c.innerHTML='<div class="empty" style="padding:18px">Loading games&hellip;</div>';
+  try{
+    var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events",{dateFormat:"iso"}));
+    if(!r.ok){ c.innerHTML='<div class="empty" style="padding:18px">Failed to load games ('+r.status+').</div>'; return; }
+    var data=await r.json();
+    var now=Date.now();
+    _trendsEvents=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime()>now-3*3600*1000; }).slice(0,24);
+    renderTrendsGamesRow();
+  }catch(e){ c.innerHTML='<div class="empty" style="padding:18px">Error loading games.</div>'; }
+}
+
+async function trendsFetchAndLoad(){
+  var mount=$("trendsMount"); if(!mount) return;
+  if(!_trendsEventId){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game above to see trends.</p></div>'; return;
+  }
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading props&hellip;</p></div>';
+  var ev=null;
+  for(var ei=0;ei<_trendsEvents.length;ei++){ if(_trendsEvents[ei].id===_trendsEventId){ev=_trendsEvents[ei];break;} }
+  var gameLabel=ev?((ev.away_team||"")+" vs "+(ev.home_team||"")):"";
+  var mks=LOTD_MARKETS[_trendsSport]||[];
+  try{
+    var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events/"+_trendsEventId+"/odds",{
+      regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
+    }));
+    if(!r.ok){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No lines available yet.</p></div>'; return; }
+    var oddsData=await r.json();
+    var candidates=[];
+    mks.forEach(function(mk){
+      parseProps(oddsData,mk).forEach(function(p){
+        p._market=mk; p._sport=_trendsSport; p._game=gameLabel; candidates.push(p);
+      });
+    });
+    // Dedupe one per player+market
+    var seen={},trendsProps=[];
+    candidates.filter(function(p){ return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null; })
+      .forEach(function(p){
+        var k=p.player.toLowerCase()+"|"+p._market;
+        if(!seen[k]){ seen[k]=1; trendsProps.push(p); }
+      });
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching '+trendsProps.length+' players&hellip;</p></div>';
+    // Enrich — temporarily set ST.sport/market per player so getGameLog hits the right API
+    var savedSport=ST.sport,savedMkt=ST.market;
+    for(var i=0;i<trendsProps.length;i++){
+      ST.sport=trendsProps[i]._sport; ST.market=trendsProps[i]._market;
+      try{ await enrichWithConfidence(trendsProps[i]); }catch(e){}
+    }
+    // Temporarily swap ST so existing calc functions see the right sport/props/event
+    var savedProps=ST.props,savedEid=ST.eventId;
+    ST.sport=_trendsSport; ST.market=mks[0]||""; ST.props=trendsProps; ST.eventId=_trendsEventId;
+    var trends=[], calcErr=null;
+    try{
+      trends=trends.concat(calcPlayerStreakTrends());
+      trends=trends.concat(calcLineValueTrends());
+      trends=trends.concat(calcOddsMovementTrends());
+      trends.sort(function(a,b){ return b.conf-a.conf; });
+      var totTrends=await calcTotalsTrends();
+      if(totTrends.length) trends=trends.concat(totTrends).sort(function(a,b){return b.conf-a.conf;});
+    }catch(ce){ calcErr=ce; }
+    // Always restore ST regardless of errors
+    ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
+    if(calcErr) throw calcErr;
+    _trendsData=trends;
+    renderTrends(trends);
+    var ct=$("trendsCalcTime");
+    if(ct) ct.textContent="Last calculated: "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+" · "+trends.length+" trend"+(trends.length!==1?"s":"")+" found";
+  }catch(e){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Error loading trends. Try again.</p></div>';
+  }
+}
+
+function initTrends(){
+  renderTrendsSportTabs();
+  if(!_trendsEvents.length) trendsLoadSport();
+  else renderTrendsGamesRow();
+  if(_trendsData.length) renderTrends(_trendsData);
+  else if(_trendsEventId) trendsFetchAndLoad();
+  else {
+    var m=$("trendsMount");
+    if(m) m.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game above to see trends.</p></div>';
+  }
 }
 
 async function loadTrends(){
