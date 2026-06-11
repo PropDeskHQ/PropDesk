@@ -360,15 +360,15 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .trend-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
 /* Grid: equal-height cards */
 .trend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px;margin-top:4px;align-items:start}
-.tcard{background:var(--surf);border:1px solid #1e1e1e;border-radius:16px;padding:20px 20px 16px;display:flex;flex-direction:column;cursor:pointer;transition:border-color .15s,background .15s;min-height:210px}
+.tcard{background:var(--surf);border:1px solid #1e1e1e;border-radius:16px;padding:20px 20px 16px;display:flex;flex-direction:column;cursor:pointer;transition:border-color .15s,background .15s;min-height:240px}
 .tcard:hover{border-color:#2c2c2c;background:var(--surf2)}
 /* No left border — clean uniform cards */
 .tc-tags{display:flex;gap:5px;align-items:center;margin-bottom:14px}
 .tc-type{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:2px 7px;border-radius:4px;color:var(--mut);background:#1f1f1f;border:1px solid #2a2a2a}
 .tc-live{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:2px 7px;border-radius:4px;color:var(--accent);background:rgba(0,255,135,.08);border:1px solid rgba(0,255,135,.18);animation:livepulse 2.5s ease-in-out infinite}
 @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.5}}
-.tc-player{font-size:15px;font-weight:700;color:var(--text);line-height:1.5;margin-bottom:10px}
-.tc-record{font-size:18px;font-weight:800;color:var(--accent);letter-spacing:-.3px;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:12px}
+.tc-player{font-size:17px;font-weight:800;color:var(--text);line-height:1.4;margin-bottom:8px}
+.tc-record{font-size:12px;font-weight:700;color:var(--mut);letter-spacing:.3px;text-transform:uppercase;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:8px}
 /* Hit rate progress bar — clean, no squares */
 .tc-hitbar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .tc-hitbar-track{flex:1;height:5px;background:#222;border-radius:3px;overflow:hidden}
@@ -386,6 +386,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tc-no-data p{font-size:14px;line-height:1.7}
 .tc-no-data strong{color:var(--text)}
 .trends-empty-note{font-size:11px;color:var(--mut2);text-align:center;padding:18px 0;letter-spacing:.2px}
+.tc-spark{width:100%;height:50px;display:block;margin:10px 0 8px}
+.tc-streak-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(0,232,122,.12);color:var(--accent);border:1px solid rgba(0,232,122,.2);letter-spacing:.3px}
 /* TREND DETAIL PANEL */
 .td-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:150;display:none;justify-content:flex-end}
 .td-overlay.open{display:flex}
@@ -609,8 +611,6 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     </div>
     <div class="lbl">Sport</div>
     <div class="tabrow" id="trendsSportTabs"></div>
-    <div class="lbl">Game</div>
-    <div class="games" id="trendsGamesRow"><div class="empty" style="padding:18px">Select a sport above.</div></div>
     <div class="trend-tabs" id="trendTabs">
       <button class="pill active" data-ttype="all">All Trends</button>
       <button class="pill" data-ttype="streak">Streaks</button>
@@ -619,7 +619,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
       <button class="pill" data-ttype="totals">Totals</button>
     </div>
     <div id="trendsMount">
-      <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a sport and game above to see trends.</p></div>
+      <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a sport above to see trends.</p></div>
     </div>
   </div>
 
@@ -3667,7 +3667,7 @@ function init(){
       renderTrends(_trendsData);
     };
   });
-  $("trendsRefreshBtn").onclick=function(){ _trendsData=[]; if(_trendsEventId) trendsFetchAndLoad(); else trendsLoadSport(); };
+  $("trendsRefreshBtn").onclick=function(){ _trendsData=[]; _trendsEvents=[]; trendsLoadSport(); };
   $("t10RefreshBtn").onclick=function(){ _t10Data=[]; if(_t10EventId) t10LoadGame(); else t10LoadSport(); };
 
   $("showNoValueBtn").onclick=function(){
@@ -3988,6 +3988,7 @@ function calcPlayerStreakTrends(){
       title:p.player+" "+lineLabel,
       record:hits+"-"+misses+" L"+bestN,
       hitRate:Math.round(best*100),
+      streak:streak,
       recordCls:isOver?"":"under",
       detail:"Hit this line in "+hits+" of "+bestN+" games ("+Math.round(best*100)+"% hit rate)."+streakNote,
       source:"ESPN / MLB Game Log",
@@ -4196,21 +4197,44 @@ async function calcTotalsTrends(){
   return trends;
 }
 
+/* --- Sparkline ----------------------------------------------------- */
+function renderSparkline(vals,line,isOver){
+  if(!vals||vals.length<3) return '';
+  var n=Math.min(15,vals.length);
+  var pts=vals.slice(0,n).slice().reverse(); // oldest left, newest right
+  var W=200,H=50,px=6,py=8;
+  var chartW=W-px*2, chartH=H-py*2;
+  var allV=pts.concat([line]);
+  var minV=Math.min.apply(null,allV), maxV=Math.max.apply(null,allV);
+  var range=(maxV-minV)||1;
+  function xp(i){ return px+(n===1?chartW/2:i*chartW/(n-1)); }
+  function yp(v){ return py+chartH*(1-(v-minV)/range); }
+  var poly=pts.map(function(v,i){ return xp(i).toFixed(1)+','+yp(v).toFixed(1); }).join(' ');
+  var lineY=yp(line).toFixed(1);
+  var dots=pts.map(function(v,i){
+    var hit=isOver?v>line:v<line;
+    return '<circle cx="'+xp(i).toFixed(1)+'" cy="'+yp(v).toFixed(1)+'" r="3" fill="'+(hit?'#00e87a':'#e84f4f')+'"/>';
+  }).join('');
+  return '<svg class="tc-spark" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">'+
+    '<line x1="'+px+'" y1="'+lineY+'" x2="'+(W-px)+'" y2="'+lineY+'" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="3,3"/>'+
+    '<polyline points="'+poly+'" fill="none" stroke="#3a3a3a" stroke-width="1.5" stroke-linejoin="round"/>'+
+    dots+'</svg>';
+}
+
 /* --- Render -------------------------------------------------------- */
 function renderTrendCard(t){
   var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":"GAME TOTAL";
   var headline=t.headline||t.title;
+  var streakBadge=t.streak>=3?'<span class="tc-streak-badge">🔥 STREAK '+t.streak+'</span>':'';
+  var spark=(t._rawVals&&t._rawVals.length>=3&&t._rawLine!=null)?renderSparkline(t._rawVals,t._rawLine,t._rawIsOver!==false):'';
+  var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%"></div></div><span class="tc-hitbar-pct">'+t.hitRate+'%</span></div>':'';
   return '<div class="tcard" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
-    '<div class="tc-tags">'+
-      '<span class="tc-type">'+typeLabel+'</span>'+
-      '<span class="tc-live">LIVE</span>'+
-    '</div>'+
+    '<div class="tc-tags"><span class="tc-type">'+typeLabel+'</span>'+streakBadge+'</div>'+
     '<div class="tc-player">'+esc(headline)+'</div>'+
+    (spark?'<div>'+spark+'</div>':'')+
     '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
-    '<div class="tc-detail">'+esc(t.source)+'</div>'+
-    '<div class="tc-footer">'+
-      '<button class="tc-share-sm" data-share="'+esc(t.shareText)+'">Share ↗</button>'+
-    '</div>'+
+    hitBar+
+    '<div class="tc-footer"><button class="tc-share-sm" data-share="'+esc(t.shareText)+'">Share ↗</button></div>'+
   '</div>';
 }
 
@@ -4221,10 +4245,7 @@ function renderTrends(trends){
     b.classList.toggle("active", b.getAttribute("data-ttype")===_trendsFilter);
   });
   if(!visible.length){
-    var noDataMsg=!ST.props.length||!ST.eventId
-      ? '<div class="tc-no-data"><div class="nd-icon">📊</div><p>Load props on the <strong>Props</strong> tab first, then return here.</p></div>'
-      : '<div class="tc-no-data"><div class="nd-icon">🔍</div><p>Not enough data today — check back as more game data is tracked.<br><small style="color:var(--mut2);font-size:11px">Trends appear once props are enriched with stats data.</small></p></div>';
-    mount.innerHTML=noDataMsg;
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔍</div><p>No trends found — try a different sport or check back as lines post.</p></div>';
     return;
   }
   mount.innerHTML='<div class="trend-grid">'+visible.map(renderTrendCard).join("")+'</div>'+
@@ -4242,7 +4263,7 @@ function renderTrends(trends){
   });
 }
 
-/* --- Trends sport / game selectors -------------------------------- */
+/* --- Trends sport selector ---------------------------------------- */
 function renderTrendsSportTabs(){
   var c=$("trendsSportTabs"); if(!c) return;
   c.innerHTML="";
@@ -4252,93 +4273,86 @@ function renderTrendsSportTabs(){
     b.onclick=function(){
       if(_trendsSport===sp.key) return;
       _trendsSport=sp.key; _trendsEventId=null; _trendsEvents=[]; _trendsData=[];
-      renderTrendsSportTabs(); renderTrendsGamesRow();
-      var m=$("trendsMount"); if(m) m.innerHTML="";
+      renderTrendsSportTabs();
       trendsLoadSport();
     };
     c.appendChild(b);
   });
 }
 
-function renderTrendsGamesRow(){
-  var c=$("trendsGamesRow"); if(!c) return;
-  c.innerHTML="";
-  if(!_trendsEvents.length){
-    c.innerHTML='<div class="empty" style="padding:18px">No games today for this sport.</div>'; return;
-  }
-  _trendsEvents.forEach(function(ev){
-    var dt=new Date(ev.commence_time);
-    var when=dt.toLocaleDateString([],{month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
-    var b=el("button","game"+(ev.id===_trendsEventId?" active":""));
-    b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
-    b.onclick=function(){ _trendsEventId=ev.id; renderTrendsGamesRow(); trendsFetchAndLoad(); };
-    c.appendChild(b);
-  });
-}
-
 async function trendsLoadSport(){
-  var c=$("trendsGamesRow"); if(!c) return;
-  if(!getKey()){ c.innerHTML='<div class="empty" style="padding:18px">Enter your API key on the Props tab first.</div>'; return; }
-  c.innerHTML='<div class="empty" style="padding:18px">Loading games&hellip;</div>';
+  var mount=$("trendsMount"); if(!mount) return;
+  if(!getKey()){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Enter your API key on the <strong>Props</strong> tab first.</p></div>'; return;
+  }
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading games…</p></div>';
   try{
-    var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events",{dateFormat:"iso"}));
-    if(!r.ok){ c.innerHTML='<div class="empty" style="padding:18px">Failed to load games ('+r.status+').</div>'; return; }
+    var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events",{dateFormat:"iso"}),{signal:AbortSignal.timeout(8000)});
+    if(!r.ok){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Failed to load games ('+r.status+').</p></div>'; return; }
     var data=await r.json();
     var now=Date.now();
     _trendsEvents=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime()>now-3*3600*1000; }).slice(0,24);
-    renderTrendsGamesRow();
-  }catch(e){ c.innerHTML='<div class="empty" style="padding:18px">Error loading games.</div>'; }
+    if(!_trendsEvents.length){
+      mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>No games today for this sport. Check back later.</p></div>'; return;
+    }
+    trendsFetchAndLoad();
+  }catch(e){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Error loading games. Try again.</p></div>'; }
 }
 
 async function trendsFetchAndLoad(){
   var mount=$("trendsMount"); if(!mount) return;
-  if(!_trendsEventId){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game above to see trends.</p></div>'; return;
+  if(!_trendsEvents.length){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a sport above to see trends.</p></div>'; return;
   }
-  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading props&hellip;</p></div>';
-  var ev=null;
-  for(var ei=0;ei<_trendsEvents.length;ei++){ if(_trendsEvents[ei].id===_trendsEventId){ev=_trendsEvents[ei];break;} }
-  var gameLabel=ev?((ev.away_team||"")+" vs "+(ev.home_team||"")):"";
   var mks=LOTD_MARKETS[_trendsSport]||[];
+  if(!mks.length) mks=["player_points","player_assists","player_rebounds"];
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading '+_trendsEvents.length+' game'+(_trendsEvents.length!==1?"s":"")+'…</p></div>';
   try{
-    var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events/"+_trendsEventId+"/odds",{
-      regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
-    }));
-    if(!r.ok){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No lines available yet.</p></div>'; return; }
-    var oddsData=await r.json();
-    var candidates=[];
-    mks.forEach(function(mk){
-      parseProps(oddsData,mk).forEach(function(p){
-        p._market=mk; p._sport=_trendsSport; p._game=gameLabel; candidates.push(p);
-      });
-    });
-    // Dedupe one per player+market
-    var seen={},trendsProps=[];
-    candidates.filter(function(p){ return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null; })
-      .forEach(function(p){
-        var k=p.player.toLowerCase()+"|"+p._market;
-        if(!seen[k]){ seen[k]=1; trendsProps.push(p); }
-      });
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching '+trendsProps.length+' players&hellip;</p></div>';
-    // Enrich — temporarily set ST.sport/market per player so getGameLog hits the right API
-    var savedSport=ST.sport,savedMkt=ST.market;
-    for(var i=0;i<trendsProps.length;i++){
-      ST.sport=trendsProps[i]._sport; ST.market=trendsProps[i]._market;
-      try{ await enrichWithConfidence(trendsProps[i]); }catch(e){}
+    // Fetch all events' props, deduplicate by player+market
+    var allCandidates=[],seen={};
+    for(var ei=0;ei<_trendsEvents.length;ei++){
+      var ev=_trendsEvents[ei];
+      var gameLabel=(ev.away_team||"")+" vs "+(ev.home_team||"");
+      try{
+        var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events/"+ev.id+"/odds",{
+          regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
+        }),{signal:AbortSignal.timeout(8000)});
+        if(!r.ok) continue;
+        var oddsData=await r.json();
+        mks.forEach(function(mk){
+          parseProps(oddsData,mk).forEach(function(p){
+            if(p.bestOdds==null||p.yesNo||p.bestLine==null) return;
+            p._market=mk; p._sport=_trendsSport; p._game=gameLabel;
+            var k=p.player.toLowerCase()+"|"+mk;
+            if(!seen[k]){ seen[k]=1; allCandidates.push(p); }
+          });
+        });
+      }catch(e){}
     }
-    // Temporarily swap ST so existing calc functions see the right sport/props/event
-    var savedProps=ST.props,savedEid=ST.eventId;
-    ST.sport=_trendsSport; ST.market=mks[0]||""; ST.props=trendsProps; ST.eventId=_trendsEventId;
-    var trends=[], calcErr=null;
+    if(!allCandidates.length){
+      mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No lines available yet for today\'s games.</p></div>'; return;
+    }
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching '+allCandidates.length+' players…</p></div>';
+    var savedSport=ST.sport,savedMkt=ST.market,savedProps=ST.props,savedEid=ST.eventId;
+    for(var i=0;i<allCandidates.length;i++){
+      ST.sport=allCandidates[i]._sport||_trendsSport; ST.market=allCandidates[i]._market;
+      try{ await enrichWithConfidence(allCandidates[i]); }catch(e){}
+    }
+    ST.sport=_trendsSport; ST.market=mks[0]||""; ST.props=allCandidates;
+    var trends=[],calcErr=null;
     try{
+      ST.eventId=_trendsEvents[0]?_trendsEvents[0].id:null;
       trends=trends.concat(calcPlayerStreakTrends());
       trends=trends.concat(calcLineValueTrends());
       trends=trends.concat(calcOddsMovementTrends());
       trends.sort(function(a,b){ return b.conf-a.conf; });
-      var totTrends=await calcTotalsTrends();
-      if(totTrends.length) trends=trends.concat(totTrends).sort(function(a,b){return b.conf-a.conf;});
+      for(var ti=0;ti<_trendsEvents.length;ti++){
+        ST.eventId=_trendsEvents[ti].id;
+        var totTrends=await calcTotalsTrends();
+        if(totTrends.length) trends=trends.concat(totTrends);
+      }
+      trends.sort(function(a,b){ return b.conf-a.conf; });
     }catch(ce){ calcErr=ce; }
-    // Always restore ST regardless of errors
     ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
     if(calcErr) throw calcErr;
     _trendsData=trends;
@@ -4352,14 +4366,9 @@ async function trendsFetchAndLoad(){
 
 function initTrends(){
   renderTrendsSportTabs();
-  if(!_trendsEvents.length) trendsLoadSport();
-  else renderTrendsGamesRow();
   if(_trendsData.length) renderTrends(_trendsData);
-  else if(_trendsEventId) trendsFetchAndLoad();
-  else {
-    var m=$("trendsMount");
-    if(m) m.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game above to see trends.</p></div>';
-  }
+  else if(_trendsEvents.length) trendsFetchAndLoad();
+  else trendsLoadSport();
 }
 
 async function loadTrends(){
