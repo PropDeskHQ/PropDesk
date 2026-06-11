@@ -3626,9 +3626,14 @@ function init(){
   if(savedMarket && (MARKETS[ST.sport]||[]).some(function(m){return m.k===savedMarket;})) ST.market=savedMarket;
   if(savedEvent) ST.eventId=savedEvent;
 
-  // Restore Live button visual immediately — timer re-arms in loadBoard once a game loads
+  // Restore Live state from localStorage — sync ST.live and start the timer immediately
+  // silentRefresh() returns early if ST.eventId is not set, so this is safe before any game loads
   if(localStorage.getItem("pe_live")==="1"){
+    ST.live=true;
     $("liveBtn").textContent="Live ON"; $("liveBtn").classList.add("on");
+    $("countdown").style.display="inline";
+    ST.liveSecs=300; tickLive();
+    ST.liveTimer=setInterval(tickLive,1000);
   }
 
   var k=getKey();
