@@ -68,10 +68,12 @@ input:focus,select:focus{border-color:var(--accent)}
 
 /* TABS */
 .tabrow{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
-.pill{background:var(--surf2);border:1px solid var(--bd2);border-radius:999px;padding:7px 15px;font-size:13px;font-weight:600;color:var(--mut);transition:.15s;white-space:nowrap}
-.pill:hover{color:var(--text);border-color:#3a3a3a}
-.pill.active{background:var(--accent);color:#000;border-color:var(--accent)}
-.tabrow.prop .pill.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.pill{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:999px;padding:9px 20px;font-size:13px;font-weight:600;color:var(--text);transition:.15s;white-space:nowrap;text-align:center}
+.pill:hover{background:#222;border-color:#333}
+.pill.active{background:#00e87a;color:#000;border-color:transparent}
+.tabrow.prop .pill.active{background:var(--blue);color:#fff;border-color:transparent}
+/* Sport-selector tabs (4 buttons) fill the row equally */
+#sportTabs .pill,#t10SportTabs .pill{flex:1;min-width:0}
 .lbl{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--mut2);text-transform:uppercase;margin:14px 0 7px}
 
 /* GAMES */
@@ -198,9 +200,9 @@ tbody tr.prow:hover{background:var(--surf2)}
 .ev{font-weight:700;font-variant-numeric:tabular-nums}
 .ev.pos{color:var(--accent)}
 .ev.neg{color:var(--red)}
-.vs{display:inline-flex;flex-direction:column;align-items:flex-start;gap:2px}
-.vs b{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;opacity:.8}
-.vs .vt{font-size:20px;font-weight:800;letter-spacing:-.5px;line-height:1;order:-1}
+.vs{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
+.vs b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap}
+.vs .vt{font-size:10px;font-weight:700;letter-spacing:.5px;line-height:1;text-transform:uppercase}
 .t-lock{color:#ffd700} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:#b8f5d4} .t-fair{color:var(--mut2)} .t-pass{color:var(--mut2)}
 /* PropDesk Line display */
 .pd-cell{display:flex;flex-direction:column;gap:3px}
@@ -451,7 +453,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .t10-arrow{font-size:11px;color:var(--mut2)}
 .t10-pd-line{font-size:15px;font-weight:700}
 .t10-pd-line.over{color:var(--accent)}.t10-pd-line.under{color:var(--blue)}
-.t10-conf{font-size:34px;font-weight:900;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums}
+.t10-conf{font-size:34px;font-weight:900;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
 .t10-conf-lbl{font-size:13px;font-weight:700;color:var(--mut)}
 .t10-analysis{font-size:12.5px;color:#bbb;line-height:1.75;background:#141414;border-radius:10px;padding:13px 15px;border-left:2px solid #1e1e1e}
 .t10-top1 .t10-analysis{border-left-color:rgba(0,255,135,.25)}
@@ -4376,7 +4378,7 @@ function t10RenderSportTabs(){
   var c=$("t10SportTabs"); if(!c) return;
   c.innerHTML="";
   SPORTS.forEach(function(sp){
-    var b=el("button","tab-btn"+(sp.key===_t10Sport?" active":""));
+    var b=el("button","pill"+(sp.key===_t10Sport?" active":""));
     b.textContent=sp.label;
     b.onclick=function(){
       if(_t10Sport===sp.key) return;
