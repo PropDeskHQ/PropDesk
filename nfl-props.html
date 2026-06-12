@@ -4632,7 +4632,7 @@ async function t10LoadGame(){
     var r=await fetch(apiUrl("/sports/"+_t10Sport+"/events/"+_t10EventId+"/odds",{
       regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
     }));
-    if(!r.ok){ t10FallbackToBestSport(_t10Sport); return; }
+    if(!r.ok){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available for this game yet. Check back closer to game time.</p></div>'; return; }
     var oddsData=await r.json();
     var candidates=[];
     mks.forEach(function(mk){
@@ -4640,7 +4640,7 @@ async function t10LoadGame(){
         p._market=mk; p._sport=_t10Sport; p._game=gameLabel; candidates.push(p);
       });
     });
-    if(!candidates.length){ t10FallbackToBestSport(_t10Sport); return; }
+    if(!candidates.length){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available for this game yet. Check back closer to game time.</p></div>'; return; }
     // Deduplicate: one per player+market
     var seen={},unique=[];
     candidates
