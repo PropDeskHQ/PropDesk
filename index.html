@@ -388,6 +388,13 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tc-no-data p{font-size:14px;line-height:1.7}
 .tc-no-data strong{color:var(--text)}
 .trends-empty-note{font-size:11px;color:var(--mut2);text-align:center;padding:18px 0;letter-spacing:.2px}
+/* Pill tooltip */
+.pill[data-tooltip]{position:relative;overflow:visible}
+.pill[data-tooltip]::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);background:#1a1a1a;color:#e0e0e0;font-size:11px;font-weight:400;line-height:1.5;padding:7px 11px;border-radius:7px;width:210px;text-align:left;pointer-events:none;opacity:0;transition:opacity .18s;border:1px solid #2e2e2e;z-index:200;white-space:normal;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.pill[data-tooltip]:hover::after{opacity:1}
+/* Trends filter rows */
+#trendsGameChips{margin-bottom:12px}
+#trendsPropTabs{gap:5px;flex-wrap:wrap;margin-bottom:10px}
 .tc-spark{width:100%;height:50px;display:block;margin:10px 0 8px}
 .tc-streak-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(0,232,122,.12);color:var(--accent);border:1px solid rgba(0,232,122,.2);letter-spacing:.3px}
 /* TREND DETAIL PANEL */
@@ -639,12 +646,14 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     </div>
     <div class="lbl">Sport</div>
     <div class="tabrow" id="trendsSportTabs"></div>
+    <div class="t10-chips" id="trendsGameChips" style="display:none"></div>
+    <div class="tabrow" id="trendsPropTabs" style="display:none"></div>
     <div class="trend-tabs" id="trendTabs">
-      <button class="pill active" data-ttype="all">All Trends</button>
-      <button class="pill" data-ttype="streak">Streaks</button>
-      <button class="pill" data-ttype="linevalue">Line Value</button>
-      <button class="pill" data-ttype="movement">Sharp Money</button>
-      <button class="pill" data-ttype="totals">Totals</button>
+      <button class="pill active" data-ttype="all" data-tooltip="Shows every trend type across all categories">All Trends</button>
+      <button class="pill" data-ttype="streak" data-tooltip="Players hitting their line in 3+ consecutive games — active hot streaks">Streaks</button>
+      <button class="pill" data-ttype="linevalue" data-tooltip="Props where the book line is set significantly above or below the player's recent average — creating an exploitable gap">Line Value</button>
+      <button class="pill" data-ttype="movement" data-tooltip="Props where significant line movement or book disagreement signals professional betting activity">Sharp Money</button>
+      <button class="pill" data-ttype="totals" data-tooltip="Team over/under trends — games going over or under the total at an unusually high rate">Totals</button>
     </div>
     <div id="trendsMount">
       <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a sport above to see trends.</p></div>
@@ -3988,6 +3997,8 @@ function saveManualParlay(){
 
 var _trendsTime=null;
 var _trendsFilter="all";
+var _trendsGameFilter="all";
+var _trendsPropFilter="all";
 var _trendsData=[];
 var _trendsSport="basketball_nba";
 var _trendsEvents=[];
@@ -4073,7 +4084,8 @@ function calcPlayerStreakTrends(){
       _rawLine:line,
       _rawIsOver:isOver,
       _rawMarket:mktLbl,
-      _r5:r5, _r10:r10, _r15:r15, _rawN:vals.length
+      _r5:r5, _r10:r10, _r15:r15, _rawN:vals.length,
+      _game:p._game||"", _market:p._market||""
     });
   });
   return trends;
@@ -4111,7 +4123,8 @@ function calcLineValueTrends(){
           source:"Season Stats",
           shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct.toFixed(0)+"% below season avg of "+fmtStat(sznAvg)+" ("+mktLbl+") → Over value | propdeskhq.netlify.app",
           _rawVals:p._vals?p._vals.slice(0,15):null,
-          _rawLine:line, _rawIsOver:true, _rawMarket:mktLbl
+          _rawLine:line, _rawIsOver:true, _rawMarket:mktLbl,
+          _game:p._game||"", _market:p._market||""
         });
       }
     }
@@ -4134,7 +4147,8 @@ function calcLineValueTrends(){
           source:"L5 Game Log",
           shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct2.toFixed(0)+"% above L5 avg of "+fmtStat(l5Avg)+" ("+mktLbl+") → Under value | propdeskhq.netlify.app",
           _rawVals:p._vals?p._vals.slice(0,15):null,
-          _rawLine:line, _rawIsOver:false, _rawMarket:mktLbl
+          _rawLine:line, _rawIsOver:false, _rawMarket:mktLbl,
+          _game:p._game||"", _market:p._market||""
         });
       }
     }
@@ -4169,7 +4183,8 @@ function calcOddsMovementTrends(){
         recordCls:"under",
         detail:"Line rose at "+upBooks.join(", ")+" since loading — suggests sharp money on the Under or market adjustment. Betting into a rising line reduces Over value.",
         source:"Live Line Movement",
-        shareText:"PropDesk Trend: Sharp signal on "+p.player+" Under — line moved up at "+upBooks.length+" books | propdeskhq.netlify.app"
+        shareText:"PropDesk Trend: Sharp signal on "+p.player+" Under — line moved up at "+upBooks.length+" books | propdeskhq.netlify.app",
+        _game:p._game||"", _market:p._market||""
       });
     }
     if(downBooks.length>=2){
@@ -4186,7 +4201,8 @@ function calcOddsMovementTrends(){
         recordCls:"",
         detail:"Line dropped at "+downBooks.join(", ")+" since loading — suggests sharp money on the Over or news adjustment. Falling line improves Over value.",
         source:"Live Line Movement",
-        shareText:"PropDesk Trend: Sharp signal on "+p.player+" Over — line dropped at "+downBooks.length+" books | propdeskhq.netlify.app"
+        shareText:"PropDesk Trend: Sharp signal on "+p.player+" Over — line dropped at "+downBooks.length+" books | propdeskhq.netlify.app",
+        _game:p._game||"", _market:p._market||""
       });
     }
   });
@@ -4207,7 +4223,8 @@ function calcOddsMovementTrends(){
         recordCls:"neutral",
         detail:p.player+" has a "+sp+"-point spread across "+p.bookCount+" sportsbooks in "+marketName(ST.market)+". Wide disagreement signals sharp positioning — take the best number available.",
         source:"Cross-Book Analysis",
-        shareText:"PropDesk Trend: "+p.player+" has "+sp+"pt spread across "+p.bookCount+" books in "+marketName(ST.market)+" — sharp split | propdeskhq.netlify.app"
+        shareText:"PropDesk Trend: "+p.player+" has "+sp+"pt spread across "+p.bookCount+" books in "+marketName(ST.market)+" — sharp split | propdeskhq.netlify.app",
+        _game:p._game||"", _market:p._market||""
       });
     });
   return trends;
@@ -4255,6 +4272,7 @@ async function calcTotalsTrends(){
     var ev=d; // reuse var name for event
     var evData=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
     var teams=evData?(evData.away_team+" @ "+evData.home_team):"Today's Game";
+    var gameKey=evData?(evData.away_team+" vs "+evData.home_team):"";
     var conf=Math.round(Math.min(80,55+Math.abs(betterEV)*5+(5.5-Math.min(5.5,vigAmt))*2));
     trends.push({
       type:"totals",
@@ -4267,7 +4285,8 @@ async function calcTotalsTrends(){
       recordCls:betterSide==="Under"?"under":"",
       detail:betterSide+" has better market pricing: "+fmtOdds(betterOdds)+" ("+Math.round(impliedProb(betterOdds)*100)+"% implied). EV: "+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"%. Vig: "+vigAmt.toFixed(1)+"%. "+tot.over.length+" books posting.",
       source:"The Odds API — Totals Market",
-      shareText:"PropDesk Trend: "+teams+" total "+mainLine+" — "+betterSide+" at "+fmtOdds(betterOdds)+" (EV: "+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"%) | propdeskhq.netlify.app"
+      shareText:"PropDesk Trend: "+teams+" total "+mainLine+" — "+betterSide+" at "+fmtOdds(betterOdds)+" (EV: "+(betterEV>=0?"+":"")+betterEV.toFixed(1)+"%) | propdeskhq.netlify.app",
+      _game:gameKey, _market:"totals"
     });
   }catch(e){}
   return trends;
@@ -4316,12 +4335,17 @@ function renderTrendCard(t){
 
 function renderTrends(trends){
   var mount=$("trendsMount"); if(!mount) return;
-  var visible=(_trendsFilter==="all")?trends:trends.filter(function(t){return t.type===_trendsFilter;});
+  var visible=trends.filter(function(t){
+    if(_trendsFilter!=="all"&&t.type!==_trendsFilter) return false;
+    if(_trendsGameFilter!=="all"&&t._game!==_trendsGameFilter) return false;
+    if(_trendsPropFilter!=="all"&&t._market!==_trendsPropFilter&&t.type!=="totals") return false;
+    return true;
+  });
   document.querySelectorAll("#trendTabs .pill").forEach(function(b){
     b.classList.toggle("active", b.getAttribute("data-ttype")===_trendsFilter);
   });
   if(!visible.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔍</div><p>No trends found — try a different sport or check back as lines post.</p></div>';
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔍</div><p>No trends found — try a different filter or check back as lines post.</p></div>';
     return;
   }
   mount.innerHTML='<div class="trend-grid">'+visible.map(renderTrendCard).join("")+'</div>'+
@@ -4349,7 +4373,10 @@ function renderTrendsSportTabs(){
     b.onclick=function(){
       if(_trendsSport===sp.key) return;
       _trendsSport=sp.key; _trendsEventId=null; _trendsEvents=[]; _trendsData=[];
+      _trendsGameFilter="all"; _trendsPropFilter="all";
       renderTrendsSportTabs();
+      renderTrendsGameChips();
+      renderTrendsPropTabs();
       trendsLoadSport();
     };
     c.appendChild(b);
@@ -4370,6 +4397,8 @@ async function trendsLoadSport(){
     var data=await r.json();
     var now=Date.now();
     _trendsEvents=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime()>now-3*3600*1000; }).slice(0,24);
+    renderTrendsGameChips();
+    renderTrendsPropTabs();
     if(!_trendsEvents.length){
       mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>No games today for this sport. Check back later.</p></div>'; return;
     }
@@ -4442,8 +4471,73 @@ async function trendsFetchAndLoad(){
   }
 }
 
+var TRENDS_PROP_FILTERS={
+  americanfootball_nfl:[
+    {k:"player_pass_yds",n:"Pass Yards"},{k:"player_rush_yds",n:"Rush Yards"},
+    {k:"player_reception_yds",n:"Rec Yards"},{k:"player_pass_tds",n:"TDs"},
+    {k:"player_receptions",n:"Receptions"}
+  ],
+  basketball_nba:[
+    {k:"player_points",n:"Points"},{k:"player_rebounds",n:"Rebounds"},
+    {k:"player_assists",n:"Assists"},{k:"player_threes",n:"Threes"},
+    {k:"player_steals",n:"Steals"},{k:"player_blocks",n:"Blocks"}
+  ],
+  icehockey_nhl:[
+    {k:"player_shots_on_goal",n:"Shots on Goal"},{k:"player_goals",n:"Goals"},
+    {k:"player_assists",n:"Assists"},{k:"player_points",n:"Points"},
+    {k:"player_saves",n:"Saves"}
+  ],
+  baseball_mlb:[
+    {k:"batter_hits",n:"Hits"},{k:"batter_total_bases",n:"Total Bases"},
+    {k:"batter_rbis",n:"RBIs"},{k:"batter_home_runs",n:"Home Runs"},
+    {k:"pitcher_strikeouts",n:"Pitcher Ks"}
+  ]
+};
+
+function renderTrendsGameChips(){
+  var c=$("trendsGameChips"); if(!c) return;
+  c.innerHTML="";
+  if(!_trendsEvents.length){c.style.display="none"; return;}
+  c.style.display="";
+  var allBtn=el("button","t10-chip"+(_trendsGameFilter==="all"?" active":""));
+  allBtn.innerHTML='<span class="t10-chip-teams">All Games</span>';
+  allBtn.onclick=function(){_trendsGameFilter="all"; renderTrendsGameChips(); renderTrends(_trendsData);};
+  c.appendChild(allBtn);
+  _trendsEvents.forEach(function(ev){
+    var dt=new Date(ev.commence_time);
+    var timeStr=dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+    var away=teamAbbr(ev.away_team);
+    var home=teamAbbr(ev.home_team);
+    var gameKey=(ev.away_team||"")+" vs "+(ev.home_team||"");
+    var b=el("button","t10-chip"+(_trendsGameFilter===gameKey?" active":""));
+    b.innerHTML='<span class="t10-chip-teams">'+esc(away)+' @ '+esc(home)+'</span><span class="t10-chip-time">'+esc(timeStr)+'</span>';
+    b.onclick=function(){_trendsGameFilter=gameKey; renderTrendsGameChips(); renderTrends(_trendsData);};
+    c.appendChild(b);
+  });
+}
+
+function renderTrendsPropTabs(){
+  var c=$("trendsPropTabs"); if(!c) return;
+  c.innerHTML="";
+  var filters=TRENDS_PROP_FILTERS[_trendsSport]||[];
+  if(!filters.length){c.style.display="none"; return;}
+  c.style.display="";
+  var allBtn=el("button","pill"+(_trendsPropFilter==="all"?" active":""));
+  allBtn.textContent="All Props";
+  allBtn.onclick=function(){_trendsPropFilter="all"; renderTrendsPropTabs(); renderTrends(_trendsData);};
+  c.appendChild(allBtn);
+  filters.forEach(function(f){
+    var b=el("button","pill"+(_trendsPropFilter===f.k?" active":""));
+    b.textContent=f.n;
+    b.onclick=function(){_trendsPropFilter=f.k; renderTrendsPropTabs(); renderTrends(_trendsData);};
+    c.appendChild(b);
+  });
+}
+
 function initTrends(){
   renderTrendsSportTabs();
+  renderTrendsGameChips();
+  renderTrendsPropTabs();
   if(_trendsData.length) renderTrends(_trendsData);
   else if(_trendsEvents.length) trendsFetchAndLoad();
   else trendsLoadSport();
