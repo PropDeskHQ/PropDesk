@@ -185,7 +185,7 @@ input:focus,select:focus{border-color:var(--accent)}
 /* TABLE */
 .tbl-wrap{border:1px solid var(--bd);border-radius:14px;overflow:hidden;background:var(--surf)}
 table{width:100%;border-collapse:collapse}
-thead th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);text-align:left;padding:11px 12px;border-bottom:1px solid var(--bd2);background:var(--surf2);position:sticky;top:52px;z-index:5}
+thead th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);text-align:left;padding:11px 12px;border-bottom:1px solid var(--bd2);background:var(--surf2);position:sticky;top:calc(52px + var(--sbar-h,0px));z-index:5}
 tbody td{padding:11px 12px;border-bottom:1px solid var(--bd);vertical-align:top;font-size:13px;color:var(--text)}
 tbody tr.prow{transition:background .15s}
 tbody tr.prow:hover{background:var(--surf2)}
@@ -1674,6 +1674,7 @@ async function loadBoard(){
   try{
     var data=await fetchOdds(ST.eventId, ST.market);
     ST.props=parseProps(data, ST.market);
+    console.log("[PropDesk] "+ST.sport+" / "+ST.market+" — "+ST.props.length+" props from API");
     _propStore[ST.sport+"|"+ST.market]=ST.props;
     if(!ST.props.length){
       $("tableMount").innerHTML='<div class="empty">No '+esc(marketName(ST.market))+' lines posted for this game yet. Try another market.</div>';
@@ -2030,6 +2031,10 @@ function renderSummaryBar(){
   });
   var total=allEnriched.length;
   bar.style.display=total?"block":"none";
+  // Keep thead sticky below the summary bar so the first player row is never covered
+  var sbarEl=bar.firstElementChild;
+  var sbarMargin=sbarEl?parseInt(window.getComputedStyle(sbarEl).marginTop)||0:0;
+  document.documentElement.style.setProperty('--sbar-h',(total?(bar.offsetHeight+sbarMargin):0)+'px');
   if(!total) return;
   $("sb-total").textContent=total+" prop"+(total!==1?"s":"")+" analyzed";
   $("sb-lock").textContent="LOCK: "+locks;
@@ -2041,6 +2046,7 @@ function renderSummaryBar(){
 
 function renderTable(silent){
   var props=filteredProps();
+  if(!silent) console.log("[PropDesk] Displaying "+props.length+" of "+ST.props.length+" props after filters (sport: "+ST.sport+", market: "+ST.market+")");
   var cols=bookColumns();
   $("resCount").textContent=props.length+" prop"+(props.length===1?"":"s");
   var thead='<tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>Confidence</th>';
@@ -4626,7 +4632,7 @@ async function t10LoadGame(){
     var r=await fetch(apiUrl("/sports/"+_t10Sport+"/events/"+_t10EventId+"/odds",{
       regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
     }));
-    if(!r.ok){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No lines available for this game yet.</p></div>'; return; }
+    if(!r.ok){ t10FallbackToBestSport(_t10Sport); return; }
     var oddsData=await r.json();
     var candidates=[];
     mks.forEach(function(mk){
@@ -4634,13 +4640,11 @@ async function t10LoadGame(){
         p._market=mk; p._sport=_t10Sport; p._game=gameLabel; candidates.push(p);
       });
     });
-    if(!candidates.length){
-      mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines posted for this game yet. Check back closer to tip-off.</p></div>'; return;
-    }
+    if(!candidates.length){ t10FallbackToBestSport(_t10Sport); return; }
     // Deduplicate: one per player+market
     var seen={},unique=[];
     candidates
-      .filter(function(p){ return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null&&p.value>=50; })
+      .filter(function(p){ return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null; })
       .sort(function(a,b){ return b.value-a.value; })
       .forEach(function(p){
         var k=p.player.toLowerCase()+"|"+p._market;
@@ -4665,6 +4669,26 @@ async function t10LoadGame(){
   }catch(e){
     mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Error loading props. Try again.</p></div>';
   }
+}
+
+async function t10FallbackToBestSport(failedSport){
+  var mount=$("t10Mount"); if(!mount) return;
+  var tryOrder=["baseball_mlb","basketball_nba","icehockey_nhl","americanfootball_nfl"].filter(function(s){return s!==failedSport;});
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔍</div><p>No lines available for that sport yet — finding the best picks right now…</p></div>';
+  for(var i=0;i<tryOrder.length;i++){
+    var sport=tryOrder[i];
+    try{
+      var r=await fetch(apiUrl("/sports/"+sport+"/events",{dateFormat:"iso"}),{signal:AbortSignal.timeout(6000)});
+      if(!r.ok) continue;
+      var data=await r.json();
+      var now=Date.now();
+      var evts=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime()>now-3*3600*1000; }).slice(0,24);
+      if(!evts.length) continue;
+      _t10Sport=sport; _t10EventId=evts[0].id; _t10Events=evts; _t10Data=[];
+      t10RenderSportTabs(); t10RenderGamesRow(); t10LoadGame(); return;
+    }catch(e){ continue; }
+  }
+  mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available across any sport right now. Check back later.</p></div>';
 }
 
 function initTop10(){
