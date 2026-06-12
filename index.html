@@ -836,6 +836,14 @@ function threshLabel(line, marketKey){
   var stat=THRESHOLD_STAT_NAMES[marketKey]||"";
   return n+"+ "+(stat?stat:"");
 }
+// Format a line+side for display: X.5 lines under 10 become "N+" (e.g. 0.5→"1+", 1.5→"2+")
+// Large lines (10.5+) and whole-number lines keep "Over X" / "Under X" format
+function fmtLine(line, side){
+  var s=side||"Over";
+  if(line==null||line==="") return s;
+  if(s==="Over"&&(line%1)===0.5&&line<10) return Math.ceil(line)+"+";
+  return s+" "+line;
+}
 function isThreshProp(p){ return !!(p._market && (THRESHOLD_MARKETS[ST.sport]||{})[p._market]); }
 
 // Fetch opposing team's K% (strikeout rate as a batting team) from MLB Stats API
@@ -1536,8 +1544,8 @@ function updatePropPDDisplay(p){
     ?(conf>=0.65?"cb-strong":conf>=0.50?"cb-mod":"cb-none")
     :(conf>=0.65?"cb-strong":conf>=0.62?"cb-mod":"cb-none");
   // Build line labels — threshold markets use "1+ Goals" format
-  var pdLabel=thresh?threshLabel(pdLine,p._market):(side+' '+pdLine);
-  var bookLabel=thresh&&rawBookLine!=null?threshLabel(rawBookLine,p._market):(rawBookLine!=null?""+rawBookLine:"");
+  var pdLabel=thresh?threshLabel(pdLine,p._market):fmtLine(pdLine,side);
+  var bookLabel=thresh&&rawBookLine!=null?threshLabel(rawBookLine,p._market):(rawBookLine!=null?fmtLine(rawBookLine,side):"");
   // Threshold: no gap badge; Over/Under: show direction of shift
   var shiftedUp=!thresh&&pdLine!=null&&rawBookLine!=null&&pdLine>rawBookLine;
   var shiftedDown=!thresh&&pdLine!=null&&rawBookLine!=null&&pdLine<rawBookLine;
@@ -1837,7 +1845,7 @@ function renderPropOfDay(p, mkt){
   var pdSide=p.pdSide||p.side;
   var pdLine=p.pdLine!=null?p.pdLine:p.bestLine;
   var sidecls=pdSide==="Under"?"under":"over";
-  var betLabel=isThresh?threshLabel(pdLine,p._market):(pdSide+(pdLine!=null?" "+pdLine:""));
+  var betLabel=isThresh?threshLabel(pdLine,p._market):fmtLine(pdLine,pdSide);
   var sharp=(p.lineSpread>=1.5);
 
   // Tier label — drives the card header badge and analysis tone
@@ -1955,7 +1963,7 @@ async function loadLOTD(){
     var avgScore=Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length);
     if(avgScore<70){ return; } // overall quality gate
     var legHtml=legs.map(function(l,i){
-      var bet=isThreshProp(l)?threshLabel(l.bestLine,l._lotdMk):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
+      var bet=isThreshProp(l)?threshLabel(l.bestLine,l._lotdMk):fmtLine(l.bestLine,l.side);
       var bcls=l.side==="Under"?"under":(l.side==="Yes"?"yes":"over");
       var tcls=confTierOf(l.value).c;
       var tierLbl=confTierOf(l.value).t;
@@ -2100,7 +2108,7 @@ function rowHtml(p,cols,idx,silent){
   var bbcls=isThresh?"over":(p.side==="Under"?"under":(p.side==="Yes"?"yes":"over"));
   var bb=isThresh&&bookLine!==""
     ? threshLabel(bookLine,p._market)
-    : (p.side+(bookLine!==""?" "+bookLine:""));
+    : (bookLine!==""?fmtLine(bookLine,p.side):"");
   var ev=p.evOver;
   var evHtml=(ev==null)?'<span class="ev">-</span>':'<span class="ev '+(ev>=0?"pos":"neg")+'">'+(ev>=0?"+":"")+ev.toFixed(1)+'%</span>';
   var meta=p._metaLoaded?(p._meta?esc(p._meta):''):'';
@@ -2119,8 +2127,8 @@ function rowHtml(p,cols,idx,silent){
     var side=p.pdSide||"Over";
     var sideLow=side.toLowerCase();
     // For threshold markets: show "Book: 1+ → PD: 2+" format; otherwise normal
-    var pdLineLabel=isThresh?threshLabel(p.pdLine,p._market):(side+' '+p.pdLine);
-    var bookLineLabel=isThresh?(bookLine!==""?threshLabel(bookLine,p._market):""):""+bookLine;
+    var pdLineLabel=isThresh?threshLabel(p.pdLine,p._market):fmtLine(p.pdLine,side);
+    var bookLineLabel=isThresh?(bookLine!==""?threshLabel(bookLine,p._market):""):(bookLine!==""?fmtLine(bookLine,side):"");
     // Threshold: no gap badge — line never shifts; O/U: show gap if line shifted
     var gapHtml=isThresh?"":(p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>');
     pdCellContent=
@@ -2226,7 +2234,7 @@ function savePick(p,btn){
     id:Date.now()+"_"+Math.random().toString(36).slice(2,6),
     type:"pick", date:new Date().toISOString(), sport:ST.sport, sportLabel:sportLabel(ST.sport),
     player:p.player, market:marketName(ST.market),
-    bet:p.side+(p.bestLine!=null?" "+p.bestLine:"")+(p.bestOdds!=null?" "+fmtOdds(p.bestOdds):""),
+    bet:fmtLine(p.bestLine,p.side)+(p.bestOdds!=null?" "+fmtOdds(p.bestOdds):""),
     odds:p.bestOdds, value:p.value, result:"pending"
   });
   saveHist(hist);
@@ -2278,9 +2286,9 @@ async function renderAnalyze(p){
   if(!mount.parentNode) return;
 
   // Stat cards: show PropDesk line context
-  var pdLabel=p.pdLine!=null?(p.pdSide+' '+p.pdLine+(p.pdGap>0?' (adj)':'')):(p.side+' '+bookLine);
+  var pdLabel=p.pdLine!=null?(fmtLine(p.pdLine,p.pdSide)+(p.pdGap>0?' (adj)':'')):fmtLine(bookLine,p.side);
   var sc=[
-    ["Book Line", p.side+" "+(bookLine||"-")],
+    ["Book Line", bookLine?fmtLine(bookLine,p.side):"-"],
     ["PropDesk Line", pdLabel],
     ["Confidence", confPct!=null?confPct+"%":"-"],
     ["EV%", p.evOver!=null?(p.evOver>=0?"+":"")+p.evOver.toFixed(1)+"%":"-"],
@@ -3485,7 +3493,7 @@ function renderParlayResult(legs,dec,am,legNote){
   var legHtml="";
   legs.forEach(function(l,i){
     var isThresh=isThreshProp(l);
-    var bet=isThresh?threshLabel(l.bestLine,l._market):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
+    var bet=isThresh?threshLabel(l.bestLine,l._market):fmtLine(l.bestLine,l.side);
     var bcls=l.side==="Under"?"under":(l.side==="Yes"?"yes":"over");
     var conf=getEffectiveConf(l);
     var tcls=confTierOf(conf).c;
@@ -3521,7 +3529,7 @@ function saveParlay(legs,am){
     id:Date.now()+"_"+Math.random().toString(36).slice(2,6),
     type:"parlay", date:new Date().toISOString(), sport:ST.sport, sportLabel:sportLabel(ST.sport),
     odds:am, value:Math.round(avg(legs.map(function(l){return l.value;}))),
-    legs:legs.map(function(l){ return {player:l.player, market:marketName(ST.market), bet:l.side+(l.bestLine!=null?" "+l.bestLine:"")+" "+fmtOdds(l.bestOdds), value:l.value}; }),
+    legs:legs.map(function(l){ return {player:l.player, market:marketName(ST.market), bet:fmtLine(l.bestLine,l.side)+" "+fmtOdds(l.bestOdds), value:l.value}; }),
     result:"pending"
   });
   saveHist(hist);
@@ -3869,7 +3877,7 @@ function renderParlayBar(expanded){
   var legHtml="";
   legs.forEach(function(l,i){
     var thresh=isThreshProp(l);
-    var betLabel=thresh?threshLabel(l.bestLine,l._market):(l.side+(l.bestLine!=null?" "+l.bestLine:""));
+    var betLabel=thresh?threshLabel(l.bestLine,l._market):fmtLine(l.bestLine,l.side);
     var oddsStr=l.bestOdds!=null?" "+fmtOdds(l.bestOdds):"";
     var bcls=thresh?"thresh":l.side==="Under"?"under":"over";
     legHtml+=
@@ -3935,7 +3943,7 @@ function saveManualParlay(){
     value:grade?grade.score:Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length),
     legs:legs.map(function(l){
       var thresh=isThreshProp(l);
-      var betStr=(thresh?threshLabel(l.bestLine,l._market):(l.side+(l.bestLine!=null?" "+l.bestLine:"")))+(l.bestOdds!=null?" "+fmtOdds(l.bestOdds):"");
+      var betStr=(thresh?threshLabel(l.bestLine,l._market):fmtLine(l.bestLine,l.side))+(l.bestOdds!=null?" "+fmtOdds(l.bestOdds):"");
       return { player:l.player, market:marketName(l._market||ST.market), bet:betStr, value:l.value };
     }),
     result:"pending"
@@ -4005,7 +4013,7 @@ function calcPlayerStreakTrends(){
     var mktLbl=marketName(p._market||ST.market);
     var direction=isOver?"Over":"Under";
     var isThresh=isThreshProp(p);
-    var lineLabel=isThresh?threshLabel(line,p._market):(direction+" "+line);
+    var lineLabel=isThresh?threshLabel(line,p._market):fmtLine(line,direction);
     var streakNote=streak>=3?" Active streak: "+streak+" consecutive hits.":(streak<=-3?" Caution: "+Math.abs(streak)+" consecutive misses.":"");
     // Hit/miss visual bar (up to 10 most recent games)
     var bars="";
@@ -4477,7 +4485,7 @@ function buildTop10ShareItem(rank,p,mktName,sportKey){
   var sp={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"}[sportKey]||"";
   var side=p.pdSide||"Over";
   var line=p.pdLine!=null?p.pdLine:p.bestLine;
-  return "#"+rank+" "+emoji+" ["+sp+"] "+p.player+" "+mktName+" "+side+" "+line+" ("+conf+"%)";
+  return "#"+rank+" "+emoji+" ["+sp+"] "+p.player+" "+mktName+" "+fmtLine(line,side)+" ("+conf+"%)";
 }
 
 function renderTop10(picks){
@@ -4512,8 +4520,8 @@ function renderTop10(picks){
     var differ=pdLine!=null&&p.bestLine!=null&&Math.abs(pdLine-p.bestLine)>=0.5;
     var lineCls=side==="Over"?"over":"under";
     var linesHtml=differ?
-      '<div class="t10-lines"><span class="t10-book-line">'+p.bestLine+'</span><span class="t10-arrow">→</span><span class="t10-pd-line '+lineCls+'">'+pdLine+' '+side+'</span></div>':
-      '<div class="t10-lines"><span class="t10-pd-line '+lineCls+'">'+(pdLine||p.bestLine)+' '+side+'</span></div>';
+      '<div class="t10-lines"><span class="t10-book-line">'+fmtLine(p.bestLine,"Over")+'</span><span class="t10-arrow">→</span><span class="t10-pd-line '+lineCls+'">'+fmtLine(pdLine,side)+'</span></div>':
+      '<div class="t10-lines"><span class="t10-pd-line '+lineCls+'">'+fmtLine(pdLine||p.bestLine,side)+'</span></div>';
     var analysis=buildTop10Analysis(p,mktName);
     html+='<div class="t10-card'+(rank===1?" t10-top1":"")+'">'+
       '<div class="t10-rank">'+rank+'</div>'+
