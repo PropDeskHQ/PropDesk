@@ -1024,9 +1024,11 @@ async function fetchEvents(){
   if(!key){ toast("Enter your API key first"); return; }
   var row=$("gamesRow"); row.innerHTML='<div class="empty" style="padding:18px">Loading games...</div>';
   try{
-    var r=await fetch(apiUrl("/sports/"+ST.sport+"/events",{dateFormat:"iso"}));
+    var _evUrl=apiUrl("/sports/"+ST.sport+"/events",{dateFormat:"iso"});
+    console.log("[PropDesk] fetchEvents URL:", _evUrl);
+    var r=await fetch(_evUrl);
     var q=readQuota(r);
-    if(!r.ok){ setStatus("err",""); row.innerHTML='<div class="empty">Failed to load games (status '+r.status+'). Check your API key.</div>'; return; }
+    if(!r.ok){ var _evErr=await r.text(); console.error("[PropDesk] fetchEvents FAILED",r.status,_evErr); setStatus("err",""); row.innerHTML='<div class="empty">Failed to load games (status '+r.status+'). Check your API key.</div>'; return; }
     setStatus("on",q);
     var data=await r.json();
     var now=Date.now();
@@ -1044,12 +1046,14 @@ async function fetchEvents(){
 }
 
 async function fetchOdds(eventId,markets){
-  var r=await fetch(apiUrl("/sports/"+ST.sport+"/events/"+eventId+"/odds",{
+  var _oddsUrl=apiUrl("/sports/"+ST.sport+"/events/"+eventId+"/odds",{
     regions:"us,us2", markets:markets, oddsFormat:"american", dateFormat:"iso"
-  }));
+  });
+  console.log("[PropDesk] fetchOdds URL:", _oddsUrl);
+  var r=await fetch(_oddsUrl);
   var q=readQuota(r);
   if(q) setStatus("on",q);
-  if(!r.ok){ var t=await r.text(); throw new Error("status "+r.status); }
+  if(!r.ok){ var t=await r.text(); console.error("[PropDesk] fetchOdds FAILED",r.status,t); throw new Error("status "+r.status); }
   return r.json();
 }
 
@@ -4325,8 +4329,10 @@ async function trendsLoadSport(){
   }
   mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading games…</p></div>';
   try{
-    var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events",{dateFormat:"iso"}),{signal:AbortSignal.timeout(8000)});
-    if(!r.ok){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Failed to load games ('+r.status+').</p></div>'; return; }
+    var _trUrl=apiUrl("/sports/"+_trendsSport+"/events",{dateFormat:"iso"});
+    console.log("[PropDesk] trendsLoadSport URL:", _trUrl);
+    var r=await fetch(_trUrl,{signal:AbortSignal.timeout(8000)});
+    if(!r.ok){ var _trErr=await r.text(); console.error("[PropDesk] trendsLoadSport FAILED",r.status,_trErr); mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Failed to load games ('+r.status+').</p></div>'; return; }
     var data=await r.json();
     var now=Date.now();
     _trendsEvents=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime()>now-3*3600*1000; }).slice(0,24);
@@ -4629,10 +4635,12 @@ async function t10LoadGame(){
   var gameLabel=ev?(ev.home_team+" vs "+ev.away_team):"";
   var mks=LOTD_MARKETS[_t10Sport]||[];
   try{
-    var r=await fetch(apiUrl("/sports/"+_t10Sport+"/events/"+_t10EventId+"/odds",{
+    var _t10Url=apiUrl("/sports/"+_t10Sport+"/events/"+_t10EventId+"/odds",{
       regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
-    }));
-    if(!r.ok){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available for this game yet. Check back closer to game time.</p></div>'; return; }
+    });
+    console.log("[PropDesk] t10LoadGame URL:", _t10Url);
+    var r=await fetch(_t10Url);
+    if(!r.ok){ var _t10Err=await r.text(); console.error("[PropDesk] t10LoadGame FAILED",r.status,_t10Err); mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available for this game yet. Check back closer to game time.</p></div>'; return; }
     var oddsData=await r.json();
     var candidates=[];
     mks.forEach(function(mk){
