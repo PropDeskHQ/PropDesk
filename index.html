@@ -429,44 +429,69 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .td-share-big:hover{background:rgba(0,232,122,.2)}
 
 /* TOP 10 TODAY */
-.t10-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
-.t10-hdr h2{font-size:22px;font-weight:800;margin-bottom:4px}
-.t10-date{font-size:15px;font-weight:400;color:var(--mut);margin-left:8px}
-.t10-summary{font-size:13px;color:var(--mut);line-height:1.5;margin-top:4px}
-.t10-note{font-size:11px;color:var(--mut2);text-align:center;margin-bottom:14px;letter-spacing:.2px}
-.t10-card{display:flex;gap:16px;background:var(--surf);border:1px solid #1e1e1e;border-radius:16px;padding:20px 18px;margin-bottom:13px;transition:border-color .15s}
-.t10-card:hover{border-color:#2c2c2c}
-.t10-top1{border-color:rgba(0,255,135,.2)!important;box-shadow:0 0 0 1px rgba(0,255,135,.08),0 0 28px rgba(0,255,135,.07)}
-.t10-rank{font-size:26px;font-weight:900;color:var(--mut2);flex-shrink:0;width:30px;text-align:center;padding-top:2px;font-variant-numeric:tabular-nums;line-height:1.1}
-.t10-top1 .t10-rank{color:var(--accent)}
-.t10-content{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
-.t10-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.t10-sport{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;padding:2px 8px;border-radius:4px}
-.t10-sport-mlb{background:rgba(255,115,30,.12);color:#ff7820;border:1px solid rgba(255,115,30,.22)}
-.t10-sport-nba{background:rgba(66,153,255,.12);color:#4299ff;border:1px solid rgba(66,153,255,.22)}
-.t10-sport-nhl{background:rgba(0,195,175,.12);color:#00c3af;border:1px solid rgba(0,195,175,.22)}
-.t10-sport-nfl{background:rgba(0,200,90,.12);color:#00c85a;border:1px solid rgba(0,200,90,.22)}
-.t10-tier{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 8px;border-radius:4px}
+/* Header */
+.t10-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:20px}
+.t10-hdr-left{display:flex;flex-direction:column;gap:7px}
+.t10-title{font-size:24px;font-weight:900;color:#fff;line-height:1;display:flex;align-items:baseline;flex-wrap:wrap;gap:0}
+.t10-date{font-size:13px;font-weight:400;color:var(--mut);margin-left:8px}
+.t10-stat-bar{display:flex;gap:5px;flex-wrap:wrap;align-items:center;min-height:20px}
+.t10-stat-pill{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid}
+.t10-sp-lock{color:#ffd700;border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.07)}
+.t10-sp-elite{color:var(--accent);border-color:rgba(0,232,122,.3);background:rgba(0,232,122,.06)}
+.t10-sp-good{color:#7fe6a8;border-color:rgba(127,230,168,.3);background:rgba(127,230,168,.05)}
+.t10-hdr-right{display:flex;gap:7px;align-items:flex-start;flex-shrink:0}
+.t10-copy-btn{font-size:11px;font-weight:700;color:var(--accent);background:transparent;border:1px solid rgba(0,232,122,.4);border-radius:8px;padding:7px 13px;cursor:pointer;white-space:nowrap;transition:.15s}
+.t10-copy-btn:hover{background:rgba(0,232,122,.08)}
+.t10-refresh-btn{font-size:16px;color:var(--mut);background:transparent;border:1px solid #2a2a2a;border-radius:8px;padding:5px 11px;cursor:pointer;transition:.15s;line-height:1}
+.t10-refresh-btn:hover{color:var(--text);border-color:#3a3a3a}
+/* Sport tabs — auto-width, left-aligned */
+#t10SportTabs{justify-content:flex-start;gap:6px;margin-bottom:16px}
+#t10SportTabs .pill{flex:0 0 auto;padding:7px 16px;font-size:12px}
+/* Game chips */
+.t10-chips{display:flex;gap:7px;overflow-x:auto;padding:0 0 10px;margin-bottom:18px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.t10-chips::-webkit-scrollbar{display:none}
+.t10-chip{flex:0 0 auto;background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:8px 12px;text-align:center;cursor:pointer;transition:.15s;min-width:70px}
+.t10-chip:hover{border-color:#333;background:#161616}
+.t10-chip.active{border-color:var(--accent);background:rgba(0,232,122,.05)}
+.t10-chip-teams{font-size:12px;font-weight:700;color:#ddd;display:block;line-height:1.2;white-space:nowrap}
+.t10-chip-time{font-size:10px;color:var(--mut);display:block;margin-top:2px}
+/* Cards */
+.t10-card{background:#111;border:1px solid #1e1e1e;border-left:3px solid #2a2a2a;border-radius:12px;padding:14px 16px;margin-bottom:9px;transition:.12s}
+.t10-card:hover{border-color:#252525;border-left-color:#3a3a3a}
+.t10-card.tc-lock{border-left-color:#ffd700}
+.t10-card.tc-elite{border-left-color:var(--accent)}
+.t10-card.tc-good{border-left-color:#7fe6a8}
+.t10-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px}
+.t10-col-info{flex:1;min-width:0}
+.t10-col-conf{text-align:right;flex-shrink:0}
+.t10-player{font-size:17px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t10-sub{font-size:11px;color:var(--mut);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t10-conf-pct{font-size:28px;font-weight:900;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums}
+.t10-tier{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:4px;display:inline-block;margin-top:3px}
 .t10-tier.t-lock{background:rgba(255,215,0,.1);color:#ffd700;border:1px solid rgba(255,215,0,.22)}
-.t10-tier.t-elite{background:rgba(0,255,135,.08);color:var(--accent);border:1px solid rgba(0,255,135,.18)}
+.t10-tier.t-elite{background:rgba(0,232,122,.08);color:var(--accent);border:1px solid rgba(0,232,122,.18)}
 .t10-tier.t-good{background:rgba(127,230,168,.06);color:#7fe6a8;border:1px solid rgba(127,230,168,.18)}
-.t10-player{font-size:18px;font-weight:800;color:var(--text);line-height:1.2}
-.t10-prop{font-size:12px;color:var(--mut);font-weight:600;letter-spacing:.2px}
-.t10-lines{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:2px 0}
-.t10-book-line{font-size:12px;color:var(--mut2);text-decoration:line-through}
-.t10-arrow{font-size:11px;color:var(--mut2)}
-.t10-pd-line{font-size:15px;font-weight:700}
-.t10-pd-line.over{color:var(--accent)}.t10-pd-line.under{color:var(--blue)}
-.t10-conf{font-size:34px;font-weight:900;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
-.t10-conf-lbl{font-size:13px;font-weight:700;color:var(--mut)}
-.t10-analysis{font-size:12.5px;color:#bbb;line-height:1.75;background:#141414;border-radius:10px;padding:13px 15px;border-left:2px solid #1e1e1e}
-.t10-top1 .t10-analysis{border-left-color:rgba(0,255,135,.25)}
-.t10-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
-.t10-parlay-btn{font-size:11px;font-weight:700;color:var(--accent);background:rgba(0,255,135,.07);border:1px solid rgba(0,255,135,.22);border-radius:6px;padding:5px 13px;cursor:pointer;transition:.15s}
-.t10-parlay-btn:hover{background:rgba(0,255,135,.15)}
-.t10-parlay-btn.added{color:var(--mut);border-color:var(--bd2);background:transparent}
-.t10-share-btn{font-size:11px;font-weight:700;color:var(--mut);background:#1a1a1a;border:1px solid #252525;border-radius:6px;padding:5px 13px;cursor:pointer;transition:.15s}
-.t10-share-btn:hover{color:var(--text);background:#222}
+.t10-snap-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0;padding:7px 0;border-top:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a}
+.t10-snap-text{font-size:11px;color:var(--mut);flex:1;min-width:0}
+.t10-line-badge{font-size:12px;font-weight:700;padding:2px 8px;border-radius:5px;background:#1a1a1a;border:1px solid #252525;color:#aaa;flex-shrink:0}
+.t10-line-badge.over{color:var(--accent);border-color:rgba(0,232,122,.25);background:rgba(0,232,122,.05)}
+.t10-line-badge.under{color:#4299ff;border-color:rgba(66,153,255,.25);background:rgba(66,153,255,.05)}
+.t10-sport{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;padding:2px 7px;border-radius:4px;flex-shrink:0}
+.t10-sport-mlb{background:rgba(255,115,30,.1);color:#ff7820;border:1px solid rgba(255,115,30,.2)}
+.t10-sport-nba{background:rgba(66,153,255,.1);color:#4299ff;border:1px solid rgba(66,153,255,.2)}
+.t10-sport-nhl{background:rgba(0,195,175,.1);color:#00c3af;border:1px solid rgba(0,195,175,.2)}
+.t10-sport-nfl{background:rgba(0,200,90,.1);color:#00c85a;border:1px solid rgba(0,200,90,.2)}
+.t10-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;padding-top:4px}
+.t10-why-btn{font-size:11px;font-weight:600;color:var(--mut);background:none;border:none;cursor:pointer;padding:2px 0;transition:.1s}
+.t10-why-btn:hover{color:var(--text)}
+.t10-foot-btns{display:flex;gap:14px}
+.t10-parlay-btn{font-size:11px;font-weight:700;color:var(--mut);background:none;border:none;cursor:pointer;padding:2px 0;transition:.1s}
+.t10-parlay-btn:hover{color:var(--accent)}
+.t10-parlay-btn.added{color:var(--mut2)}
+.t10-share-btn{font-size:11px;font-weight:700;color:var(--mut);background:none;border:none;cursor:pointer;padding:2px 0;transition:.1s}
+.t10-share-btn:hover{color:var(--text)}
+.t10-analysis{font-size:12px;color:#999;line-height:1.7;padding:10px 0 2px;border-top:1px solid #1a1a1a;margin-top:8px}
+.t10-hidden{display:none}
 
 /* MOBILE BOTTOM NAV */
 .botnav{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:70;display:none;align-items:stretch}
@@ -629,16 +654,17 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   <!-- TOP 10 TODAY PAGE -->
   <div class="page" id="page-top10">
     <div class="t10-hdr">
-      <div>
-        <h2>Top 10 Today<span class="t10-date" id="t10Date"></span></h2>
-        <div class="t10-summary" id="t10Summary">Pick a sport and game to rank today's top props.</div>
+      <div class="t10-hdr-left">
+        <h2 class="t10-title">Top 10 Today<span class="t10-date" id="t10Date"></span></h2>
+        <div class="t10-stat-bar" id="t10Summary"></div>
       </div>
-      <button class="btn" id="t10RefreshBtn">Refresh</button>
+      <div class="t10-hdr-right">
+        <button class="t10-copy-btn" id="t10CopyAll" style="display:none">Copy All ↗</button>
+        <button class="t10-refresh-btn" id="t10RefreshBtn">⟳</button>
+      </div>
     </div>
-    <div class="lbl">Sport</div>
     <div class="tabrow" id="t10SportTabs"></div>
-    <div class="lbl">Game</div>
-    <div class="games" id="t10GamesRow"><div class="empty" style="padding:18px">Select a sport above.</div></div>
+    <div class="t10-chips" id="t10GamesRow"><div class="empty" style="padding:10px 4px">Select a sport above.</div></div>
     <div id="t10Mount"></div>
   </div>
 
@@ -4488,29 +4514,123 @@ function buildTop10ShareItem(rank,p,mktName,sportKey){
   return "#"+rank+" "+emoji+" ["+sp+"] "+p.player+" "+mktName+" "+fmtLine(line,side)+" ("+conf+"%)";
 }
 
+var TEAM_ABBR={
+  "Arizona Diamondbacks":"ARI","Atlanta Braves":"ATL","Baltimore Orioles":"BAL",
+  "Boston Red Sox":"BOS","Chicago Cubs":"CHC","Chicago White Sox":"CWS",
+  "Cincinnati Reds":"CIN","Cleveland Guardians":"CLE","Colorado Rockies":"COL",
+  "Detroit Tigers":"DET","Houston Astros":"HOU","Kansas City Royals":"KC",
+  "Los Angeles Angels":"LAA","Los Angeles Dodgers":"LAD","Miami Marlins":"MIA",
+  "Milwaukee Brewers":"MIL","Minnesota Twins":"MIN","New York Mets":"NYM",
+  "New York Yankees":"NYY","Oakland Athletics":"OAK","Philadelphia Phillies":"PHI",
+  "Pittsburgh Pirates":"PIT","San Diego Padres":"SD","San Francisco Giants":"SF",
+  "Seattle Mariners":"SEA","St. Louis Cardinals":"STL","Tampa Bay Rays":"TB",
+  "Texas Rangers":"TEX","Toronto Blue Jays":"TOR","Washington Nationals":"WSH","Athletics":"OAK",
+  "Atlanta Hawks":"ATL","Boston Celtics":"BOS","Brooklyn Nets":"BKN",
+  "Charlotte Hornets":"CHA","Chicago Bulls":"CHI","Cleveland Cavaliers":"CLE",
+  "Dallas Mavericks":"DAL","Denver Nuggets":"DEN","Detroit Pistons":"DET",
+  "Golden State Warriors":"GSW","Houston Rockets":"HOU","Indiana Pacers":"IND",
+  "Los Angeles Clippers":"LAC","Los Angeles Lakers":"LAL","Memphis Grizzlies":"MEM",
+  "Miami Heat":"MIA","Milwaukee Bucks":"MIL","Minnesota Timberwolves":"MIN",
+  "New Orleans Pelicans":"NOP","New York Knicks":"NYK","Oklahoma City Thunder":"OKC",
+  "Orlando Magic":"ORL","Philadelphia 76ers":"PHI","Phoenix Suns":"PHX",
+  "Portland Trail Blazers":"POR","Sacramento Kings":"SAC","San Antonio Spurs":"SAS",
+  "Toronto Raptors":"TOR","Utah Jazz":"UTA","Washington Wizards":"WAS",
+  "Anaheim Ducks":"ANA","Boston Bruins":"BOS","Buffalo Sabres":"BUF",
+  "Calgary Flames":"CGY","Carolina Hurricanes":"CAR","Chicago Blackhawks":"CHI",
+  "Colorado Avalanche":"COL","Columbus Blue Jackets":"CBJ","Dallas Stars":"DAL",
+  "Edmonton Oilers":"EDM","Florida Panthers":"FLA","Las Vegas Golden Knights":"VGK",
+  "Los Angeles Kings":"LAK","Minnesota Wild":"MIN","Montreal Canadiens":"MTL",
+  "Nashville Predators":"NSH","New Jersey Devils":"NJD","New York Islanders":"NYI",
+  "New York Rangers":"NYR","Ottawa Senators":"OTT","San Jose Sharks":"SJS",
+  "Seattle Kraken":"SEA","St. Louis Blues":"STL","Tampa Bay Lightning":"TBL",
+  "Toronto Maple Leafs":"TOR","Utah Hockey Club":"UHC","Vancouver Canucks":"VAN",
+  "Washington Capitals":"WSH","Winnipeg Jets":"WPG",
+  "Arizona Cardinals":"ARI","Atlanta Falcons":"ATL","Baltimore Ravens":"BAL",
+  "Buffalo Bills":"BUF","Carolina Panthers":"CAR","Chicago Bears":"CHI",
+  "Cincinnati Bengals":"CIN","Cleveland Browns":"CLE","Dallas Cowboys":"DAL",
+  "Denver Broncos":"DEN","Detroit Lions":"DET","Green Bay Packers":"GB",
+  "Houston Texans":"HOU","Indianapolis Colts":"IND","Jacksonville Jaguars":"JAX",
+  "Kansas City Chiefs":"KC","Las Vegas Raiders":"LV","Los Angeles Chargers":"LAC",
+  "Los Angeles Rams":"LAR","Miami Dolphins":"MIA","Minnesota Vikings":"MIN",
+  "New England Patriots":"NE","New Orleans Saints":"NO","New York Giants":"NYG",
+  "New York Jets":"NYJ","Philadelphia Eagles":"PHI","Pittsburgh Steelers":"PIT",
+  "San Francisco 49ers":"SF","Seattle Seahawks":"SEA","Tampa Bay Buccaneers":"TB",
+  "Tennessee Titans":"TEN","Washington Commanders":"WAS"
+};
+function teamAbbr(n){
+  if(TEAM_ABBR[n]) return TEAM_ABBR[n];
+  var w=n.trim().split(/\s+/);
+  if(w.length===1) return n.slice(0,3).toUpperCase();
+  return (w[0].slice(0,1)+w[w.length-1].slice(0,2)).toUpperCase();
+}
+function buildT10SnapLine(p,mktName){
+  var parts=[];
+  var line=p.pdLine!=null?p.pdLine:p.bestLine;
+  var side=p.pdSide||"Over";
+  var isO=side==="Over";
+  var vals=p._vals||[];
+  var l5=vals.slice(0,5);
+  if(l5.length){
+    var sum=l5.reduce(function(a,v){return a+v;},0);
+    parts.push((sum/l5.length).toFixed(1)+" "+mktName.toLowerCase()+"/game");
+  } else if(p.seasonAvgEnrich!=null){
+    parts.push(p.seasonAvgEnrich.toFixed(1)+" avg/game");
+  }
+  if(l5.length>=3&&line!=null){
+    var hits=l5.filter(function(v){return isO?v>line:v<line;}).length;
+    parts.push(hits+"-of-"+l5.length+" L5");
+  }
+  var conf=getEffectiveConf(p);
+  parts.push(confTierOf(conf).t);
+  return parts.join(" · ");
+}
+
 function renderTop10(picks){
   var mount=$("t10Mount"); if(!mount) return;
   var dateEl=$("t10Date");
   if(dateEl) dateEl.textContent=" — "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"});
   var sumEl=$("t10Summary");
+  var copyBtn=$("t10CopyAll");
   if(!picks.length){
     mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🏆</div><p>Not enough qualifying props found today (55%+ confidence required).</p></div>';
-    if(sumEl) sumEl.textContent="Best props across all sports, ranked by confidence.";
+    if(sumEl) sumEl.innerHTML="";
+    if(copyBtn) copyBtn.style.display="none";
     return;
   }
   var lockCt=picks.filter(function(p){return getEffectiveConf(p)>=72;}).length;
   var eliteCt=picks.filter(function(p){var c=getEffectiveConf(p);return c>=67&&c<72;}).length;
-  if(sumEl) sumEl.textContent=picks.length+" props ranked today — "+lockCt+" LOCK"+(lockCt!==1?"s":"")+", "+eliteCt+" ELITE";
+  var goodCt=picks.length-lockCt-eliteCt;
+  if(sumEl){
+    var pills="";
+    if(lockCt) pills+='<span class="t10-stat-pill t10-sp-lock">'+lockCt+' LOCK</span>';
+    if(eliteCt) pills+='<span class="t10-stat-pill t10-sp-elite">'+eliteCt+' ELITE</span>';
+    if(goodCt) pills+='<span class="t10-stat-pill t10-sp-good">'+goodCt+' STRONG</span>';
+    sumEl.innerHTML=pills;
+  }
+  if(copyBtn){
+    copyBtn.style.display="";
+    copyBtn.onclick=function(){
+      var lines=["🏆 PropDesk Top 10 Props — "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}),""];
+      picks.forEach(function(p,i){
+        var sk=p._sport||"";
+        var ma=MARKETS[sk]||[];
+        var md=null; for(var x=0;x<ma.length;x++){if(ma[x].k===(p._market||"")){md=ma[x];break;}}
+        lines.push(buildTop10ShareItem(i+1,p,md?md.n:(p._market||"").replace(/_/g," "),sk));
+      });
+      lines.push("","📊 PropDesk.app");
+      copyText(lines.join("\n")); toast("All picks copied!");
+    };
+  }
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
-  var html='<button class="btn btn-accent" id="t10CopyAll" style="width:100%;padding:11px;margin-bottom:16px">Copy All Picks ↗</button>';
+  var html="";
   picks.forEach(function(p,i){
-    var rank=i+1;
     var conf=getEffectiveConf(p);
     var tier=confTierOf(conf);
     var sportKey=p._sport||"";
     var sportLabel=spLbls[sportKey]||sportKey.toUpperCase();
     var sportCls="t10-sport-"+sportLabel.toLowerCase();
     var tierCls="t-"+tier.t.toLowerCase();
+    var cardCls="tc-"+tier.t.toLowerCase();
     var mktArr=MARKETS[sportKey]||[];
     var mktDef=null;
     for(var mi=0;mi<mktArr.length;mi++){if(mktArr[mi].k===(p._market||"")){mktDef=mktArr[mi];break;}}
@@ -4519,45 +4639,50 @@ function renderTop10(picks){
     var pdLine=p.pdLine!=null?p.pdLine:p.bestLine;
     var differ=pdLine!=null&&p.bestLine!=null&&Math.abs(pdLine-p.bestLine)>=0.5;
     var lineCls=side==="Over"?"over":"under";
-    var linesHtml=differ?
-      '<div class="t10-lines"><span class="t10-book-line">'+fmtLine(p.bestLine,"Over")+'</span><span class="t10-arrow">→</span><span class="t10-pd-line '+lineCls+'">'+fmtLine(pdLine,side)+'</span></div>':
-      '<div class="t10-lines"><span class="t10-pd-line '+lineCls+'">'+fmtLine(pdLine||p.bestLine,side)+'</span></div>';
+    var lineHtml=differ?
+      '<span class="t10-line-badge" style="text-decoration:line-through;opacity:.45">'+esc(fmtLine(p.bestLine,"Over"))+'</span><span style="color:var(--mut2);font-size:10px;margin:0 2px">→</span><span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine,side))+'</span>':
+      '<span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine||p.bestLine,side))+'</span>';
+    var snap=buildT10SnapLine(p,mktName);
     var analysis=buildTop10Analysis(p,mktName);
-    html+='<div class="t10-card'+(rank===1?" t10-top1":"")+'">'+
-      '<div class="t10-rank">'+rank+'</div>'+
-      '<div class="t10-content">'+
-        '<div class="t10-badges">'+
+    var gameShort=p._game||"";
+    var subLine=esc(mktName)+(gameShort?' <span style="color:var(--mut2)">&middot; '+esc(gameShort)+'</span>':'');
+    html+=
+      '<div class="t10-card '+cardCls+'">'+
+        '<div class="t10-row-top">'+
+          '<div class="t10-col-info">'+
+            '<div class="t10-player">'+esc(p.player)+'</div>'+
+            '<div class="t10-sub">'+subLine+'</div>'+
+          '</div>'+
+          '<div class="t10-col-conf">'+
+            '<div class="t10-conf-pct">'+conf+'%</div>'+
+            '<span class="t10-tier '+tierCls+'">'+tier.t+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="t10-snap-row">'+
+          '<span class="t10-snap-text">'+esc(snap)+'</span>'+
+          lineHtml+
           '<span class="t10-sport '+sportCls+'">'+sportLabel+'</span>'+
-          '<span class="t10-tier '+tierCls+'">'+tier.t+'</span>'+
         '</div>'+
-        '<div class="t10-player">'+esc(p.player)+'</div>'+
-        '<div class="t10-prop">'+esc(mktName)+(p._game?'<span style="color:var(--mut2);font-weight:400"> &middot; '+esc(p._game)+'</span>':'')+'</div>'+
-        linesHtml+
-        '<div style="display:flex;align-items:baseline;gap:6px">'+
-          '<div class="t10-conf">'+conf+'%</div>'+
-          '<div class="t10-conf-lbl">confidence</div>'+
+        '<div class="t10-foot">'+
+          '<button class="t10-why-btn" data-t10why="'+i+'">Why? &#9656;</button>'+
+          '<div class="t10-foot-btns">'+
+            '<button class="t10-parlay-btn" data-t10add="'+i+'">+ Parlay</button>'+
+            '<button class="t10-share-btn" data-t10share="'+i+'">Share ↗</button>'+
+          '</div>'+
         '</div>'+
-        '<div class="t10-analysis">'+esc(analysis)+'</div>'+
-        '<div class="t10-actions">'+
-          '<button class="t10-parlay-btn" data-t10add="'+i+'">+ Add to Parlay</button>'+
-          '<button class="t10-share-btn" data-t10share="'+i+'">Share ↗</button>'+
-        '</div>'+
-      '</div>'+
-    '</div>';
+        '<div class="t10-analysis t10-hidden" id="t10why-'+i+'">'+esc(analysis)+'</div>'+
+      '</div>';
   });
   mount.innerHTML=html;
-  var copyBtn=$("t10CopyAll");
-  if(copyBtn) copyBtn.onclick=function(){
-    var lines=["🏆 PropDesk Top 10 Props — "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}),""];
-    picks.forEach(function(p,i){
-      var sk=p._sport||"";
-      var ma=MARKETS[sk]||[];
-      var md=null; for(var x=0;x<ma.length;x++){if(ma[x].k===(p._market||"")){md=ma[x];break;}}
-      lines.push(buildTop10ShareItem(i+1,p,md?md.n:(p._market||"").replace(/_/g," "),sk));
-    });
-    lines.push("","📊 PropDesk.app");
-    copyText(lines.join("\n")); toast("All picks copied!");
-  };
+  mount.querySelectorAll("[data-t10why]").forEach(function(btn){
+    btn.onclick=function(){
+      var idx=btn.getAttribute("data-t10why");
+      var analysisEl=document.getElementById("t10why-"+idx);
+      if(!analysisEl) return;
+      var nowHidden=analysisEl.classList.toggle("t10-hidden");
+      btn.innerHTML=nowHidden?"Why? &#9656;":"Why? &#9662;";
+    };
+  });
   mount.querySelectorAll("[data-t10add]").forEach(function(btn){
     btn.onclick=function(){
       var idx=parseInt(btn.getAttribute("data-t10add"),10);
@@ -4593,7 +4718,7 @@ function t10RenderSportTabs(){
       t10RenderSportTabs();
       t10RenderGamesRow();
       var m=$("t10Mount"); if(m) m.innerHTML="";
-      var s=$("t10Summary"); if(s) s.textContent="Pick a game to rank today's top props.";
+      var s=$("t10Summary"); if(s) s.innerHTML="";
       t10LoadSport();
     };
     c.appendChild(b);
@@ -4604,13 +4729,15 @@ function t10RenderGamesRow(){
   var c=$("t10GamesRow"); if(!c) return;
   c.innerHTML="";
   if(!_t10Events.length){
-    c.innerHTML='<div class="empty" style="padding:18px">No games today for this sport.</div>'; return;
+    c.innerHTML='<div class="empty" style="padding:10px 4px">No games today for this sport.</div>'; return;
   }
   _t10Events.forEach(function(ev){
     var dt=new Date(ev.commence_time);
-    var when=dt.toLocaleDateString([],{month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
-    var b=el("button","game"+(ev.id===_t10EventId?" active":""));
-    b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
+    var timeStr=dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+    var away=teamAbbr(ev.away_team);
+    var home=teamAbbr(ev.home_team);
+    var b=el("button","t10-chip"+(ev.id===_t10EventId?" active":""));
+    b.innerHTML='<span class="t10-chip-teams">'+esc(away)+' @ '+esc(home)+'</span><span class="t10-chip-time">'+esc(timeStr)+'</span>';
     b.onclick=function(){ _t10EventId=ev.id; t10RenderGamesRow(); t10LoadGame(); };
     c.appendChild(b);
   });
