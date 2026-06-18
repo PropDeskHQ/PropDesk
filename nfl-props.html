@@ -370,6 +370,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tc-live{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;padding:2px 7px;border-radius:4px;color:var(--accent);background:rgba(0,255,135,.08);border:1px solid rgba(0,255,135,.18);animation:livepulse 2.5s ease-in-out infinite}
 @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.5}}
 .tc-player{font-size:17px;font-weight:800;color:var(--text);line-height:1.4;margin-bottom:8px}
+.tc-system-name{font-size:11px;font-weight:800;letter-spacing:.3px;color:var(--accent);text-transform:uppercase;margin-bottom:6px}
 .tc-record{font-size:12px;font-weight:700;color:var(--mut);letter-spacing:.3px;text-transform:uppercase;font-variant-numeric:tabular-nums;line-height:1;margin-bottom:8px}
 /* Hit rate progress bar — clean, no squares */
 .tc-hitbar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
@@ -393,8 +394,6 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .pill[data-tooltip]::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);background:#1a1a1a;color:#e0e0e0;font-size:11px;font-weight:400;line-height:1.5;padding:7px 11px;border-radius:7px;width:210px;text-align:left;pointer-events:none;opacity:0;transition:opacity .18s;border:1px solid #2e2e2e;z-index:200;white-space:normal;box-shadow:0 4px 16px rgba(0,0,0,.5)}
 .pill[data-tooltip]:hover::after{opacity:1}
 /* Trends filter rows */
-#trendsGameChips{margin-bottom:12px}
-#trendsPropTabs{gap:5px;flex-wrap:wrap;margin-bottom:10px}
 .tc-spark{width:100%;height:50px;display:block;margin:10px 0 8px}
 .tc-streak-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(0,232,122,.12);color:var(--accent);border:1px solid rgba(0,232,122,.2);letter-spacing:.3px}
 /* TREND DETAIL PANEL */
@@ -519,6 +518,32 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   .filterbar input.search{width:100%}
   .card .pname{font-size:19px}
 }
+
+/* MONEYLINE in PROPS TAB */
+.ml-board-card{background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:16px 18px 12px;margin-bottom:14px}
+.ml-board-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.ml-board-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:#111;margin:0 0 14px}
+.ml-board-bar-a{background:var(--blue);transition:width .5s}
+.ml-board-bar-h{background:var(--accent);transition:width .5s}
+.ml-board-row{display:flex;align-items:center;gap:10px;padding:12px 0}
+.ml-board-row+.ml-board-row{border-top:1px solid #111}
+.ml-board-badge{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:3px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.ml-board-badge-a{background:rgba(66,153,255,.15);color:var(--blue)}
+.ml-board-badge-h{background:rgba(0,255,135,.1);color:var(--accent)}
+.ml-board-team{font-size:14px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ml-board-rec{font-size:11px;color:var(--mut);font-weight:600;flex-shrink:0}
+.ml-board-stats{display:flex;gap:14px;flex-shrink:0;align-items:center}
+.ml-board-stat{display:flex;flex-direction:column;align-items:flex-end}
+.ml-board-stat-lbl{font-size:9px;color:var(--mut2);font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.ml-board-stat-val{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
+.ml-board-edge-pos{color:var(--accent)}
+.ml-board-edge-neg{color:var(--blue)}
+.ml-board-tier{font-size:9px;font-weight:800;letter-spacing:.5px;padding:3px 8px;border-radius:4px;text-transform:uppercase;white-space:nowrap;margin-left:auto}
+.ml-board-tier-lock{background:rgba(255,215,0,.12);color:#ffd700;border:1px solid rgba(255,215,0,.25)}
+.ml-board-tier-elite{background:rgba(0,255,135,.1);color:var(--accent);border:1px solid rgba(0,255,135,.2)}
+.ml-board-tier-strong{background:rgba(127,230,168,.08);color:#7fe6a8;border:1px solid rgba(127,230,168,.2)}
+.ml-board-disc{font-size:10px;color:var(--mut2);line-height:1.4;text-align:center;margin-top:12px;font-style:italic}
+@media(max-width:480px){.ml-board-stats{gap:8px}.ml-board-stat-val{font-size:12px}.ml-board-rec{display:none}}
 </style>
 </head>
 <body>
@@ -646,14 +671,14 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     </div>
     <div class="lbl">Sport</div>
     <div class="tabrow" id="trendsSportTabs"></div>
-    <div class="t10-chips" id="trendsGameChips" style="display:none"></div>
-    <div class="tabrow" id="trendsPropTabs" style="display:none"></div>
     <div class="trend-tabs" id="trendTabs">
       <button class="pill active" data-ttype="all" data-tooltip="Shows every trend type across all categories">All Trends</button>
       <button class="pill" data-ttype="streak" data-tooltip="Players hitting their line in 3+ consecutive games — active hot streaks">Streaks</button>
       <button class="pill" data-ttype="linevalue" data-tooltip="Props where the book line is set significantly above or below the player's recent average — creating an exploitable gap">Line Value</button>
       <button class="pill" data-ttype="movement" data-tooltip="Props where significant line movement or book disagreement signals professional betting activity">Sharp Money</button>
       <button class="pill" data-ttype="totals" data-tooltip="Team over/under trends — games going over or under the total at an unusually high rate">Totals</button>
+      <button class="pill" data-ttype="matchup" data-tooltip="MLB players combining real handedness + batting-order matchup data — at least 2 conditions, real boxscore history only">Matchups</button>
+      <button class="pill" data-ttype="teamsit" data-tooltip="MLB team systems combining rest days, opponent rank, and home/road splits against real final scores">Team Systems</button>
     </div>
     <div id="trendsMount">
       <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a sport above to see trends.</p></div>
@@ -676,6 +701,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     <div class="t10-chips" id="t10GamesRow"><div class="empty" style="padding:10px 4px">Select a sport above.</div></div>
     <div id="t10Mount"></div>
   </div>
+
 
   <!-- DISCLAIMER -->
   <div class="page" id="page-disclaimer">
@@ -752,7 +778,7 @@ var MARKETS = {
     {k:"player_receptions",n:"Receptions"},{k:"player_reception_yds",n:"Receiving Yards"},
     {k:"player_anytime_td",n:"Anytime TD"},{k:"player_first_td",n:"First TD"},
     {k:"player_kicking_points",n:"Kicking Points"},{k:"player_sacks",n:"Sacks"},
-    {k:"player_tackles_assists",n:"Tackles + Assists"}
+    {k:"player_tackles_assists",n:"Tackles + Assists"},{k:"_h2h",n:"Moneyline"}
   ],
   basketball_nba:[
     {k:"player_points",n:"Points"},{k:"player_rebounds",n:"Rebounds"},
@@ -760,13 +786,13 @@ var MARKETS = {
     {k:"player_blocks",n:"Blocks"},{k:"player_steals",n:"Steals"},
     {k:"player_turnovers",n:"Turnovers"},{k:"player_points_rebounds_assists",n:"Pts+Reb+Ast"},
     {k:"player_points_rebounds",n:"Pts+Reb"},{k:"player_points_assists",n:"Pts+Ast"},
-    {k:"player_rebounds_assists",n:"Reb+Ast"},{k:"player_first_basket",n:"First Basket"}
+    {k:"player_rebounds_assists",n:"Reb+Ast"},{k:"player_first_basket",n:"First Basket"},{k:"_h2h",n:"Moneyline"}
   ],
   icehockey_nhl:[
     {k:"player_points",n:"Points"},{k:"player_goals",n:"Goals"},
     {k:"player_assists",n:"Assists"},{k:"player_shots_on_goal",n:"Shots on Goal"},
     {k:"player_saves",n:"Saves"},{k:"player_anytime_goalscorer",n:"Anytime Goal"},
-    {k:"player_first_goalscorer",n:"First Goal"}
+    {k:"player_first_goalscorer",n:"First Goal"},{k:"_h2h",n:"Moneyline"}
   ],
   baseball_mlb:[
     {k:"batter_hits",n:"Hits"},{k:"batter_total_bases",n:"Total Bases"},
@@ -774,7 +800,7 @@ var MARKETS = {
     {k:"batter_runs_scored",n:"Runs"},{k:"batter_hits_runs_rbis",n:"H+R+RBI"},
     {k:"batter_strikeouts",n:"Batter Ks"},{k:"pitcher_strikeouts",n:"Pitcher Ks"},
     {k:"pitcher_hits_allowed",n:"Hits Allowed"},{k:"pitcher_earned_runs",n:"Earned Runs"},
-    {k:"pitcher_outs",n:"Outs"},{k:"pitcher_walks",n:"Walks"}
+    {k:"pitcher_outs",n:"Outs"},{k:"pitcher_walks",n:"Walks"},{k:"_h2h",n:"Moneyline"}
   ]
 };
 
@@ -880,6 +906,89 @@ function fmtLine(line, side){
   return s+" "+line;
 }
 function isThreshProp(p){ return !!(p._market && (THRESHOLD_MARKETS[ST.sport]||{})[p._market]); }
+
+/* ============ MLB TEAM SITUATIONAL DATA (real history, no fabricated odds) ============ */
+var _mlbTeamsCache=null;
+async function mlbTeamId(name){
+  if(!name) return null;
+  if(!_mlbTeamsCache){
+    try{
+      var r=await fetch("https://statsapi.mlb.com/api/v1/teams?sportId=1",{signal:AbortSignal.timeout(8000)});
+      _mlbTeamsCache=r.ok?((await r.json()).teams||[]):[];
+    }catch(e){ _mlbTeamsCache=[]; }
+  }
+  var clean=name.toLowerCase().trim();
+  var hits=_mlbTeamsCache.filter(function(t){
+    return (t.name||"").toLowerCase()===clean || (t.teamName||"").toLowerCase()===clean ||
+      (t.clubName||"").toLowerCase()===clean || clean.indexOf((t.teamName||"").toLowerCase())>=0;
+  });
+  return hits.length?hits[0].id:null;
+}
+// Division rank + win% — cached once per day, shared across every team trend lookup that day
+var _standingsCache=null;
+async function mlbStandingsRank(teamId){
+  if(!teamId) return null;
+  if(!_standingsCache){
+    try{
+      var yr=new Date().getFullYear();
+      var r=await fetch("https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season="+yr,{signal:AbortSignal.timeout(8000)});
+      var map={};
+      if(r.ok){
+        var d=await r.json();
+        (d.records||[]).forEach(function(rec){
+          (rec.teamRecords||[]).forEach(function(tr){
+            if(tr.team&&tr.team.id!=null){
+              map[tr.team.id]={divisionRank:parseInt(tr.divisionRank,10)||null,
+                winPct:tr.winningPercentage!=null?parseFloat(tr.winningPercentage):null};
+            }
+          });
+        });
+      }
+      _standingsCache=map;
+    }catch(e){ _standingsCache={}; }
+  }
+  return _standingsCache[teamId]||null;
+}
+// Real completed-game results for a team — used for rest days (date gaps) and actual
+// combined-score outcomes. Never fabricates a historical line; only real final scores.
+var _teamGamesCache={};
+async function mlbTeamRecentGames(teamId,n){
+  if(!teamId) return [];
+  var ckey=teamId+"|"+new Date().toISOString().slice(0,10);
+  if(_teamGamesCache[ckey]!==undefined) return _teamGamesCache[ckey];
+  var result=[];
+  try{
+    var yr=new Date().getFullYear();
+    var today=new Date().toISOString().slice(0,10);
+    var start=new Date(Date.now()-50*864e5).toISOString().slice(0,10);
+    var r=await fetch("https://statsapi.mlb.com/api/v1/schedule?teamId="+teamId+"&season="+yr+"&gameType=R&sportId=1&startDate="+start+"&endDate="+today,{signal:AbortSignal.timeout(8000)});
+    if(r.ok){
+      var d=await r.json();
+      var games=[];
+      (d.dates||[]).forEach(function(day){
+        (day.games||[]).forEach(function(g){
+          if(g.status&&g.status.detailedState==="Final"&&g.teams){
+            var isHome=g.teams.home.team&&g.teams.home.team.id===teamId;
+            var us=isHome?g.teams.home:g.teams.away;
+            var opp=isHome?g.teams.away:g.teams.home;
+            games.push({
+              date:g.gameDate?g.gameDate.slice(0,10):"",
+              isHome:isHome,
+              opponentId:opp.team?opp.team.id:null,
+              opponentName:opp.team?opp.team.name:"",
+              runsFor:us.score!=null?us.score:null,
+              runsAgainst:opp.score!=null?opp.score:null
+            });
+          }
+        });
+      });
+      games.sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
+      result=games.slice(0,n||15);
+    }
+  }catch(e){}
+  _teamGamesCache[ckey]=result;
+  return result;
+}
 
 // Fetch opposing team's K% (strikeout rate as a batting team) from MLB Stats API
 // Cached by normalized team name; returns fraction 0-1 or null if unavailable
@@ -1013,10 +1122,11 @@ function tierOf(s){
 }
 // Confidence-based tier (used after phase-2 enrichment to display X%)
 function confTierOf(pct){ // pct is 0-100
-  if(pct>=72) return {c:"t-lock",  t:"LOCK"};
-  if(pct>=67) return {c:"t-elite", t:"ELITE"};
-  if(pct>=62) return {c:"t-good",  t:"GOOD"};
-  return       {c:"t-pass",  t:"···"};
+  if(pct>=80) return {c:"t-lock",   t:"LOCK"};
+  if(pct>=72) return {c:"t-elite",  t:"ELITE"};
+  if(pct>=65) return {c:"t-strong", t:"STRONG"};
+  if(pct>=58) return {c:"t-good",   t:"GOOD"};
+  return       {c:"t-pass",   t:"···"};
 }
 function sportLabel(k){ for(var i=0;i<SPORTS.length;i++) if(SPORTS[i].key===k) return SPORTS[i].label; return k; }
 function marketName(k){
@@ -1227,7 +1337,7 @@ function computeBestBet(p,marketKey){
    ═══════════════════════════════════════════════════════════════════════ */
 
 // Weighted composite confidence player hits the prop at a given line
-// L5=40% (recent form), L10=30% (medium trend), season=30% (baseline)
+// L5=60% (recent form dominates), L10=25% (medium trend), season=15% (baseline)
 // isOver=true → "hit" means val > line; isOver=false → val < line
 function compositeConf(vals, line, isOver){
   if(!vals||vals.length<3) return null;
@@ -1236,13 +1346,16 @@ function compositeConf(vals, line, isOver){
     if(!sl.length) return null;
     return sl.filter(function(v){ return isOver?v>line:v<line; }).length/sl.length;
   }
-  var r5=vals.length>=3?sliceHR(5):null;   // L5 recent form  (40%)
-  var r10=vals.length>=7?sliceHR(10):null; // L10 trend       (30%)
-  var rAll=sliceHR(vals.length);           // season baseline (30%)
-  var w5=r5!=null?0.40:0, w10=r10!=null?0.30:0, wA=0.30;
+  var r5=vals.length>=3?sliceHR(5):null;   // L5 recent form  (60%)
+  var r10=vals.length>=7?sliceHR(10):null; // L10 trend       (25%)
+  var rAll=sliceHR(vals.length);           // season baseline (15%)
+  var w5=r5!=null?0.60:0, w10=r10!=null?0.25:0, wA=0.15;
   var tot=w5+w10+wA;
   if(!tot) return null;
-  return ((r5||0)*w5+(r10||0)*w10+(rAll||0)*wA)/tot;
+  var composite=((r5||0)*w5+(r10||0)*w10+(rAll||0)*wA)/tot;
+  // High-variance penalty: L5 and season diverging by >20% signals instability
+  if(r5!=null&&rAll!=null&&Math.abs(r5-rAll)>0.20) composite=composite*0.93;
+  return composite;
 }
 
 // Find PropDesk Line: always seek a line different from the book line.
@@ -1328,6 +1441,11 @@ async function enrichWithConfidence(p){
     p._vals=vals;
     p._dates=gl.dates||[];
     if(gl.avgMins!=null) p.avgMins=gl.avgMins;
+    // Free per-game context from the MLB gameLog response — used by matchup/situational trends
+    p._gamePks=gl.gamePks||[];
+    p._isHomeArr=gl.isHomeArr||[];
+    p._opponents=gl.opponents||[];
+    p._playerId=gl.playerId||null;
 
     if(vals.length<10&&p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
@@ -1514,6 +1632,18 @@ async function enrichWithConfidence(p){
       p.pdResult.confidence=p.pdConfidence;
       p.hitRate14=+(p.pdConfidence*100).toFixed(1);
       p.value=Math.round(p.pdConfidence*100);
+    }
+    // LOCK gate: requires 4 of last 5 games hitting at the PropDesk line
+    if(p.pdConfidence!=null&&vals&&Math.round(p.pdConfidence*100)>=80){
+      var _l5s=vals.slice(0,Math.min(5,vals.length));
+      var _l5hits=_l5s.filter(function(v){return p.pdSide==="Over"?v>p.pdLine:v<p.pdLine;}).length;
+      if(_l5hits<4){
+        p.pdConfidence=Math.min(p.pdConfidence,0.799);
+        if(p.pdResult) p.pdResult.confidence=p.pdConfidence;
+        p.hitRate14=+(p.pdConfidence*100).toFixed(1);
+        p.value=Math.round(p.pdConfidence*100);
+        if(p.guardrailFlags.indexOf("L5_LOCK_FAIL")<0) p.guardrailFlags.push("L5_LOCK_FAIL");
+      }
     }
 
     updatePropValueDisplay(p);
@@ -1713,6 +1843,7 @@ function skeletonTable(){
 
 async function loadBoard(){
   if(!ST.eventId || !ST.market) return;
+  if(ST.market==="_h2h"){loadMoneylineBoard();return;}
   if(!getKey()){ toast("Connect your API key first"); return; }
   destroyCharts();
   $("tableMount").innerHTML=skeletonTable();
@@ -1766,7 +1897,7 @@ async function loadPropOfDay(){
     '<span class="market">Scanning all markets...</span></div>'+
     '<div class="pname" style="color:#555;font-weight:400">Finding the best prop across every market for this game</div></div>';
 
-  var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;});
+  var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;}).filter(function(k){return k!=="_h2h";});
   var bestProp=null, bestScore=-1, bestMkt=null;
   // Alt pool: ALL phase-1 candidates ≥44 — we'll enrich the top 5 unique players
   // and pick the best enriched result. Enriching only 1 misses better props because
@@ -2728,10 +2859,25 @@ async function getGameLog(name){
   var ckey=ST.sport+"|"+ST.market+"|"+name;
   var cached=_cacheGet(_glCache,ckey);
   if(cached!==undefined) return cached;
-  var meta=await getMeta(name);
-  if(!meta||!meta.id){ _cacheSet(_glCache,ckey,null); return null; }
   var result=null;
-  try{ result=ST.sport==="baseball_mlb"?await mlbGameLog(meta.id):await espnGameLog(meta.id); }catch(e){}
+  if(ST.sport==="baseball_mlb"){
+    var meta=await getMeta(name);
+    if(!meta||!meta.id){ _cacheSet(_glCache,ckey,null); return null; }
+    try{ result=await mlbGameLog(meta.id); }catch(e){}
+  } else if(ST.sport==="icehockey_nhl"){
+    // NHL official API gives reliable game log data; ESPN unreliable for NHL
+    var nhlId=await nhlSearch(name);
+    if(nhlId){ try{ result=await nhlGameLog(nhlId); }catch(e){} }
+    // Fallback to ESPN if NHL API yields nothing
+    if(!result){
+      var _meta=await getMeta(name);
+      if(_meta&&_meta.id){ try{ result=await espnGameLog(_meta.id); }catch(e){} }
+    }
+  } else {
+    var meta=await getMeta(name);
+    if(!meta||!meta.id){ _cacheSet(_glCache,ckey,null); return null; }
+    try{ result=await espnGameLog(meta.id); }catch(e){}
+  }
   _cacheSet(_glCache,ckey,result);
   return result;
 }
@@ -2744,7 +2890,7 @@ async function mlbGameLog(id){
       var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+id+"/stats?stats=gameLog&season="+years[y]+"&group="+group+"&limit=20");
       var d=await r.json();
       if(d.stats && d.stats[0] && d.stats[0].splits && d.stats[0].splits.length){
-        var vals=[],dates=[];
+        var vals=[],dates=[],gamePks=[],isHomeArr=[],opponents=[];
         d.stats[0].splits.slice().reverse().slice(0,15).forEach(function(sp){
           var v=pickStat(sp.stat||{},keys);
           if(v!=null){
@@ -2754,11 +2900,16 @@ async function mlbGameLog(id){
             // Store full ISO "2024-05-15" — new Date() parses it correctly for daysRest.
             // Chart labels format it to "M/D" for display (see drawAnalyzeCharts).
             dates.push(mDate?mDate[1]:"");
+            // gamePk/isHome/opponent already present on every split — free context for matchup trends
+            gamePks.push((sp.game&&sp.game.gamePk)||null);
+            isHomeArr.push(sp.isHome!==false);
+            opponents.push((sp.opponent&&sp.opponent.name)||"");
           }
         });
         if(vals.length){
           var savg=await mlbSeasonAvg(id,group,keys,years[y]);
-          return {values:vals, seasonAvg:savg!=null?savg:avg(vals), dates:dates};
+          return {values:vals, seasonAvg:savg!=null?savg:avg(vals), dates:dates,
+            gamePks:gamePks, isHomeArr:isHomeArr, opponents:opponents, playerId:id};
         }
       }
     }catch(e){}
@@ -2787,6 +2938,60 @@ function pickStat(statObj,keys){
   }
   return null;
 }
+
+/* ============ MLB MATCHUP CONTEXT (boxscore: batting order + opposing starter) ============ */
+var _boxCache={};
+async function mlbBoxscoreContext(gamePk){
+  if(!gamePk) return null;
+  if(_boxCache[gamePk]!==undefined) return _boxCache[gamePk];
+  var result=null;
+  try{
+    var r=await fetch("https://statsapi.mlb.com/api/v1/game/"+gamePk+"/boxscore",{signal:AbortSignal.timeout(7000)});
+    if(r.ok){
+      var d=await r.json();
+      var out={away:null,home:null};
+      ["away","home"].forEach(function(side){
+        var team=d.teams&&d.teams[side];
+        if(!team) return;
+        var starterId=(team.pitchers&&team.pitchers.length)?team.pitchers[0]:null;
+        var orderMap={};
+        var players=team.players||{};
+        for(var pid in players){
+          var pl=players[pid];
+          if(pl&&pl.battingOrder!=null&&pl.person&&pl.person.id!=null){
+            orderMap[pl.person.id]=parseInt(String(pl.battingOrder).charAt(0),10);
+          }
+        }
+        out[side]={starterId:starterId,orderMap:orderMap};
+      });
+      result=out;
+    }
+  }catch(e){}
+  _boxCache[gamePk]=result;
+  return result;
+}
+
+// Batch-fetch throwing hand for opposing starters — one call covers every unique pitcher
+// across a player's whole game log instead of one call per game.
+var _pitchHandCache={};
+async function mlbPitcherHands(ids){
+  var uniq=ids.filter(function(v,i,a){ return v!=null && a.indexOf(v)===i; });
+  var need=uniq.filter(function(id){ return _pitchHandCache[id]===undefined; });
+  if(need.length){
+    try{
+      var r=await fetch("https://statsapi.mlb.com/api/v1/people?personIds="+need.join(","),{signal:AbortSignal.timeout(8000)});
+      if(r.ok){
+        var d=await r.json();
+        (d.people||[]).forEach(function(p){ _pitchHandCache[p.id]=(p.pitchHand&&p.pitchHand.code)||null; });
+      }
+    }catch(e){}
+    need.forEach(function(id){ if(_pitchHandCache[id]===undefined) _pitchHandCache[id]=null; });
+  }
+  var out={};
+  uniq.forEach(function(id){ out[id]=_pitchHandCache[id]||null; });
+  return out;
+}
+
 async function espnGameLog(id){
   var path=ESPN_PATH[ST.sport];
   var keys=STAT_KEYS[ST.market]||[];
@@ -2895,6 +3100,44 @@ async function nhlSearch(name){
         if(hits.length) return hits[0].playerId||null;
       }catch(e){ continue; }
     }
+  }
+  return null;
+}
+
+async function nhlGameLog(nhlId){
+  // Mirror of mlbGameLog — uses NHL Web API instead of MLB Stats API.
+  // Maps the active Odds API market key to the field name in the NHL game-log response.
+  var nhlField={
+    player_goals:"goals", player_assists:"assists",
+    player_points:"points", player_shots_on_goal:"shots",
+    player_saves:"saves"
+  }[ST.market]||"points";
+  var yr=new Date().getFullYear();
+  var seasons=[(yr-1)+""+yr,(yr-2)+""+(yr-1)];
+  for(var si=0;si<seasons.length;si++){
+    try{
+      var allGames=[];
+      // Fetch regular season (gameType 2) and playoffs (gameType 3)
+      for(var gt=0;gt<2;gt++){
+        try{
+          var r=await fetch("https://api-web.nhle.com/v1/player/"+nhlId+"/game-log/"+seasons[si]+"/"+(gt===0?2:3),{signal:AbortSignal.timeout(8000)});
+          if(r.ok){var d=await r.json();allGames=allGames.concat(d.gameLog||[]);}
+        }catch(e){}
+      }
+      allGames.sort(function(a,b){return (b.gameDate||"").localeCompare(a.gameDate||"");});
+      var games=allGames.slice(0,15);
+      if(!games.length) continue;
+      var vals=[],dates=[];
+      games.forEach(function(g){
+        var v=g[nhlField];
+        if(v!=null){
+          vals.push(Number(v));
+          var dm=(g.gameDate||"").match(/^(\d{4}-\d{2}-\d{2})/);
+          dates.push(dm?dm[1]:"");
+        }
+      });
+      if(vals.length) return {values:vals, seasonAvg:avg(vals), dates:dates};
+    }catch(e){}
   }
   return null;
 }
@@ -3997,8 +4240,6 @@ function saveManualParlay(){
 
 var _trendsTime=null;
 var _trendsFilter="all";
-var _trendsGameFilter="all";
-var _trendsPropFilter="all";
 var _trendsData=[];
 var _trendsSport="basketball_nba";
 var _trendsEvents=[];
@@ -4292,6 +4533,203 @@ async function calcTotalsTrends(){
   return trends;
 }
 
+/* --- Short catchy label for multi-condition trends, e.g. "Ohtani Lefty Lineup System" */
+function trendSystemName(who,conditionLabel){
+  var label=(conditionLabel||"").toLowerCase();
+  var shortName=(who||"").trim().split(" ").pop()||"PropDesk";
+  var tags=[];
+  if(label.indexOf("left-handed")>=0) tags.push("Lefty");
+  if(label.indexOf("right-handed")>=0) tags.push("Righty");
+  if(label.indexOf("top 3")>=0) tags.push("Lineup");
+  if(label.indexOf("home")>=0) tags.push("Home");
+  if(label.indexOf("road")>=0) tags.push("Road");
+  if(label.indexOf("rest")>=0) tags.push("Rest");
+  if(label.indexOf("division opponent")>=0) tags.push("Matchup");
+  if(!tags.length) tags.push("Situational");
+  return shortName+" "+tags.slice(0,2).join(" ")+" System";
+}
+
+/* --- TYPE 5: Player Matchup Trends (handedness x batting order x home/away) — MLB hitters only
+   Uses real per-game boxscore data (opposing starter id -> throwing hand, batting order slot).
+   Never fabricates: every subset requires >=5 real qualifying games, sample size shown as-is. */
+async function calcPlayerMatchupTrends(){
+  var trends=[];
+  if(_trendsSport!=="baseball_mlb") return trends;
+  var candidates=(ST.props||[]).filter(function(p){
+    return p.enriched && !p.pdNoValue && p._market && p._market.indexOf("batter_")===0 &&
+      p._vals && p._vals.length>=5 && p._gamePks &&
+      p._gamePks.filter(function(g){return g!=null;}).length>=5 && p.pdConfidence!=null;
+  });
+  candidates.sort(function(a,b){ return (b.pdConfidence||0)-(a.pdConfidence||0); });
+  candidates=candidates.slice(0,8); // bound boxscore fan-out per trends load
+
+  for(var ci=0;ci<candidates.length;ci++){
+    var p=candidates[ci];
+    var line=p.pdLine!=null?p.pdLine:p.bestLine;
+    if(line==null||p._playerId==null) continue;
+    var isOver=(p.pdSide||"Over")==="Over";
+    var vals=p._vals, gamePks=p._gamePks, isHomeArr=p._isHomeArr||[];
+    var n=Math.min(vals.length,gamePks.length,15);
+
+    var ctxList=await Promise.all(gamePks.slice(0,n).map(function(gpk){
+      return gpk?mlbBoxscoreContext(gpk):Promise.resolve(null);
+    }));
+    var oppStarterIds=[], perGame=[];
+    for(var gj=0;gj<n;gj++){
+      var box=ctxList[gj];
+      if(!box){ perGame.push(null); continue; }
+      var isHome=isHomeArr[gj]!==false;
+      var myBox=box[isHome?"home":"away"], oppBox=box[isHome?"away":"home"];
+      var slot=myBox?myBox.orderMap[p._playerId]:null;
+      var oppStarterId=oppBox?oppBox.starterId:null;
+      if(oppStarterId!=null) oppStarterIds.push(oppStarterId);
+      perGame.push({val:vals[gj], isHome:isHome, orderSlot:slot||null, oppStarterId:oppStarterId});
+    }
+    if(!oppStarterIds.length) continue;
+    var handMap=await mlbPitcherHands(oppStarterIds);
+    perGame.forEach(function(g){ if(g&&g.oppStarterId!=null) g.hand=handMap[g.oppStarterId]||null; });
+
+    function hitTest(v){ return isOver?v>line:v<line; }
+    function evalSubset(filterFn,label){
+      var sub=perGame.filter(function(g){ return g && filterFn(g); });
+      if(sub.length<5) return null;
+      var hits=sub.filter(function(g){ return hitTest(g.val); }).length;
+      return {label:label,n:sub.length,hits:hits,rate:hits/sub.length};
+    }
+    // Only compound (2-condition) splits qualify as a "matchup system" — single-stat trends already exist elsewhere
+    var combos=[
+      evalSubset(function(g){return g.hand==="L"&&g.orderSlot!=null&&g.orderSlot<=3;},"faces a left-handed pitcher and bats in the top 3 of the order"),
+      evalSubset(function(g){return g.hand==="R"&&g.orderSlot!=null&&g.orderSlot<=3;},"faces a right-handed pitcher and bats in the top 3 of the order"),
+      evalSubset(function(g){return g.hand==="L"&&g.isHome;},"faces a left-handed pitcher at home"),
+      evalSubset(function(g){return g.hand==="R"&&g.isHome;},"faces a right-handed pitcher at home"),
+      evalSubset(function(g){return g.hand==="L"&&!g.isHome;},"faces a left-handed pitcher on the road"),
+      evalSubset(function(g){return g.hand==="R"&&!g.isHome;},"faces a right-handed pitcher on the road"),
+      evalSubset(function(g){return g.orderSlot!=null&&g.orderSlot<=3&&g.isHome;},"bats in the top 3 of the order at home")
+    ].filter(function(c){ return c; });
+    if(!combos.length) continue;
+    combos.sort(function(a,b){ return b.rate-a.rate; });
+    var best=combos[0];
+    if(best.rate<0.70) continue; // require a real, meaningful lean — never surface a coin-flip as a "system"
+
+    var mktLbl=marketName(p._market);
+    var isThresh=isThreshProp(p);
+    var lineLabel=isThresh?threshLabel(line,p._market):fmtLine(line,p.pdSide||"Over");
+    var statPhrase=isThresh?("recorded "+lineLabel):("gone "+(p.pdSide||"Over")+" "+line+" "+mktLbl);
+    var headline="When "+p.player+" "+best.label+", he has "+statPhrase+" in "+best.hits+" of his last "+best.n+" such games";
+    var conf=Math.round(Math.min(94,50+best.rate*40+Math.min(best.n,10)));
+    trends.push({
+      type:"matchup",
+      conf:conf,
+      player:p.player,
+      systemName:trendSystemName(p.player,best.label),
+      headline:headline,
+      title:p.player+" "+lineLabel,
+      record:best.hits+"-"+(best.n-best.hits)+" L"+best.n,
+      hitRate:Math.round(best.rate*100),
+      recordCls:(p.pdSide||"Over")==="Under"?"under":"",
+      detail:"Real per-game matchup data from MLB boxscores — "+best.n+" games this season matched this exact situation ("+best.label+"). "+best.hits+" hits, "+(best.n-best.hits)+" misses.",
+      source:"MLB Stats API — Boxscore Matchup Data",
+      shareText:"PropDesk Trend: "+p.player+" "+best.label+" → "+lineLabel+" "+best.hits+"-"+(best.n-best.hits)+" ("+Math.round(best.rate*100)+"%) | propdeskhq.netlify.app",
+      _game:p._game||"", _market:p._market||""
+    });
+  }
+  return trends;
+}
+
+/* --- TYPE 6: Team Situational Trends (rest days x opponent rank x home/away) — MLB only
+   Combines >=2 real, derivable conditions and checks them against REAL final scores from
+   completed games this season. Applies TODAY's posted total retroactively to those real
+   scores — no historical odds are fabricated; only the total line and the outcome bucket
+   are both clearly real. */
+async function calcTeamSituationalTrends(){
+  var trends=[];
+  if(_trendsSport!=="baseball_mlb") return trends;
+  for(var ei=0;ei<_trendsEvents.length;ei++){
+    var ev=_trendsEvents[ei];
+    var totalLine=null;
+    try{
+      var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events/"+ev.id+"/odds",{
+        regions:"us,us2",markets:"totals",oddsFormat:"american"
+      }),{signal:AbortSignal.timeout(8000)});
+      if(r.ok){
+        var d=await r.json();
+        var totMap={};
+        (d.bookmakers||[]).forEach(function(bm){
+          (bm.markets||[]).forEach(function(mkt){
+            if(mkt.key!=="totals") return;
+            (mkt.outcomes||[]).forEach(function(oc){ if(oc.point!=null) totMap[oc.point]=(totMap[oc.point]||0)+1; });
+          });
+        });
+        var lines=Object.keys(totMap).map(Number).sort(function(a,b){ return totMap[b]-totMap[a]; });
+        if(lines.length) totalLine=lines[0];
+      }
+    }catch(e){}
+    if(totalLine==null) continue;
+
+    var teams=[ev.home_team,ev.away_team];
+    for(var ti=0;ti<teams.length;ti++){
+      var teamName=teams[ti];
+      if(!teamName) continue;
+      var teamId=await mlbTeamId(teamName);
+      if(!teamId) continue;
+      var games=await mlbTeamRecentGames(teamId,15);
+      if(games.length<8) continue; // not enough real games yet for an honest 2-condition subset
+
+      var withRest=[];
+      for(var gi=0;gi<games.length;gi++){
+        var prevGame=games[gi+1];
+        if(!prevGame||!games[gi].date||!prevGame.date) continue;
+        var rest=Math.round((new Date(games[gi].date)-new Date(prevGame.date))/864e5);
+        withRest.push({game:games[gi],rest:rest});
+      }
+      var oppIds=withRest.map(function(x){ return x.game.opponentId; }).filter(function(v,i,a){ return v!=null&&a.indexOf(v)===i; });
+      var rankMap={};
+      for(var oi=0;oi<oppIds.length;oi++) rankMap[oppIds[oi]]=await mlbStandingsRank(oppIds[oi]);
+
+      function combinedOver(g){ return g.runsFor!=null&&g.runsAgainst!=null&&(g.runsFor+g.runsAgainst)>totalLine; }
+      function evalSubset(filterFn,label){
+        var sub=withRest.filter(function(x){ return filterFn(x); });
+        if(sub.length<5) return null;
+        var hits=sub.filter(function(x){ return combinedOver(x.game); }).length;
+        return {label:label,n:sub.length,hits:hits,rate:hits/sub.length};
+      }
+      // Every combo below ANDs at least 2 real conditions together
+      var combos=[
+        evalSubset(function(x){ return x.game.isHome&&x.rest>=1; },"is at home with at least a day of rest"),
+        evalSubset(function(x){ return !x.game.isHome&&x.rest>=1; },"is on the road with at least a day of rest"),
+        evalSubset(function(x){ return x.game.isHome&&x.rest===0; },"is at home on zero days rest"),
+        evalSubset(function(x){ var rk=rankMap[x.game.opponentId]; return x.game.isHome&&rk&&rk.divisionRank!=null&&rk.divisionRank<=2; },"is at home against a top-2 division opponent"),
+        evalSubset(function(x){ var rk=rankMap[x.game.opponentId]; return rk&&rk.divisionRank!=null&&rk.divisionRank>=4&&x.rest>=1; },"faces a bottom-half division opponent with at least a day of rest")
+      ].filter(function(c){ return c; });
+      if(!combos.length) continue;
+      combos.sort(function(a,b){ return Math.max(b.rate,1-b.rate)-Math.max(a.rate,1-a.rate); });
+      var best=combos[0];
+      var leanRate=Math.max(best.rate,1-best.rate);
+      if(leanRate<0.70) continue; // require a real, meaningful lean either way
+
+      var side=best.rate>=0.5?"Over":"Under";
+      var sideHits=best.rate>=0.5?best.hits:(best.n-best.hits);
+      var conf=Math.round(Math.min(88,50+leanRate*35+Math.min(best.n,10)));
+      trends.push({
+        type:"teamsit",
+        conf:conf,
+        player:teamName,
+        systemName:trendSystemName(teamName,best.label),
+        headline:"When the "+teamName+" "+best.label+", the "+side+" ("+totalLine+") has hit in "+sideHits+" of their last "+best.n+" such games",
+        title:teamName+" Total "+totalLine,
+        record:sideHits+"-"+(best.n-sideHits)+" L"+best.n,
+        hitRate:Math.round(leanRate*100),
+        recordCls:side==="Under"?"under":"",
+        detail:best.n+" completed games this season matched this exact situation. Today's "+totalLine+" total applied to those real final scores: "+sideHits+" hit, "+(best.n-sideHits)+" missed.",
+        source:"MLB Stats API — Real Final Scores",
+        shareText:"PropDesk Trend: "+teamName+" "+best.label+" → "+side+" "+totalLine+" "+sideHits+"-"+(best.n-sideHits)+" ("+Math.round(leanRate*100)+"%) | propdeskhq.netlify.app",
+        _game:(ev.away_team||"")+" vs "+(ev.home_team||""), _market:"teamsit"
+      });
+    }
+  }
+  return trends;
+}
+
 /* --- Sparkline ----------------------------------------------------- */
 function renderSparkline(vals,line,isOver){
   if(!vals||vals.length<3) return '';
@@ -4318,13 +4756,16 @@ function renderSparkline(vals,line,isOver){
 
 /* --- Render -------------------------------------------------------- */
 function renderTrendCard(t){
-  var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":"GAME TOTAL";
+  var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
+    t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":"GAME TOTAL";
   var headline=t.headline||t.title;
+  var systemName=t.systemName?'<div class="tc-system-name">'+esc(t.systemName)+'</div>':'';
   var streakBadge=t.streak>=3?'<span class="tc-streak-badge">🔥 STREAK '+t.streak+'</span>':'';
   var spark=(t._rawVals&&t._rawVals.length>=3&&t._rawLine!=null)?renderSparkline(t._rawVals,t._rawLine,t._rawIsOver!==false):'';
   var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%"></div></div><span class="tc-hitbar-pct">'+t.hitRate+'%</span></div>':'';
   return '<div class="tcard" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
     '<div class="tc-tags"><span class="tc-type">'+typeLabel+'</span>'+streakBadge+'</div>'+
+    systemName+
     '<div class="tc-player">'+esc(headline)+'</div>'+
     (spark?'<div>'+spark+'</div>':'')+
     '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
@@ -4337,8 +4778,6 @@ function renderTrends(trends){
   var mount=$("trendsMount"); if(!mount) return;
   var visible=trends.filter(function(t){
     if(_trendsFilter!=="all"&&t.type!==_trendsFilter) return false;
-    if(_trendsGameFilter!=="all"&&t._game!==_trendsGameFilter) return false;
-    if(_trendsPropFilter!=="all"&&t._market!==_trendsPropFilter&&t.type!=="totals") return false;
     return true;
   });
   document.querySelectorAll("#trendTabs .pill").forEach(function(b){
@@ -4373,10 +4812,7 @@ function renderTrendsSportTabs(){
     b.onclick=function(){
       if(_trendsSport===sp.key) return;
       _trendsSport=sp.key; _trendsEventId=null; _trendsEvents=[]; _trendsData=[];
-      _trendsGameFilter="all"; _trendsPropFilter="all";
       renderTrendsSportTabs();
-      renderTrendsGameChips();
-      renderTrendsPropTabs();
       trendsLoadSport();
     };
     c.appendChild(b);
@@ -4397,8 +4833,6 @@ async function trendsLoadSport(){
     var data=await r.json();
     var now=Date.now();
     _trendsEvents=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime()>now-3*3600*1000; }).slice(0,24);
-    renderTrendsGameChips();
-    renderTrendsPropTabs();
     if(!_trendsEvents.length){
       mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>No games today for this sport. Check back later.</p></div>'; return;
     }
@@ -4415,27 +4849,33 @@ async function trendsFetchAndLoad(){
   if(!mks.length) mks=["player_points","player_assists","player_rebounds"];
   mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading '+_trendsEvents.length+' game'+(_trendsEvents.length!==1?"s":"")+'…</p></div>';
   try{
-    // Fetch all events' props, deduplicate by player+market
+    // Fetch one market at a time per event — same pattern as Props tab loadBoard → fetchOdds(eventId, market)
     var allCandidates=[],seen={};
     for(var ei=0;ei<_trendsEvents.length;ei++){
       var ev=_trendsEvents[ei];
       var gameLabel=(ev.away_team||"")+" vs "+(ev.home_team||"");
-      try{
-        var r=await fetch(apiUrl("/sports/"+_trendsSport+"/events/"+ev.id+"/odds",{
-          regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
-        }),{signal:AbortSignal.timeout(8000)});
-        if(!r.ok) continue;
-        var oddsData=await r.json();
-        mks.forEach(function(mk){
-          parseProps(oddsData,mk).forEach(function(p){
+      for(var mi=0;mi<mks.length;mi++){
+        var mk=mks[mi];
+        try{
+          var _trMkUrl=apiUrl("/sports/"+_trendsSport+"/events/"+ev.id+"/odds",{
+            regions:"us,us2",markets:mk,oddsFormat:"american",dateFormat:"iso"
+          });
+          console.log("[PropDesk] trendsFetch market:", mk, "event:", ev.id);
+          var r=await fetch(_trMkUrl,{signal:AbortSignal.timeout(8000)});
+          if(!r.ok){ console.warn("[PropDesk] trendsFetch SKIP "+mk,r.status); continue; }
+          var oddsData=await r.json();
+          var mkProps=parseProps(oddsData,mk);
+          console.log("[PropDesk] trendsFetch", mk, "game", ei+1, "→", mkProps.length, "props");
+          mkProps.forEach(function(p){
             if(p.bestOdds==null||p.yesNo||p.bestLine==null) return;
             p._market=mk; p._sport=_trendsSport; p._game=gameLabel;
             var k=p.player.toLowerCase()+"|"+mk;
             if(!seen[k]){ seen[k]=1; allCandidates.push(p); }
           });
-        });
-      }catch(e){}
+        }catch(e){ console.warn("[PropDesk] trendsFetch error",mk,e); }
+      }
     }
+    console.log("[PropDesk] trendsFetch total candidates:", allCandidates.length);
     if(!allCandidates.length){
       mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No lines available yet for today\'s games.</p></div>'; return;
     }
@@ -4458,6 +4898,16 @@ async function trendsFetchAndLoad(){
         var totTrends=await calcTotalsTrends();
         if(totTrends.length) trends=trends.concat(totTrends);
       }
+      // Multi-condition systems — MLB only, real boxscore/standings/final-score data, no fabricated odds.
+      // First load per session is slower (boxscore/schedule fetches); cached aggressively after that.
+      if(_trendsSport==="baseball_mlb") mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Building matchup &amp; team systems from real game data&hellip;</p></div>';
+      console.log("[PropDesk] trendsFetch: computing matchup + team-situational systems…");
+      var matchupTrends=await calcPlayerMatchupTrends();
+      console.log("[PropDesk] trendsFetch matchup systems found:", matchupTrends.length);
+      if(matchupTrends.length) trends=trends.concat(matchupTrends);
+      var teamSitTrends=await calcTeamSituationalTrends();
+      console.log("[PropDesk] trendsFetch team-situational systems found:", teamSitTrends.length);
+      if(teamSitTrends.length) trends=trends.concat(teamSitTrends);
       trends.sort(function(a,b){ return b.conf-a.conf; });
     }catch(ce){ calcErr=ce; }
     ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
@@ -4471,73 +4921,8 @@ async function trendsFetchAndLoad(){
   }
 }
 
-var TRENDS_PROP_FILTERS={
-  americanfootball_nfl:[
-    {k:"player_pass_yds",n:"Pass Yards"},{k:"player_rush_yds",n:"Rush Yards"},
-    {k:"player_reception_yds",n:"Rec Yards"},{k:"player_pass_tds",n:"TDs"},
-    {k:"player_receptions",n:"Receptions"}
-  ],
-  basketball_nba:[
-    {k:"player_points",n:"Points"},{k:"player_rebounds",n:"Rebounds"},
-    {k:"player_assists",n:"Assists"},{k:"player_threes",n:"Threes"},
-    {k:"player_steals",n:"Steals"},{k:"player_blocks",n:"Blocks"}
-  ],
-  icehockey_nhl:[
-    {k:"player_shots_on_goal",n:"Shots on Goal"},{k:"player_goals",n:"Goals"},
-    {k:"player_assists",n:"Assists"},{k:"player_points",n:"Points"},
-    {k:"player_saves",n:"Saves"}
-  ],
-  baseball_mlb:[
-    {k:"batter_hits",n:"Hits"},{k:"batter_total_bases",n:"Total Bases"},
-    {k:"batter_rbis",n:"RBIs"},{k:"batter_home_runs",n:"Home Runs"},
-    {k:"pitcher_strikeouts",n:"Pitcher Ks"}
-  ]
-};
-
-function renderTrendsGameChips(){
-  var c=$("trendsGameChips"); if(!c) return;
-  c.innerHTML="";
-  if(!_trendsEvents.length){c.style.display="none"; return;}
-  c.style.display="";
-  var allBtn=el("button","t10-chip"+(_trendsGameFilter==="all"?" active":""));
-  allBtn.innerHTML='<span class="t10-chip-teams">All Games</span>';
-  allBtn.onclick=function(){_trendsGameFilter="all"; renderTrendsGameChips(); renderTrends(_trendsData);};
-  c.appendChild(allBtn);
-  _trendsEvents.forEach(function(ev){
-    var dt=new Date(ev.commence_time);
-    var timeStr=dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
-    var away=teamAbbr(ev.away_team);
-    var home=teamAbbr(ev.home_team);
-    var gameKey=(ev.away_team||"")+" vs "+(ev.home_team||"");
-    var b=el("button","t10-chip"+(_trendsGameFilter===gameKey?" active":""));
-    b.innerHTML='<span class="t10-chip-teams">'+esc(away)+' @ '+esc(home)+'</span><span class="t10-chip-time">'+esc(timeStr)+'</span>';
-    b.onclick=function(){_trendsGameFilter=gameKey; renderTrendsGameChips(); renderTrends(_trendsData);};
-    c.appendChild(b);
-  });
-}
-
-function renderTrendsPropTabs(){
-  var c=$("trendsPropTabs"); if(!c) return;
-  c.innerHTML="";
-  var filters=TRENDS_PROP_FILTERS[_trendsSport]||[];
-  if(!filters.length){c.style.display="none"; return;}
-  c.style.display="";
-  var allBtn=el("button","pill"+(_trendsPropFilter==="all"?" active":""));
-  allBtn.textContent="All Props";
-  allBtn.onclick=function(){_trendsPropFilter="all"; renderTrendsPropTabs(); renderTrends(_trendsData);};
-  c.appendChild(allBtn);
-  filters.forEach(function(f){
-    var b=el("button","pill"+(_trendsPropFilter===f.k?" active":""));
-    b.textContent=f.n;
-    b.onclick=function(){_trendsPropFilter=f.k; renderTrendsPropTabs(); renderTrends(_trendsData);};
-    c.appendChild(b);
-  });
-}
-
 function initTrends(){
   renderTrendsSportTabs();
-  renderTrendsGameChips();
-  renderTrendsPropTabs();
   if(_trendsData.length) renderTrends(_trendsData);
   else if(_trendsEvents.length) trendsFetchAndLoad();
   else trendsLoadSport();
@@ -4866,19 +5251,24 @@ async function t10LoadGame(){
   var gameLabel=ev?(ev.home_team+" vs "+ev.away_team):"";
   var mks=LOTD_MARKETS[_t10Sport]||[];
   try{
-    var _t10Url=apiUrl("/sports/"+_t10Sport+"/events/"+_t10EventId+"/odds",{
-      regions:"us,us2",markets:mks.join(","),oddsFormat:"american",dateFormat:"iso"
-    });
-    console.log("[PropDesk] t10LoadGame URL:", _t10Url);
-    var r=await fetch(_t10Url);
-    if(!r.ok){ var _t10Err=await r.text(); console.error("[PropDesk] t10LoadGame FAILED",r.status,_t10Err); mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available for this game yet. Check back closer to game time.</p></div>'; return; }
-    var oddsData=await r.json();
+    // Fetch one market at a time — same pattern as Props tab loadBoard → fetchOdds(eventId, market)
     var candidates=[];
-    mks.forEach(function(mk){
-      parseProps(oddsData,mk).forEach(function(p){
-        p._market=mk; p._sport=_t10Sport; p._game=gameLabel; candidates.push(p);
-      });
-    });
+    for(var mi=0;mi<mks.length;mi++){
+      var mk=mks[mi];
+      try{
+        var _mkUrl=apiUrl("/sports/"+_t10Sport+"/events/"+_t10EventId+"/odds",{
+          regions:"us,us2",markets:mk,oddsFormat:"american",dateFormat:"iso"
+        });
+        console.log("[PropDesk] t10LoadGame market fetch:", mk, _mkUrl);
+        var mkR=await fetch(_mkUrl);
+        if(!mkR.ok){ var _mkE=await mkR.text(); console.warn("[PropDesk] t10LoadGame SKIP "+mk,mkR.status,_mkE); continue; }
+        var mkData=await mkR.json();
+        var mkProps=parseProps(mkData,mk);
+        console.log("[PropDesk] t10LoadGame", mk, "→", mkProps.length, "props");
+        mkProps.forEach(function(p){ p._market=mk; p._sport=_t10Sport; p._game=gameLabel; candidates.push(p); });
+      }catch(mkE){ console.warn("[PropDesk] t10LoadGame market error",mk,mkE); }
+    }
+    console.log("[PropDesk] t10LoadGame total candidates:", candidates.length);
     if(!candidates.length){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available for this game yet. Check back closer to game time.</p></div>'; return; }
     // Deduplicate: one per player+market
     var seen={},unique=[];
@@ -4897,6 +5287,9 @@ async function t10LoadGame(){
       try{ await enrichWithConfidence(toEnrich[i]); }catch(e){}
     }
     ST.sport=savedSport; ST.market=savedMkt;
+    console.log("[PropDesk] t10LoadGame after enrichment:", toEnrich.map(function(p){
+      return p.player+"/"+p._market+":"+(p.pdConfidence!=null?Math.round(p.pdConfidence*100)+"%":"null");
+    }));
     var qualified=toEnrich.filter(function(p){
       if(p.enriched&&p.pdNoValue) return false;
       if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
@@ -4904,6 +5297,7 @@ async function t10LoadGame(){
     });
     qualified.sort(function(a,b){ return getEffectiveConf(b)-getEffectiveConf(a); });
     _t10Data=qualified.slice(0,10);
+    console.log("[PropDesk] t10LoadGame qualified for Top 10:", _t10Data.length, _t10Data.map(function(p){return p.player;}));
     renderTop10(_t10Data);
   }catch(e){
     mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Error loading props. Try again.</p></div>';
@@ -4950,7 +5344,8 @@ function openTrendDetail(t){
   var hdr=$("tdHeaderContent"); if(hdr) hdr.innerHTML=
     '<div class="td-big-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
     '<div class="td-title">'+esc(t.player)+' &mdash; '+
-      (t.type==="streak"?"Player Streak":t.type==="linevalue"?"Line Value":t.type==="movement"?"Sharp Money":"Game Total")+
+      (t.type==="streak"?"Player Streak":t.type==="linevalue"?"Line Value":t.type==="movement"?"Sharp Money":
+       t.type==="matchup"?"Matchup System":t.type==="teamsit"?"Team System":"Game Total")+
     '</div>';
   var shareBtn=$("tdShareBtn");
   if(shareBtn){ shareBtn.onclick=function(){ copyText(t.shareText); toast("Copied!"); }; }
@@ -5017,7 +5412,8 @@ function buildDetailContent(t){
   if(similar.length){
     html+='<div class="td-section"><div class="td-sect-title">Similar Trends</div><div class="td-related">';
     similar.forEach(function(s,si){
-      var typeLabel=s.type==="streak"?"Player Streak":s.type==="linevalue"?"Line Value":s.type==="movement"?"Sharp Money":"Game Total";
+      var typeLabel=s.type==="streak"?"Player Streak":s.type==="linevalue"?"Line Value":s.type==="movement"?"Sharp Money":
+        s.type==="matchup"?"Matchup System":s.type==="teamsit"?"Team System":"Game Total";
       html+='<div class="td-rel-item" data-relidx="'+_trendsData.indexOf(s)+'">'+
         '<div class="td-rel-record'+(s.recordCls?" "+s.recordCls:"")+'">'+esc(s.record)+'</div>'+
         '<div class="td-rel-info">'+
@@ -5075,10 +5471,387 @@ function buildInsight(t){
   if(t.type==="totals"){
     return "Market pricing shows one side of the total has better value after accounting for vig. This is based on current live odds from multiple books.";
   }
+  if(t.type==="matchup"){
+    return "Built from real MLB boxscore data — opposing starter handedness and "+t.player+"'s actual batting-order slot in each game, not estimated. Sample size is shown as-is; small samples mean more variance.";
+  }
+  if(t.type==="teamsit"){
+    return "Built from the "+t.player+"'s real completed-game results this season, with today's posted total applied retroactively to those real final scores. No historical odds are assumed — only the total number and the actual outcomes are real.";
+  }
   return "";
 }
 
 /* END TRENDS TAB */
+
+/* ============ MONEYLINE ENGINE ============ */
+var _mlStCache={};
+var _mlProbCache=null;
+var _mlPitcherCache={};
+var _mlOddsCache={};
+
+/* Sport-specific Elo scaling parameters */
+var ML_PARAMS={
+  americanfootball_nfl:{winScale:400,marginScale:10,homeAdv:22,l10Scale:50},
+  basketball_nba:{winScale:400,marginScale:4,homeAdv:22,l10Scale:50,b2bPenalty:22},
+  icehockey_nhl:{winScale:400,marginScale:35,homeAdv:18,l10Scale:40},
+  baseball_mlb:{winScale:400,marginScale:30,homeAdv:28,l10Scale:40,pitcherWeight:55}
+};
+
+function mlSportCode(s){
+  return s==="americanfootball_nfl"?"nfl":s==="basketball_nba"?"nba":s==="icehockey_nhl"?"nhl":"mlb";
+}
+function mlNormKey(name){return(name||"").toLowerCase().replace(/[^a-z0-9]/g,"");}
+function mlNick(name){return(name||"").trim().split(/\s+/).pop();}
+function mlLookup(map,name){
+  var full=mlNormKey(name); if(map[full]) return map[full];
+  var nick=(name||"").trim().split(/\s+/).pop().toLowerCase(); return map[nick]||null;
+}
+function americanToProb(o){o=Number(o);if(!o)return 0.5;return o>0?100/(100+o):Math.abs(o)/(Math.abs(o)+100);}
+
+function parseH2HOdds(event){
+  var hProbs=[],aProbs=[],bestH=null,bestA=null;
+  var books=event.bookmakers||[];
+  books.forEach(function(bk){
+    (bk.markets||[]).forEach(function(mkt){
+      if(mkt.key!=="h2h") return;
+      var ho=null,ao=null;
+      (mkt.outcomes||[]).forEach(function(o){
+        if(o.name===event.home_team){
+          ho=Number(o.price);
+          if(bestH===null||ho>bestH) bestH=ho;
+        }else if(o.name===event.away_team){
+          ao=Number(o.price);
+          if(bestA===null||ao>bestA) bestA=ao;
+        }
+      });
+      if(ho!=null) hProbs.push(americanToProb(ho));
+      if(ao!=null) aProbs.push(americanToProb(ao));
+    });
+  });
+  console.log("[ML] parseH2HOdds",event.away_team+"@"+event.home_team,
+    "books:"+books.length,"hProbs:"+hProbs.length,"bestH:"+bestH,"bestA:"+bestA);
+  if(!hProbs.length) return null;
+  var avgH=hProbs.reduce(function(a,b){return a+b;},0)/hProbs.length;
+  var avgA=aProbs.length?aProbs.reduce(function(a,b){return a+b;},0)/aProbs.length:1-avgH;
+  var tot=avgH+avgA;
+  return{homeImplied:avgH/tot,awayImplied:avgA/tot,homeOdds:bestH,awayOdds:bestA,bookCount:hProbs.length};
+}
+
+function mlPitcherAdj(stats,maxAdj){
+  if(!stats) return 0;
+  var adj=(4.20-stats.era)*8+(1.30-stats.whip)*15;
+  return Math.max(-maxAdj,Math.min(maxAdj,adj));
+}
+
+async function mlFetchStandings(sport){
+  if(_mlStCache[sport]) return _mlStCache[sport];
+  var result={};
+  var params=ML_PARAMS[sport]||ML_PARAMS.baseball_mlb;
+  try{
+    if(sport==="baseball_mlb"){
+      var yr=new Date().getFullYear();
+      var r=await fetch("https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season="+yr,{signal:AbortSignal.timeout(8000)});
+      if(r.ok){
+        var d=await r.json();
+        (d.records||[]).forEach(function(div){
+          (div.teamRecords||[]).forEach(function(t){
+            var w=t.wins||0,l=t.losses||0,g=w+l;
+            var wp=g?w/g:0.5;
+            var rs=Number(t.runsScored||0),ra=Number(t.runsAllowed||0);
+            var margin=g?(rs-ra)/g:0;
+            var l10=(t.records&&t.records.splitRecords||[]).find(function(s){return s.type==="lastTen";});
+            var l10w=l10?l10.wins:5;
+            var eloBase=(wp-0.5)*params.winScale+margin*params.marginScale;
+            var l10Bonus=(l10w/10-0.5)*params.l10Scale;
+            var name=(t.team&&t.team.name)||"";
+            var nick=(name).trim().split(/\s+/).pop().toLowerCase();
+            var data={eloBase:eloBase,l10Bonus:l10Bonus,record:w+"-"+l,l10:l10w+"-"+(10-l10w),wp:wp};
+            result[mlNormKey(name)]=data; result[nick]=data;
+          });
+        });
+      }
+    } else if(sport==="icehockey_nhl"){
+      var r=await fetch("https://api-web.nhle.com/v1/standings/now",{signal:AbortSignal.timeout(8000)});
+      if(r.ok){
+        var d=await r.json();
+        (d.standings||[]).forEach(function(t){
+          var w=t.wins||0,l=t.losses||0,otl=t.otLosses||0,g=w+l+otl;
+          var wp=g?w/g:0.5;
+          var gf=t.goalFor||0,ga=t.goalAgainst||0;
+          var margin=g?(gf-ga)/g:0;
+          var l10w=t.l10Wins||5;
+          var eloBase=(wp-0.5)*params.winScale+margin*params.marginScale;
+          var l10Bonus=(l10w/10-0.5)*params.l10Scale;
+          var name=(t.teamName&&t.teamName.default)||(t.teamCommonName&&t.teamCommonName.default)||"";
+          var nick=name.trim().split(/\s+/).pop().toLowerCase();
+          var data={eloBase:eloBase,l10Bonus:l10Bonus,record:w+"-"+l+(otl?"-"+otl:""),l10:l10w+"-"+(10-l10w),wp:wp};
+          result[mlNormKey(name)]=data; result[nick]=data;
+        });
+      }
+    } else {
+      var espnSport=sport==="americanfootball_nfl"?"football/nfl":"basketball/nba";
+      var r=await fetch("https://site.api.espn.com/apis/site/v2/sports/"+espnSport+"/standings",{signal:AbortSignal.timeout(8000)});
+      if(r.ok){
+        var d=await r.json();
+        function sv(stats,name,alt){
+          var s=(stats||[]).find(function(x){return x.name===name||x.abbreviation===name;});
+          if(!s&&alt) s=(stats||[]).find(function(x){return x.name===alt||x.abbreviation===alt;});
+          return s?Number(s.value):0;
+        }
+        function traverse(node){
+          if(node.standings&&node.standings.entries){
+            node.standings.entries.forEach(function(entry){
+              var teamName=(entry.team&&entry.team.displayName)||"";
+              var stats=entry.stats||[];
+              var w=sv(stats,"wins","W"),l=sv(stats,"losses","L"),g=w+l;
+              var wp=g?w/g:0.5;
+              var pf=sv(stats,"pointsFor","PF"),pa=sv(stats,"pointsAgainst","PA");
+              if(pf>1000&&g>0){pf=pf/g;pa=pa/g;}
+              var margin=pf-pa;
+              var eloBase=(wp-0.5)*params.winScale+margin*params.marginScale;
+              var nick=teamName.trim().split(/\s+/).pop().toLowerCase();
+              var data={eloBase:eloBase,l10Bonus:0,record:w+"-"+l,l10:"",wp:wp};
+              result[mlNormKey(teamName)]=data; result[nick]=data;
+            });
+          }
+          if(node.children) node.children.forEach(traverse);
+        }
+        (d.children||[]).forEach(traverse);
+      }
+    }
+  }catch(e){console.warn("[ML] standings error:",sport,e);}
+  _mlStCache[sport]=result;
+  return result;
+}
+
+async function mlFetchMLBProbables(){
+  if(_mlProbCache) return _mlProbCache;
+  var today=new Date().toISOString().slice(0,10);
+  var result={};
+  try{
+    var r=await fetch("https://statsapi.mlb.com/api/v1/schedule?date="+today+"&sportId=1&hydrate=probablePitchers,team&gameType=R",{signal:AbortSignal.timeout(8000)});
+    if(r.ok){
+      var d=await r.json();
+      (d.dates||[]).forEach(function(dt){
+        (dt.games||[]).forEach(function(game){
+          var hTeam=(game.teams&&game.teams.home&&game.teams.home.team&&game.teams.home.team.name)||"";
+          var aTeam=(game.teams&&game.teams.away&&game.teams.away.team&&game.teams.away.team.name)||"";
+          var hP=game.teams&&game.teams.home&&game.teams.home.probablePitcher;
+          var aP=game.teams&&game.teams.away&&game.teams.away.probablePitcher;
+          result[mlNormKey(hTeam)]={
+            home:hP?{id:hP.id,name:hP.fullName}:null,
+            away:aP?{id:aP.id,name:aP.fullName}:null,
+            homeTeam:hTeam,awayTeam:aTeam
+          };
+        });
+      });
+    }
+  }catch(e){console.warn("[ML] probables error:",e);}
+  _mlProbCache=result;
+  return result;
+}
+
+async function mlFetchPitcherStats(pid){
+  if(_mlPitcherCache[pid]!==undefined) return _mlPitcherCache[pid];
+  var yr=new Date().getFullYear();
+  try{
+    var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+pid+"/stats?stats=gameLog&group=pitching&season="+yr,{signal:AbortSignal.timeout(8000)});
+    if(r.ok){
+      var d=await r.json();
+      var logs=(d.stats&&d.stats[0]&&d.stats[0].splits)||[];
+      var last5=logs.slice(-5);
+      if(!last5.length){_mlPitcherCache[pid]=null;return null;}
+      var er=0,ip=0,h=0,bb=0;
+      last5.forEach(function(st){
+        var s=st.stat||{};
+        er+=Number(s.earnedRuns||0);
+        var raw=parseFloat(s.inningsPitched||"0");
+        ip+=Math.floor(raw)+Math.round((raw-Math.floor(raw))*10)/3;
+        h+=Number(s.hits||0); bb+=Number(s.baseOnBalls||0);
+      });
+      var res={era:ip>0?Math.round(er*9/ip*100)/100:4.5,whip:ip>0?Math.round((h+bb)/ip*100)/100:1.4,games:last5.length};
+      _mlPitcherCache[pid]=res; return res;
+    }
+  }catch(e){}
+  _mlPitcherCache[pid]=null; return null;
+}
+
+async function mlDetectB2B(){
+  var result={};
+  var yest=new Date(Date.now()-86400000).toISOString().slice(0,10).replace(/-/g,"");
+  try{
+    var r=await fetch("https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates="+yest,{signal:AbortSignal.timeout(6000)});
+    if(r.ok){
+      var d=await r.json();
+      (d.events||[]).forEach(function(ev){
+        (ev.competitions||[]).forEach(function(comp){
+          (comp.competitors||[]).forEach(function(c){
+            var name=(c.team&&c.team.displayName)||"";
+            result[mlNormKey(name)]=true;
+            result[name.trim().split(/\s+/).pop().toLowerCase()]=true;
+          });
+        });
+      });
+    }
+  }catch(e){}
+  return result;
+}
+
+/* ev = base event (home_team, away_team, commence_time)
+   oddsEvent = full odds response with bookmakers (may be null if not yet posted) */
+function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
+  var home=ev.home_team,away=ev.away_team;
+  var odds=oddsEvent?parseH2HOdds(oddsEvent):null;
+  var hasOdds=!!(odds&&odds.bookCount>0);
+
+  var params=ML_PARAMS[sport]||ML_PARAMS.baseball_mlb;
+  var hd=mlLookup(standings,home)||{eloBase:0,l10Bonus:0,record:"",l10:"",wp:0.5};
+  var ad=mlLookup(standings,away)||{eloBase:0,l10Bonus:0,record:"",l10:"",wp:0.5};
+  var eloDiff=(hd.eloBase+hd.l10Bonus)-(ad.eloBase+ad.l10Bonus)+params.homeAdv;
+  var adjustments=[];
+
+  if(sport==="baseball_mlb"&&extraData.probables){
+    var pg=extraData.probables[mlNormKey(home)];
+    if(!pg){Object.values(extraData.probables).forEach(function(p){if(mlNormKey(p.homeTeam||"")===mlNormKey(home))pg=p;});}
+    if(pg){
+      if(pg.home&&extraData.pitcherStats[pg.home.id]){
+        var hp=extraData.pitcherStats[pg.home.id];
+        var ha=mlPitcherAdj(hp,params.pitcherWeight);
+        eloDiff+=ha;
+        if(Math.abs(ha)>3) adjustments.push({team:home,text:pg.home.name+" ("+hp.era+" ERA, "+hp.whip+" WHIP L5)",mag:Math.abs(ha),isPitcher:true,side:"home"});
+      }
+      if(pg.away&&extraData.pitcherStats[pg.away.id]){
+        var ap=extraData.pitcherStats[pg.away.id];
+        var aa=mlPitcherAdj(ap,params.pitcherWeight);
+        eloDiff-=aa;
+        if(Math.abs(aa)>3) adjustments.push({team:away,text:pg.away.name+" ("+ap.era+" ERA, "+ap.whip+" WHIP L5)",mag:Math.abs(aa),isPitcher:true,side:"away"});
+      }
+    }
+  }
+
+  if(sport==="basketball_nba"&&extraData.b2b){
+    if(mlLookup(extraData.b2b,home)||extraData.b2b[mlNick(home).toLowerCase()]){
+      eloDiff-=params.b2bPenalty;
+      adjustments.push({team:home,text:mlNick(home)+" on back-to-back (home)",mag:params.b2bPenalty,side:"home"});
+    }
+    if(mlLookup(extraData.b2b,away)||extraData.b2b[mlNick(away).toLowerCase()]){
+      eloDiff+=params.b2bPenalty;
+      adjustments.push({team:away,text:mlNick(away)+" on back-to-back (road)",mag:params.b2bPenalty,side:"away"});
+    }
+  }
+
+  if(hd.l10&&hd.l10Bonus!==0) adjustments.push({team:home,text:mlNick(home)+" "+hd.l10+" in L10",mag:Math.abs(hd.l10Bonus),isRecord:true,side:"home"});
+  if(ad.l10&&ad.l10Bonus!==0) adjustments.push({team:away,text:mlNick(away)+" "+ad.l10+" in L10",mag:Math.abs(ad.l10Bonus),isRecord:true,side:"away"});
+
+  var pdHomeProb=1/(1+Math.pow(10,-eloDiff/400));
+  var homeImplied=hasOdds?odds.homeImplied:0.5;
+  var awayImplied=hasOdds?odds.awayImplied:0.5;
+  var edge=hasOdds?pdHomeProb-homeImplied:0;
+  var absEdge=Math.abs(edge);
+  var tier=hasOdds&&absEdge>=0.15?"LOCK":hasOdds&&absEdge>=0.10?"ELITE":hasOdds&&absEdge>=0.05?"STRONG":null;
+  adjustments.sort(function(a,b){return b.mag-a.mag;});
+  return{home:home,away:away,time:ev.commence_time,
+    homeProb:pdHomeProb,awayProb:1-pdHomeProb,
+    homeImplied:homeImplied,awayImplied:awayImplied,
+    homeOdds:hasOdds?odds.homeOdds:null,awayOdds:hasOdds?odds.awayOdds:null,
+    homeRec:hd.record,awayRec:ad.record,homeL10:hd.l10,awayL10:ad.l10,
+    edge:edge,tier:tier,adjustments:adjustments,noOdds:!hasOdds,
+    bookCount:hasOdds?odds.bookCount:0};
+}
+
+function renderMoneylineCard(c){
+  var hp=Math.round(c.homeProb*100),ap=100-hp;
+  var favHome=c.edge>0;
+  var absEdge=Math.abs(c.edge);
+  var edgePct=Math.round(absEdge*100);
+  var tierCls=c.tier==="LOCK"?"ml-board-tier-lock":c.tier==="ELITE"?"ml-board-tier-elite":"ml-board-tier-strong";
+  var bkLbl=c.bookCount>1?"Best of "+c.bookCount+" books":"Best available";
+  var tierBadge=c.tier?'<span class="ml-board-tier '+tierCls+'">'+esc(c.tier)+' '+esc(mlNick(favHome?c.home:c.away))+' +'+edgePct+'%</span>':"";
+  function fmtOdds(o){if(o===null)return"—";return(o>0?"+":"")+o;}
+  function fmtPct(p){return Math.round(p*100)+"%";}
+  function edgeCls(side){
+    if(c.noOdds||!c.tier) return "";
+    return((side==="home"&&favHome)||(side==="away"&&!favHome))?"ml-board-edge-pos":"ml-board-edge-neg";
+  }
+  function edgeStr(side){
+    if(c.noOdds) return "—";
+    var e=(side==="home")?c.edge:-c.edge;
+    return(e>0?"+":"")+Math.round(e*100)+"%";
+  }
+  return '<div class="ml-board-card">'+
+    '<div class="ml-board-hdr">'+
+      '<span class="tag tag-g" style="font-size:9px;padding:3px 8px">Moneyline</span>'+
+      (c.bookCount>0?'<span style="font-size:11px;color:var(--mut)">'+esc(bkLbl)+'</span>':'')+
+      tierBadge+
+    '</div>'+
+    '<div class="ml-board-bar">'+
+      '<div class="ml-board-bar-a" style="width:'+ap+'%"></div>'+
+      '<div class="ml-board-bar-h" style="width:'+hp+'%"></div>'+
+    '</div>'+
+    '<div class="ml-board-row">'+
+      '<span class="ml-board-badge ml-board-badge-a">Away</span>'+
+      '<span class="ml-board-team">'+esc(c.away)+'</span>'+
+      (c.awayRec?'<span class="ml-board-rec">'+esc(c.awayRec)+'</span>':'')+
+      '<div class="ml-board-stats">'+
+        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Odds</span><span class="ml-board-stat-val">'+esc(fmtOdds(c.awayOdds))+'</span></div>'+
+        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Book</span><span class="ml-board-stat-val">'+fmtPct(c.awayImplied)+'</span></div>'+
+        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">PD Model</span><span class="ml-board-stat-val" style="color:var(--blue)">'+ap+'%</span></div>'+
+        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Edge</span><span class="ml-board-stat-val '+edgeCls("away")+'">'+edgeStr("away")+'</span></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="ml-board-row">'+
+      '<span class="ml-board-badge ml-board-badge-h">Home</span>'+
+      '<span class="ml-board-team">'+esc(c.home)+'</span>'+
+      (c.homeRec?'<span class="ml-board-rec">'+esc(c.homeRec)+'</span>':'')+
+      '<div class="ml-board-stats">'+
+        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Odds</span><span class="ml-board-stat-val">'+esc(fmtOdds(c.homeOdds))+'</span></div>'+
+        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Book</span><span class="ml-board-stat-val">'+fmtPct(c.homeImplied)+'</span></div>'+
+        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">PD Model</span><span class="ml-board-stat-val" style="color:var(--accent)">'+hp+'%</span></div>'+
+        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Edge</span><span class="ml-board-stat-val '+edgeCls("home")+'">'+edgeStr("home")+'</span></div>'+
+      '</div>'+
+    '</div>'+
+    (c.noOdds?'<p style="color:var(--mut2);font-size:12px;font-style:italic;text-align:center;padding:6px 0">Lines not yet posted</p>':'')+
+    '<p class="ml-board-disc">PropDesk win probability — team ratings, recent form, starting pitchers (MLB), back-to-back (NBA). Not a guarantee of outcome. 21+ where legal.</p>'+
+  '</div>';
+}
+
+async function loadMoneylineBoard(){
+  var mount=$("tableMount");
+  mount.innerHTML=skeletonTable();
+  $("filterBar").style.display="none";
+  var key=(localStorage.getItem("pe_key")||"").trim();
+  if(!key){ mount.innerHTML='<div class="empty">Connect your API key first.</div>'; return; }
+  var ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
+  if(!ev){ mount.innerHTML='<div class="empty">Select a game above.</div>'; return; }
+  try{
+    var oddsUrl=apiUrl("/sports/"+ST.sport+"/events/"+ST.eventId+"/odds",{regions:"us",markets:"h2h",oddsFormat:"american"});
+    console.log("[ML] board URL:",oddsUrl);
+    var r=await fetch(oddsUrl,{signal:AbortSignal.timeout(10000)});
+    var q=readQuota(r); if(q) setStatus("on",q);
+    if(!r.ok){var t=await r.text();throw new Error("Odds API "+r.status+": "+t.slice(0,80));}
+    var oddsData=await r.json();
+    console.log("[ML] bookmakers:",(oddsData.bookmakers||[]).length);
+    var standings=await mlFetchStandings(ST.sport);
+    var extraData={};
+    if(ST.sport==="baseball_mlb"){
+      extraData.probables=await mlFetchMLBProbables();
+      extraData.pitcherStats={};
+      var pids=[];
+      Object.values(extraData.probables||{}).forEach(function(pg){
+        if(pg.home&&pg.home.id) pids.push(pg.home.id);
+        if(pg.away&&pg.away.id) pids.push(pg.away.id);
+      });
+      if(pids.length) await Promise.all(pids.map(async function(pid){extraData.pitcherStats[pid]=await mlFetchPitcherStats(pid);}));
+    }
+    if(ST.sport==="basketball_nba") extraData.b2b=await mlDetectB2B();
+    var c=mlComputeGame(ev,oddsData,standings,extraData,ST.sport);
+    if(!c){ mount.innerHTML='<div class="empty">Could not compute ratings for this game.</div>'; return; }
+    mount.innerHTML=renderMoneylineCard(c);
+  }catch(e){
+    console.error("[ML] board error:",e);
+    mount.innerHTML='<div class="empty">Could not load moneyline odds. '+esc((e.message||"Error").slice(0,100))+'</div>';
+  }
+}
+/* END MONEYLINE ENGINE */
 
 document.addEventListener("DOMContentLoaded",init);
 </script>
