@@ -520,30 +520,47 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 }
 
 /* MONEYLINE in PROPS TAB */
-.ml-board-card{background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:16px 18px 12px;margin-bottom:14px}
-.ml-board-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-.ml-board-bar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:#111;margin:0 0 14px}
-.ml-board-bar-a{background:var(--blue);transition:width .5s}
-.ml-board-bar-h{background:var(--accent);transition:width .5s}
-.ml-board-row{display:flex;align-items:center;gap:10px;padding:12px 0}
-.ml-board-row+.ml-board-row{border-top:1px solid #111}
-.ml-board-badge{font-size:9px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:3px 7px;border-radius:4px;white-space:nowrap;flex-shrink:0}
-.ml-board-badge-a{background:rgba(66,153,255,.15);color:var(--blue)}
-.ml-board-badge-h{background:rgba(0,255,135,.1);color:var(--accent)}
-.ml-board-team{font-size:14px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ml-board-rec{font-size:11px;color:var(--mut);font-weight:600;flex-shrink:0}
-.ml-board-stats{display:flex;gap:14px;flex-shrink:0;align-items:center}
-.ml-board-stat{display:flex;flex-direction:column;align-items:flex-end}
-.ml-board-stat-lbl{font-size:9px;color:var(--mut2);font-weight:700;letter-spacing:.4px;text-transform:uppercase}
-.ml-board-stat-val{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.2}
-.ml-board-edge-pos{color:var(--accent)}
-.ml-board-edge-neg{color:var(--blue)}
-.ml-board-tier{font-size:9px;font-weight:800;letter-spacing:.5px;padding:3px 8px;border-radius:4px;text-transform:uppercase;white-space:nowrap;margin-left:auto}
-.ml-board-tier-lock{background:rgba(255,215,0,.12);color:#ffd700;border:1px solid rgba(255,215,0,.25)}
-.ml-board-tier-elite{background:rgba(0,255,135,.1);color:var(--accent);border:1px solid rgba(0,255,135,.2)}
-.ml-board-tier-strong{background:rgba(127,230,168,.08);color:#7fe6a8;border:1px solid rgba(127,230,168,.2)}
-.ml-board-disc{font-size:10px;color:var(--mut2);line-height:1.4;text-align:center;margin-top:12px;font-style:italic}
-@media(max-width:480px){.ml-board-stats{gap:8px}.ml-board-stat-val{font-size:12px}.ml-board-rec{display:none}}
+.ml-card2{background:var(--surf);border:1px solid #1e1e1e;border-left:3px solid #1e1e1e;border-radius:12px;padding:24px 24px 18px;margin-bottom:14px}
+.ml-card2-edge{border-left-color:var(--accent)}
+.ml-c3-hdr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.ml-c3-lbl{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--text)}
+.ml-c3-sep{color:var(--mut2);font-size:11px}
+.ml-c3-bklbl{font-size:11px;color:var(--mut2)}
+.ml-c3-time{font-size:11px;color:var(--mut);font-weight:600}
+.ml-c3-divider{height:1px;background:#1a1a1a;margin:10px 0 18px}
+.ml-c3-tier-wrap{text-align:center;margin-bottom:14px}
+.ml-c3-tier{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:800;padding:7px 16px;border-radius:8px;background:rgba(0,255,135,.08);color:var(--accent);border:1px solid rgba(0,255,135,.22)}
+.ml-c3-tier-lock{background:rgba(255,215,0,.1)!important;color:#ffd700!important;border-color:rgba(255,215,0,.25)!important}
+.ml-c3-bar{display:flex;height:24px;border-radius:6px;overflow:hidden;margin:0 0 22px;background:#111}
+.ml-c3-bar-a{background:var(--blue);display:flex;align-items:center;justify-content:space-between;padding:0 10px;gap:4px;transition:width .5s;min-width:0;overflow:hidden;color:rgba(255,255,255,.92)}
+.ml-c3-bar-h{background:var(--accent);display:flex;align-items:center;justify-content:space-between;padding:0 10px;gap:4px;transition:width .5s;min-width:0;overflow:hidden;color:rgba(0,0,0,.8)}
+.ml-c3-bar-nick{font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.ml-c3-bar-pct{font-size:12px;font-weight:900;white-space:nowrap;flex-shrink:0}
+.ml-c3-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:18px 0}
+.ml-c3-row+.ml-c3-row{border-top:1px solid #181818}
+.ml-c3-left{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ml-c3-pill{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:4px;display:inline-block;align-self:flex-start;margin-bottom:2px}
+.ml-c3-pill-a{background:rgba(66,153,255,.15);color:var(--blue)}
+.ml-c3-pill-h{background:rgba(0,255,135,.1);color:var(--accent)}
+.ml-c3-name{font-size:18px;font-weight:800;color:var(--text);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ml-c3-rec{font-size:11px;color:var(--mut);font-weight:500}
+.ml-c3-center{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;flex-shrink:0}
+.ml-c3-prob{font-size:48px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1}
+.ml-c3-prob-lbl{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--mut2);margin-top:2px}
+.ml-c3-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;min-width:0}
+.ml-c3-odds{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;color:var(--text);line-height:1}
+.ml-c3-book-says{font-size:11px;color:var(--mut2);font-weight:500}
+.ml-c3-epill{font-size:12px;font-weight:800;padding:4px 10px;border-radius:6px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.ml-c3-ep-pos{background:rgba(0,255,135,.1);color:var(--accent);border:1px solid rgba(0,255,135,.22)}
+.ml-c3-ep-neg{background:rgba(255,55,55,.07);color:#ff5050;border:1px solid rgba(255,55,55,.18)}
+.ml-c3-ep-none{background:transparent;color:var(--mut2);border:1px solid #222}
+.ml-c3-explain{margin-top:14px;padding:14px 16px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid #1e1e1e}
+.ml-c3-explain p{font-size:13px;color:var(--mut);line-height:1.6;margin:0}
+.ml-c3-disc{font-size:9px;color:var(--mut2);line-height:1.4;text-align:center;margin-top:14px;opacity:.5;font-style:italic}
+@media(max-width:480px){
+  .ml-c3-row{gap:6px}.ml-c3-prob{font-size:36px}
+  .ml-c3-name{font-size:14px}.ml-c3-odds{font-size:18px}.ml-c3-bar-nick{display:none}
+}
 </style>
 </head>
 <body>
@@ -5761,56 +5778,109 @@ function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
 function renderMoneylineCard(c){
   var hp=Math.round(c.homeProb*100),ap=100-hp;
   var favHome=c.edge>0;
-  var absEdge=Math.abs(c.edge);
-  var edgePct=Math.round(absEdge*100);
-  var tierCls=c.tier==="LOCK"?"ml-board-tier-lock":c.tier==="ELITE"?"ml-board-tier-elite":"ml-board-tier-strong";
+  var edgePct=Math.round(Math.abs(c.edge)*100);
   var bkLbl=c.bookCount>1?"Best of "+c.bookCount+" books":"Best available";
-  var tierBadge=c.tier?'<span class="ml-board-tier '+tierCls+'">'+esc(c.tier)+' '+esc(mlNick(favHome?c.home:c.away))+' +'+edgePct+'%</span>':"";
+
+  var timeStr="";
+  try{var _d=new Date(c.time);timeStr=_d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:"America/New_York"})+" ET";}catch(e){}
+
+  /* Tier badge — centered, large, with emoji, above split bar */
+  var tierHtml="";
+  if(c.tier){
+    var favNick=mlNick(favHome?c.home:c.away);
+    var tierEmoji=c.tier==="LOCK"?"🔒":c.tier==="ELITE"?"⚡":"💪";
+    var tierCl="ml-c3-tier"+(c.tier==="LOCK"?" ml-c3-tier-lock":"");
+    tierHtml='<div class="ml-c3-tier-wrap"><span class="'+tierCl+'">'+tierEmoji+' '+esc(c.tier)+' — '+esc(favNick)+' +'+edgePct+'%</span></div>';
+  }
+
   function fmtOdds(o){if(o===null)return"—";return(o>0?"+":"")+o;}
   function fmtPct(p){return Math.round(p*100)+"%";}
-  function edgeCls(side){
-    if(c.noOdds||!c.tier) return "";
-    return((side==="home"&&favHome)||(side==="away"&&!favHome))?"ml-board-edge-pos":"ml-board-edge-neg";
+  function epCls(side){
+    if(c.noOdds) return "ml-c3-epill ml-c3-ep-none";
+    var e=(side==="home")?c.edge:-c.edge;
+    return "ml-c3-epill "+(e>0?"ml-c3-ep-pos":"ml-c3-ep-neg");
   }
-  function edgeStr(side){
+  function epStr(side){
     if(c.noOdds) return "—";
     var e=(side==="home")?c.edge:-c.edge;
     return(e>0?"+":"")+Math.round(e*100)+"%";
   }
-  return '<div class="ml-board-card">'+
-    '<div class="ml-board-hdr">'+
-      '<span class="tag tag-g" style="font-size:9px;padding:3px 8px">Moneyline</span>'+
-      (c.bookCount>0?'<span style="font-size:11px;color:var(--mut)">'+esc(bkLbl)+'</span>':'')+
-      tierBadge+
+
+  /* 3-column grid: left=pill+name+rec | center=big win% | right=odds+book+edge */
+  function teamRow(side){
+    var h=side==="home";
+    var name=h?c.home:c.away, rec=h?c.homeRec:c.awayRec;
+    var odds=h?c.homeOdds:c.awayOdds, impl=h?c.homeImplied:c.awayImplied;
+    var prob=h?hp:ap;
+    var isFav=h?c.edge>0:c.edge<0;
+    var probCol=isFav?"color:var(--accent)":"color:var(--text)";
+    return '<div class="ml-c3-row">'+
+      '<div class="ml-c3-left">'+
+        '<span class="ml-c3-pill '+(h?"ml-c3-pill-h":"ml-c3-pill-a")+'">'+(h?"Home":"Away")+'</span>'+
+        '<span class="ml-c3-name">'+esc(name)+'</span>'+
+        (rec?'<span class="ml-c3-rec">'+esc(rec)+'</span>':'')+
+      '</div>'+
+      '<div class="ml-c3-center">'+
+        '<span class="ml-c3-prob" style="'+probCol+'">'+prob+'%</span>'+
+        '<span class="ml-c3-prob-lbl">Win Prob</span>'+
+      '</div>'+
+      '<div class="ml-c3-right">'+
+        '<span class="ml-c3-odds">'+esc(fmtOdds(odds))+'</span>'+
+        (impl!=null?'<span class="ml-c3-book-says">Book: '+fmtPct(impl)+'</span>':'')+
+        '<span class="'+epCls(side)+'">'+epStr(side)+'</span>'+
+      '</div>'+
+    '</div>';
+  }
+
+  /* Plain-English explanation built from c.adjustments */
+  function buildExplanation(){
+    var favName=favHome?c.home:c.away;
+    var undName=favHome?c.away:c.home;
+    var favSide=favHome?"home":"away";
+    var undSide=favHome?"away":"home";
+    var favProb=favHome?hp:ap;
+    var adjs=c.adjustments||[];
+    var out=[];
+    out.push("PropDesk gives the "+esc(favName)+" a "+favProb+"% win probability, "+edgePct+"% above what the books imply.");
+    var favPit=adjs.filter(function(a){return a.isPitcher&&a.side===favSide;})[0];
+    var undPit=adjs.filter(function(a){return a.isPitcher&&a.side===undSide;})[0];
+    if(favPit&&undPit){
+      out.push(esc(favName)+"'s "+esc(favPit.text)+" faces "+esc(undName)+"'s "+esc(undPit.text)+".");
+    }else if(favPit){
+      out.push(esc(favName)+" gets a boost from their starter: "+esc(favPit.text)+".");
+    }else if(undPit){
+      out.push(esc(undName)+"'s starter "+esc(undPit.text)+" is a factor in the model.");
+    }
+    var misc=adjs.filter(function(a){return !a.isPitcher;});
+    if(misc.length) out.push(misc.map(function(a){return esc(a.text);}).join("; ")+".");
+    return out.join(" ");
+  }
+
+  var explainText=(!c.noOdds&&(c.adjustments||[]).length)?buildExplanation():"";
+
+  return '<div class="ml-card2'+(c.tier?" ml-card2-edge":"")+'">'+
+    '<div class="ml-c3-hdr">'+
+      '<span class="ml-c3-lbl">Moneyline</span>'+
+      (c.bookCount>0?'<span class="ml-c3-sep">·</span><span class="ml-c3-bklbl">'+esc(bkLbl)+'</span>':'')+
+      (timeStr?'<span class="ml-c3-sep">·</span><span class="ml-c3-time">'+esc(timeStr)+'</span>':'')+
     '</div>'+
-    '<div class="ml-board-bar">'+
-      '<div class="ml-board-bar-a" style="width:'+ap+'%"></div>'+
-      '<div class="ml-board-bar-h" style="width:'+hp+'%"></div>'+
-    '</div>'+
-    '<div class="ml-board-row">'+
-      '<span class="ml-board-badge ml-board-badge-a">Away</span>'+
-      '<span class="ml-board-team">'+esc(c.away)+'</span>'+
-      (c.awayRec?'<span class="ml-board-rec">'+esc(c.awayRec)+'</span>':'')+
-      '<div class="ml-board-stats">'+
-        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Odds</span><span class="ml-board-stat-val">'+esc(fmtOdds(c.awayOdds))+'</span></div>'+
-        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Book</span><span class="ml-board-stat-val">'+fmtPct(c.awayImplied)+'</span></div>'+
-        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">PD Model</span><span class="ml-board-stat-val" style="color:var(--blue)">'+ap+'%</span></div>'+
-        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Edge</span><span class="ml-board-stat-val '+edgeCls("away")+'">'+edgeStr("away")+'</span></div>'+
+    '<div class="ml-c3-divider"></div>'+
+    tierHtml+
+    '<div class="ml-c3-bar">'+
+      '<div class="ml-c3-bar-a" style="width:'+ap+'%">'+
+        '<span class="ml-c3-bar-nick">'+esc(mlNick(c.away))+'</span>'+
+        '<span class="ml-c3-bar-pct">'+ap+'%</span>'+
+      '</div>'+
+      '<div class="ml-c3-bar-h" style="width:'+hp+'%">'+
+        '<span class="ml-c3-bar-pct">'+hp+'%</span>'+
+        '<span class="ml-c3-bar-nick" style="text-align:right">'+esc(mlNick(c.home))+'</span>'+
       '</div>'+
     '</div>'+
-    '<div class="ml-board-row">'+
-      '<span class="ml-board-badge ml-board-badge-h">Home</span>'+
-      '<span class="ml-board-team">'+esc(c.home)+'</span>'+
-      (c.homeRec?'<span class="ml-board-rec">'+esc(c.homeRec)+'</span>':'')+
-      '<div class="ml-board-stats">'+
-        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Odds</span><span class="ml-board-stat-val">'+esc(fmtOdds(c.homeOdds))+'</span></div>'+
-        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Book</span><span class="ml-board-stat-val">'+fmtPct(c.homeImplied)+'</span></div>'+
-        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">PD Model</span><span class="ml-board-stat-val" style="color:var(--accent)">'+hp+'%</span></div>'+
-        '<div class="ml-board-stat"><span class="ml-board-stat-lbl">Edge</span><span class="ml-board-stat-val '+edgeCls("home")+'">'+edgeStr("home")+'</span></div>'+
-      '</div>'+
-    '</div>'+
-    (c.noOdds?'<p style="color:var(--mut2);font-size:12px;font-style:italic;text-align:center;padding:6px 0">Lines not yet posted</p>':'')+
-    '<p class="ml-board-disc">PropDesk win probability — team ratings, recent form, starting pitchers (MLB), back-to-back (NBA). Not a guarantee of outcome. 21+ where legal.</p>'+
+    teamRow("away")+
+    teamRow("home")+
+    (explainText?'<div class="ml-c3-explain"><p>'+explainText+'</p></div>':'')+
+    (c.noOdds?'<p style="color:var(--mut2);font-size:11px;text-align:center;padding:4px 0;font-style:italic">Lines not yet posted</p>':'')+
+    '<p class="ml-c3-disc">PropDesk win probability — team ratings, recent form, starting pitchers (MLB), back-to-back (NBA). Not a guarantee of outcome. 21+ where legal.</p>'+
   '</div>';
 }
 
