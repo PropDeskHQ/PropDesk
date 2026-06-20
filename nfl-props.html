@@ -570,6 +570,9 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .g5-hdr{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
 .g5-title{font-size:15px;font-weight:800;color:var(--text)}
 .g5-sub{font-size:12px;color:var(--mut)}
+.g5-arrow{font-size:11px;font-weight:900;margin-left:3px;vertical-align:middle}
+.g5-up{color:var(--accent)}
+.g5-down{color:#ff5050}
 </style>
 </head>
 <body>
@@ -5893,7 +5896,11 @@ async function loadMoneylineBoard(){
     var c=mlComputeGame(ev,oddsData,standings,extraData,ST.sport);
     if(!c){ mlMount.innerHTML='<div class="empty">Could not compute ratings for this game.</div>'; return; }
     mlMount.innerHTML=renderMoneylineCard(c);
-    if(giMount) giMount.innerHTML=renderGameInfoStrip(c,ev);
+    if(giMount){
+      var _series=null,_weather=null;
+      try{var _x=await Promise.all([fetchSeasonSeries(ST.sport,c.home,c.away),fetchWeather(c.home,ST.sport)]);_series=_x[0];_weather=_x[1];}catch(e){}
+      giMount.innerHTML=renderGameInfoStrip(c,ev,{series:_series,weather:_weather});
+    }
   }catch(e){
     console.error("[ML] board error:",e);
     mlMount.innerHTML='<div class="empty">Could not load moneyline odds. '+esc((e.message||"Error").slice(0,100))+'</div>';
@@ -5902,7 +5909,8 @@ async function loadMoneylineBoard(){
 /* END MONEYLINE ENGINE */
 
 /* ============ GAME DETAIL ============ */
-function renderGameInfoStrip(c,ev){
+function renderGameInfoStrip(c,ev,extra){
+  extra=extra||{};
   var timeStr="";
   try{var d=new Date(c.time);timeStr=d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:"America/New_York"})+" ET";}catch(e){}
   var chips=[];
@@ -5916,6 +5924,8 @@ function renderGameInfoStrip(c,ev){
   var homePit=adjs.filter(function(a){return a.isPitcher&&a.side==="home";})[0];
   if(awayPit) chips.push({l:mlNick(c.away)+" SP",v:awayPit.text});
   if(homePit) chips.push({l:mlNick(c.home)+" SP",v:homePit.text});
+  if(extra.series) chips.push({l:"Season Series",v:extra.series});
+  if(extra.weather){var w=extra.weather;chips.push({l:"Weather",v:w.temp+"\xb0F \xb7 "+w.wind+" mph "+w.dir});}
   return '<div class="gis-wrap">'+
     chips.map(function(ch){
       return '<div class="gis-chip"><span class="gis-lbl">'+esc(ch.l)+'</span><span class="gis-val">'+esc(ch.v)+'</span></div>';
@@ -5984,7 +5994,20 @@ async function loadGameTop5(){
       return p.value>=55;
     });
     qualified.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
-    renderGameTop5(qualified.slice(0,5));
+    var _top5=qualified.slice(0,5);
+    try{
+      var _hist=JSON.parse(localStorage.getItem("pe_g5_hist")||"{}");
+      var _newH={};
+      _top5.forEach(function(p){
+        var k=(p.player||"").toLowerCase()+"|"+(p._market||"");
+        var cur=getEffectiveConf(p);
+        _newH[k]=cur;
+        if(_hist[k]!=null){var diff=cur-_hist[k];p._confTrend=diff>=1?"up":diff<=-1?"down":"same";}
+      });
+      Object.keys(_newH).forEach(function(k){_hist[k]=_newH[k];});
+      localStorage.setItem("pe_g5_hist",JSON.stringify(_hist));
+    }catch(e){}
+    renderGameTop5(_top5);
   }catch(e){
     mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Error loading picks.</div>';
   }
@@ -6025,7 +6048,7 @@ function renderGameTop5(picks){
             '<div class="t10-sub">'+esc(mktName)+'</div>'+
           '</div>'+
           '<div class="t10-col-conf">'+
-            '<div class="t10-conf-pct">'+conf+'%</div>'+
+            '<div class="t10-conf-pct">'+conf+'%'+(p._confTrend==="up"?'<span class="g5-arrow g5-up">↑</span>':p._confTrend==="down"?'<span class="g5-arrow g5-down">↓</span>':'')+'</div>'+
             '<span class="t10-tier '+tierCls+'">'+tier.t+'</span>'+
           '</div>'+
         '</div>'+
@@ -6128,6 +6151,140 @@ async function loadGameTrends(){
     trMount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>No trends found for this game yet. Try a prop market first to load data.</p></div>'; return;
   }
   renderTrends(unique);
+}
+
+/* ============ OUTDOOR STADIUM COORDS ============ */
+var OUTDOOR_STADIUMS={
+  baseball_mlb:{
+    "Boston Red Sox":{lat:42.3467,lon:-71.0972},
+    "New York Yankees":{lat:40.8296,lon:-73.9262},
+    "Baltimore Orioles":{lat:39.2838,lon:-76.6217},
+    "Philadelphia Phillies":{lat:39.9058,lon:-75.1665},
+    "New York Mets":{lat:40.7571,lon:-73.8458},
+    "St. Louis Cardinals":{lat:38.6226,lon:-90.1928},
+    "Chicago Cubs":{lat:41.9484,lon:-87.6553},
+    "Cincinnati Reds":{lat:39.0979,lon:-84.5082},
+    "Pittsburgh Pirates":{lat:40.4468,lon:-80.0057},
+    "Detroit Tigers":{lat:42.3390,lon:-83.0485},
+    "Cleveland Guardians":{lat:41.4962,lon:-81.6852},
+    "Minnesota Twins":{lat:44.9817,lon:-93.2777},
+    "Kansas City Royals":{lat:39.0517,lon:-94.4803},
+    "Chicago White Sox":{lat:41.8300,lon:-87.6339},
+    "Los Angeles Dodgers":{lat:34.0739,lon:-118.2400},
+    "San Francisco Giants":{lat:37.7786,lon:-122.3893},
+    "San Diego Padres":{lat:32.7076,lon:-117.1570},
+    "Colorado Rockies":{lat:39.7559,lon:-104.9942},
+    "Los Angeles Angels":{lat:33.8003,lon:-117.8827},
+    "Atlanta Braves":{lat:33.8908,lon:-84.4678},
+    "Washington Nationals":{lat:38.8730,lon:-77.0074}
+  },
+  americanfootball_nfl:{
+    "Buffalo Bills":{lat:42.7738,lon:-78.7868},
+    "New England Patriots":{lat:42.0909,lon:-71.2643},
+    "New York Jets":{lat:40.8135,lon:-74.0745},
+    "New York Giants":{lat:40.8135,lon:-74.0745},
+    "Miami Dolphins":{lat:25.9580,lon:-80.2388},
+    "Baltimore Ravens":{lat:39.2781,lon:-76.6227},
+    "Pittsburgh Steelers":{lat:40.4468,lon:-80.0157},
+    "Cleveland Browns":{lat:41.5061,lon:-81.6995},
+    "Cincinnati Bengals":{lat:39.0955,lon:-84.5160},
+    "Jacksonville Jaguars":{lat:30.3239,lon:-81.6373},
+    "Tennessee Titans":{lat:36.1665,lon:-86.7713},
+    "Kansas City Chiefs":{lat:39.0489,lon:-94.4839},
+    "Denver Broncos":{lat:39.7439,lon:-105.0201},
+    "Seattle Seahawks":{lat:47.5952,lon:-122.3316},
+    "San Francisco 49ers":{lat:37.4033,lon:-121.9694},
+    "Green Bay Packers":{lat:44.5013,lon:-88.0622},
+    "Chicago Bears":{lat:41.8623,lon:-87.6167},
+    "Philadelphia Eagles":{lat:39.9008,lon:-75.1675},
+    "Washington Commanders":{lat:38.9076,lon:-76.8645},
+    "Tampa Bay Buccaneers":{lat:27.9759,lon:-82.5033},
+    "Carolina Panthers":{lat:35.2258,lon:-80.8528}
+  }
+};
+
+function windDirLabel(deg){
+  if(deg==null) return "";
+  var dirs=["N","NE","E","SE","S","SW","W","NW"];
+  return dirs[Math.round(deg/45)%8]||"";
+}
+
+var _seriesCache={};
+async function fetchSeasonSeries(sport,homeTeam,awayTeam){
+  if(sport!=="baseball_mlb") return null;
+  var ck=sport+"|"+(homeTeam||"")+"|"+(awayTeam||"");
+  if(_seriesCache[ck]!==undefined) return _seriesCache[ck];
+  try{
+    var teamId=await mlbTeamId(homeTeam);
+    if(!teamId){ _seriesCache[ck]=null; return null; }
+    var yr=new Date().getFullYear();
+    var r=await fetch("https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId="+teamId+"&season="+yr+"&gameType=R",{signal:AbortSignal.timeout(8000)});
+    if(!r.ok){ _seriesCache[ck]=null; return null; }
+    var d=await r.json();
+    var awayNorm=mlNormKey(awayTeam||""),homeNorm=mlNormKey(homeTeam||"");
+    var homeW=0,homeL=0;
+    var today=new Date(); today.setHours(0,0,0,0);
+    (d.dates||[]).forEach(function(dt){
+      (dt.games||[]).forEach(function(game){
+        if(!game.status||game.status.detailedState!=="Final") return;
+        var gd=new Date(game.gameDate||""); gd.setHours(0,0,0,0);
+        if(gd>=today) return;
+        var gh=mlNormKey((game.teams&&game.teams.home&&game.teams.home.team&&game.teams.home.team.name)||"");
+        var ga=mlNormKey((game.teams&&game.teams.away&&game.teams.away.team&&game.teams.away.team.name)||"");
+        if(gh!==awayNorm&&ga!==awayNorm) return;
+        var ourSide=(gh===homeNorm)?"home":"away";
+        var ourData=game.teams&&game.teams[ourSide];
+        if(ourData&&ourData.isWinner) homeW++; else homeL++;
+      });
+    });
+    var total=homeW+homeL;
+    var result;
+    if(total===0){
+      result="First meeting this season";
+    }else if(homeW===homeL){
+      result="Series tied "+homeW+"-"+homeL;
+    }else{
+      var leadName=homeW>homeL?mlNick(homeTeam):mlNick(awayTeam);
+      var lW=homeW>homeL?homeW:homeL,lL=homeW>homeL?homeL:homeW;
+      result=leadName+" lead series "+lW+"-"+lL;
+    }
+    _seriesCache[ck]=result;
+    return result;
+  }catch(e){
+    console.warn("[Series]",e);
+    _seriesCache[ck]=null;
+    return null;
+  }
+}
+
+var _weatherCache={};
+async function fetchWeather(homeTeam,sport){
+  var stadiums=OUTDOOR_STADIUMS[sport];
+  if(!stadiums) return null;
+  var normHome=(homeTeam||"").toLowerCase();
+  var coords=null;
+  for(var name in stadiums){
+    if(name.toLowerCase()===normHome){coords=stadiums[name];break;}
+  }
+  if(!coords){
+    var lastWord=normHome.trim().split(/\s+/).pop();
+    for(var name in stadiums){
+      if(name.toLowerCase().indexOf(lastWord)>=0){coords=stadiums[name];break;}
+    }
+  }
+  if(!coords) return null;
+  var ck=coords.lat+","+coords.lon;
+  if(_weatherCache[ck]&&Date.now()-_weatherCache[ck]._ts<1800000) return _weatherCache[ck];
+  try{
+    var url="https://api.open-meteo.com/v1/forecast?latitude="+coords.lat+"&longitude="+coords.lon+"&current=temperature_2m,wind_speed_10m,wind_direction_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto";
+    var r=await fetch(url,{signal:AbortSignal.timeout(6000)});
+    if(!r.ok) return null;
+    var d=await r.json();
+    var cur=d.current; if(!cur) return null;
+    var w={temp:Math.round(cur.temperature_2m),wind:Math.round(cur.wind_speed_10m),dir:windDirLabel(cur.wind_direction_10m),_ts:Date.now()};
+    _weatherCache[ck]=w;
+    return w;
+  }catch(e){return null;}
 }
 
 document.addEventListener("DOMContentLoaded",init);
