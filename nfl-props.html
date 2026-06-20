@@ -561,6 +561,15 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   .ml-c3-row{gap:6px}.ml-c3-prob{font-size:36px}
   .ml-c3-name{font-size:14px}.ml-c3-odds{font-size:18px}.ml-c3-bar-nick{display:none}
 }
+/* GAME INFO STRIP */
+.gis-wrap{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px;background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px 14px;margin:12px 0 4px}
+.gis-chip{display:flex;flex-direction:column;gap:2px}
+.gis-lbl{font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--mut2)}
+.gis-val{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+/* TOP 5 GAME SECTION */
+.g5-hdr{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
+.g5-title{font-size:15px;font-weight:800;color:var(--text)}
+.g5-sub{font-size:12px;color:var(--mut)}
 </style>
 </head>
 <body>
@@ -591,9 +600,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     <button class="drawer-close" id="drawerClose">&times;</button>
   </div>
   <nav class="drawer-nav" id="drawerNav">
-    <button data-page="props" class="active">Props</button>
-    <button data-page="trends">Trends</button>
-    <button data-page="top10">Top 10</button>
+    <button data-page="games" class="active">Games</button>
     <button data-page="history">History</button>
     <button data-page="how">How It Works</button>
     <button data-page="disclaimer">Disclaimer</button>
@@ -603,39 +610,48 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 
 <div class="wrap">
 
-  <!-- PROPS PAGE -->
-  <div class="page active" id="page-props">
-    <div class="lbl">Sport</div>
+  <!-- GAMES PAGE -->
+  <div class="page active" id="page-games">
     <div class="tabrow" id="sportTabs"></div>
-    <div class="lbl">Prop Market</div>
-    <div class="tabrow prop" id="propTabs"></div>
-    <div class="lbl">Games</div>
     <div class="games" id="gamesRow"><div class="empty" style="padding:18px">Connect your API key, then pick a sport.</div></div>
 
-    <div class="filterbar" id="filterBar" style="display:none">
-      <input class="search" id="searchIn" placeholder="Search player...">
-      <span class="fb-lbl">My Book:</span>
-      <select id="bookSel"><option value="">All Books</option></select>
-      <button class="btn" id="parlayBtn">Build Parlay</button>
-      <button class="btn-toggle" id="showNoValueBtn" title="Show props with no clear edge">Show Hidden</button>
-      <span class="count" id="resCount"></span>
-    </div>
+    <!-- Game detail — shown when a game is selected -->
+    <div id="gameDetail" style="display:none">
+      <div id="gameInfoStrip"></div>
 
-    <div id="potgMount"></div>
-    <div id="lotdMount"></div>
+      <div class="lbl" style="margin-top:12px">Explore</div>
+      <div class="tabrow prop" id="propTabs" style="margin-bottom:14px"></div>
 
-    <div id="summaryBar" style="display:none">
-      <div class="summary-bar">
-        <span class="sb-label" id="sb-total">0 props</span>
-        <span class="sb-chip sb-lock" id="sb-lock">LOCK: 0</span>
-        <span class="sb-chip sb-elite" id="sb-elite">ELITE: 0</span>
-        <span class="sb-chip sb-good" id="sb-good">GOOD: 0</span>
-        <span class="sb-spacer"></span>
-        <button class="btn-best" id="bestBetsBtn">Best Bets Only</button>
+      <div id="gameMLMount"></div>
+      <div id="gameTop5Mount"></div>
+
+      <div id="gameContentMount" style="display:none">
+        <div class="filterbar" id="filterBar" style="display:none">
+          <input class="search" id="searchIn" placeholder="Search player...">
+          <span class="fb-lbl">My Book:</span>
+          <select id="bookSel"><option value="">All Books</option></select>
+          <button class="btn" id="parlayBtn">Build Parlay</button>
+          <button class="btn-toggle" id="showNoValueBtn" title="Show props with no clear edge">Show Hidden</button>
+          <span class="count" id="resCount"></span>
+        </div>
+        <div id="potgMount"></div>
+        <div id="lotdMount"></div>
+        <div id="summaryBar" style="display:none">
+          <div class="summary-bar">
+            <span class="sb-label" id="sb-total">0 props</span>
+            <span class="sb-chip sb-lock" id="sb-lock">LOCK: 0</span>
+            <span class="sb-chip sb-elite" id="sb-elite">ELITE: 0</span>
+            <span class="sb-chip sb-good" id="sb-good">GOOD: 0</span>
+            <span class="sb-spacer"></span>
+            <button class="btn-best" id="bestBetsBtn">Best Bets Only</button>
+          </div>
+        </div>
+        <div id="tableMount"></div>
+        <div id="trendsMount" style="display:none">
+          <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game to see trends.</p></div>
+        </div>
       </div>
     </div>
-
-    <div id="tableMount"></div>
   </div>
 
   <!-- HISTORY PAGE -->
@@ -676,48 +692,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     </div>
   </div>
 
-  <!-- TRENDS PAGE -->
-  <div class="page" id="page-trends">
-    <div class="trends-hdr">
-      <div>
-        <h2>Trends</h2>
-        <p class="trends-sub">Real trends calculated from live stats and market data. Every trend is backed by actual numbers — no mock data.</p>
-        <div class="trends-calc-time" id="trendsCalcTime"></div>
-      </div>
-      <button class="btn" id="trendsRefreshBtn">Refresh</button>
-    </div>
-    <div class="lbl">Sport</div>
-    <div class="tabrow" id="trendsSportTabs"></div>
-    <div class="trend-tabs" id="trendTabs">
-      <button class="pill active" data-ttype="all" data-tooltip="Shows every trend type across all categories">All Trends</button>
-      <button class="pill" data-ttype="streak" data-tooltip="Players hitting their line in 3+ consecutive games — active hot streaks">Streaks</button>
-      <button class="pill" data-ttype="linevalue" data-tooltip="Props where the book line is set significantly above or below the player's recent average — creating an exploitable gap">Line Value</button>
-      <button class="pill" data-ttype="movement" data-tooltip="Props where significant line movement or book disagreement signals professional betting activity">Sharp Money</button>
-      <button class="pill" data-ttype="totals" data-tooltip="Team over/under trends — games going over or under the total at an unusually high rate">Totals</button>
-      <button class="pill" data-ttype="matchup" data-tooltip="MLB players combining real handedness + batting-order matchup data — at least 2 conditions, real boxscore history only">Matchups</button>
-      <button class="pill" data-ttype="teamsit" data-tooltip="MLB team systems combining rest days, opponent rank, and home/road splits against real final scores">Team Systems</button>
-    </div>
-    <div id="trendsMount">
-      <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a sport above to see trends.</p></div>
-    </div>
-  </div>
 
-  <!-- TOP 10 TODAY PAGE -->
-  <div class="page" id="page-top10">
-    <div class="t10-hdr">
-      <div class="t10-hdr-left">
-        <h2 class="t10-title">Top 10 Today<span class="t10-date" id="t10Date"></span></h2>
-        <div class="t10-stat-bar" id="t10Summary"></div>
-      </div>
-      <div class="t10-hdr-right">
-        <button class="t10-copy-btn" id="t10CopyAll" style="display:none">Copy All ↗</button>
-        <button class="t10-refresh-btn" id="t10RefreshBtn">⟳</button>
-      </div>
-    </div>
-    <div class="tabrow" id="t10SportTabs"></div>
-    <div class="t10-chips" id="t10GamesRow"><div class="empty" style="padding:10px 4px">Select a sport above.</div></div>
-    <div id="t10Mount"></div>
-  </div>
 
 
   <!-- DISCLAIMER -->
@@ -766,10 +741,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 
 <!-- MOBILE BOTTOM NAV -->
 <nav class="botnav" id="botnav">
-  <button data-nav="props" class="active"><span class="bn-ic">#</span>Props</button>
-  <button data-nav="trends"><span class="bn-ic">~</span>Trends</button>
-  <button data-nav="top10"><span class="bn-ic">10</span>Top 10</button>
-  <button data-nav="history"><span class="bn-ic">*</span>History</button>
+  <button data-nav="games" class="active"><span class="bn-ic">#</span>Games</button>
+  <button data-nav="history"><span class="bn-ic">★</span>History</button>
   <button data-nav="parlay"><span class="bn-ic">+</span>Parlay</button>
 </nav>
 
@@ -1206,8 +1179,7 @@ async function fetchEvents(){
     renderGames();
     // Auto-restore last selected game if it's still in today's slate
     if(ST.eventId && ST.events.some(function(e){return e.id===ST.eventId;})){
-      if(ST.market) loadBoard();
-      loadPropOfDay();
+      loadGameDetail();
     } else {
       ST.eventId=null;
       localStorage.removeItem("pe_event");
@@ -1809,11 +1781,17 @@ function renderSportTabs(){
     c.appendChild(b);
   });
 }
+function showGameContent(){
+  var cm=$("gameContentMount"); if(cm) cm.style.display="";
+}
 function renderPropTabs(){
-  var c=$("propTabs"); c.innerHTML="";
-  (MARKETS[ST.sport]||[]).forEach(function(m){
+  var c=$("propTabs"); if(!c) return; c.innerHTML="";
+  var tp=el("button","pill"+(ST.market==="__trends__"?" active":""),"Trends");
+  tp.onclick=function(){ ST.market="__trends__"; renderPropTabs(); showGameContent(); loadGameTrends(); };
+  c.appendChild(tp);
+  (MARKETS[ST.sport]||[]).filter(function(m){return m.k!=="_h2h";}).forEach(function(m){
     var b=el("button","pill"+(m.k===ST.market?" active":""),m.n);
-    b.onclick=function(){ ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); if(ST.eventId) loadBoard(); };
+    b.onclick=function(){ ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); showGameContent(); if(ST.eventId) loadBoard(); };
     c.appendChild(b);
   });
 }
@@ -1827,16 +1805,24 @@ function renderGames(){
     var when=dt.toLocaleDateString([], {month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
     var b=el("button","game"+(ev.id===ST.eventId?" active":""));
     b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
-    b.onclick=function(){ ST.eventId=ev.id; localStorage.setItem("pe_event",ev.id); _glCache={}; _qsCache={}; renderGames(); if(ST.market) loadBoard(); loadPropOfDay(); };
+    b.onclick=function(){ ST.eventId=ev.id; localStorage.setItem("pe_event",ev.id); _glCache={}; _qsCache={}; renderGames(); loadGameDetail(); };
     c.appendChild(b);
   });
 }
 
 /* ============ CLEAR BOARD ============ */
-function clearBoard(){_potgCache={};
+function clearBoard(){
+  _potgCache={};
   destroyCharts();
+  var gd=$("gameDetail"); if(gd) gd.style.display="none";
+  var mlM=$("gameMLMount"); if(mlM) mlM.innerHTML="";
+  var t5M=$("gameTop5Mount"); if(t5M) t5M.innerHTML="";
+  var giM=$("gameInfoStrip"); if(giM) giM.innerHTML="";
+  var cm=$("gameContentMount"); if(cm) cm.style.display="none";
   $("filterBar").style.display="none";
   $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
+  var trM=$("trendsMount"); if(trM) trM.style.display="none";
+  var sb=$("summaryBar"); if(sb) sb.style.display="none";
   $("gamesRow").innerHTML='<div class="empty" style="padding:18px">Loading games...</div>';
 }
 
@@ -1863,6 +1849,9 @@ async function loadBoard(){
   if(ST.market==="_h2h"){loadMoneylineBoard();return;}
   if(!getKey()){ toast("Connect your API key first"); return; }
   destroyCharts();
+  var cm=$("gameContentMount"); if(cm) cm.style.display="";
+  var trMount=$("trendsMount"); if(trMount) trMount.style.display="none";
+  var tm=$("tableMount"); if(tm) tm.style.display="";
   $("tableMount").innerHTML=skeletonTable();
   // Do NOT clear potgMount here   POTG is per-game, not per-market
   $("filterBar").style.display="none";
@@ -3910,8 +3899,6 @@ function showPage(name){
   $("drawerNav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-page")===name); });
   $("botnav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-nav")===name); });
   if(name==="history") renderHistory();
-  if(name==="trends") initTrends();
-  if(name==="top10") initTop10();
   window.scrollTo(0,0);
 }
 
@@ -3998,16 +3985,6 @@ function init(){
   $("bookSel").addEventListener("change",function(){ ST.book=$("bookSel").value; localStorage.setItem("pe_book",ST.book); if(ST.props.length) renderTable(false); });
   if(ST.book) $("bookSel").value=ST.book;
   $("parlayBtn").onclick=openParlay;
-  // Trend type filter tabs
-  document.querySelectorAll("#trendTabs .pill").forEach(function(b){
-    b.onclick=function(){
-      _trendsFilter=b.getAttribute("data-ttype")||"all";
-      renderTrends(_trendsData);
-    };
-  });
-  $("trendsRefreshBtn").onclick=function(){ _trendsData=[]; _trendsEvents=[]; trendsLoadSport(); };
-  $("t10RefreshBtn").onclick=function(){ _t10Data=[]; if(_t10EventId) t10LoadGame(); else t10LoadSport(); };
-
   $("showNoValueBtn").onclick=function(){
     ST_showNoValue=!ST_showNoValue;
     this.classList.toggle("on",ST_showNoValue);
@@ -5885,13 +5862,13 @@ function renderMoneylineCard(c){
 }
 
 async function loadMoneylineBoard(){
-  var mount=$("tableMount");
-  mount.innerHTML=skeletonTable();
-  $("filterBar").style.display="none";
+  var mlMount=$("gameMLMount"); if(!mlMount) return;
+  var giMount=$("gameInfoStrip");
+  mlMount.innerHTML='<div style="color:var(--mut);font-size:12px;padding:16px;text-align:center">Loading moneyline...</div>';
   var key=(localStorage.getItem("pe_key")||"").trim();
-  if(!key){ mount.innerHTML='<div class="empty">Connect your API key first.</div>'; return; }
+  if(!key){ mlMount.innerHTML='<div class="empty">Connect your API key first.</div>'; return; }
   var ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
-  if(!ev){ mount.innerHTML='<div class="empty">Select a game above.</div>'; return; }
+  if(!ev){ mlMount.innerHTML='<div class="empty">Select a game above.</div>'; return; }
   try{
     var oddsUrl=apiUrl("/sports/"+ST.sport+"/events/"+ST.eventId+"/odds",{regions:"us",markets:"h2h",oddsFormat:"american"});
     console.log("[ML] board URL:",oddsUrl);
@@ -5914,14 +5891,244 @@ async function loadMoneylineBoard(){
     }
     if(ST.sport==="basketball_nba") extraData.b2b=await mlDetectB2B();
     var c=mlComputeGame(ev,oddsData,standings,extraData,ST.sport);
-    if(!c){ mount.innerHTML='<div class="empty">Could not compute ratings for this game.</div>'; return; }
-    mount.innerHTML=renderMoneylineCard(c);
+    if(!c){ mlMount.innerHTML='<div class="empty">Could not compute ratings for this game.</div>'; return; }
+    mlMount.innerHTML=renderMoneylineCard(c);
+    if(giMount) giMount.innerHTML=renderGameInfoStrip(c,ev);
   }catch(e){
     console.error("[ML] board error:",e);
-    mount.innerHTML='<div class="empty">Could not load moneyline odds. '+esc((e.message||"Error").slice(0,100))+'</div>';
+    mlMount.innerHTML='<div class="empty">Could not load moneyline odds. '+esc((e.message||"Error").slice(0,100))+'</div>';
   }
 }
 /* END MONEYLINE ENGINE */
+
+/* ============ GAME DETAIL ============ */
+function renderGameInfoStrip(c,ev){
+  var timeStr="";
+  try{var d=new Date(c.time);timeStr=d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:"America/New_York"})+" ET";}catch(e){}
+  var chips=[];
+  if(timeStr) chips.push({l:"Time",v:timeStr});
+  chips.push({l:mlNick(c.away)+" Rec",v:c.awayRec||"—"});
+  chips.push({l:mlNick(c.home)+" Rec",v:c.homeRec||"—"});
+  if(c.awayL10) chips.push({l:mlNick(c.away)+" L10",v:c.awayL10});
+  if(c.homeL10) chips.push({l:mlNick(c.home)+" L10",v:c.homeL10});
+  var adjs=c.adjustments||[];
+  var awayPit=adjs.filter(function(a){return a.isPitcher&&a.side==="away";})[0];
+  var homePit=adjs.filter(function(a){return a.isPitcher&&a.side==="home";})[0];
+  if(awayPit) chips.push({l:mlNick(c.away)+" SP",v:awayPit.text});
+  if(homePit) chips.push({l:mlNick(c.home)+" SP",v:homePit.text});
+  return '<div class="gis-wrap">'+
+    chips.map(function(ch){
+      return '<div class="gis-chip"><span class="gis-lbl">'+esc(ch.l)+'</span><span class="gis-val">'+esc(ch.v)+'</span></div>';
+    }).join('')+
+  '</div>';
+}
+
+function loadGameDetail(){
+  var gd=$("gameDetail"); if(!gd) return;
+  gd.style.display="";
+  var cm=$("gameContentMount"); if(cm) cm.style.display="none";
+  $("filterBar").style.display="none";
+  $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
+  var trM=$("trendsMount"); if(trM) trM.style.display="none";
+  var sb=$("summaryBar"); if(sb) sb.style.display="none";
+  renderPropTabs();
+  var giM=$("gameInfoStrip");
+  if(giM) giM.innerHTML='<div class="gis-wrap"><span style="color:var(--mut);font-size:12px">Loading game data…</span></div>';
+  var mlM=$("gameMLMount");
+  if(mlM) mlM.innerHTML='';
+  var t5M=$("gameTop5Mount");
+  if(t5M) t5M.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:20px;font-size:13px">Scanning all markets…</div>';
+  loadMoneylineBoard();
+  loadGameTop5();
+  loadPropOfDay();
+}
+
+async function loadGameTop5(){
+  var mount=$("gameTop5Mount"); if(!mount) return;
+  var eventId=ST.eventId;
+  var ev=(ST.events||[]).filter(function(e){return e.id===eventId;})[0];
+  if(!ev||!getKey()) return;
+  var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
+  var mks=LOTD_MARKETS[ST.sport]||[];
+  try{
+    var candidates=[];
+    for(var mi=0;mi<mks.length;mi++){
+      var mk=mks[mi];
+      try{
+        var mkData=await fetchOdds(eventId,mk);
+        var mkProps=parseProps(mkData,mk);
+        mkProps.forEach(function(p){p._market=mk;p._sport=ST.sport;p._game=gameLabel;candidates.push(p);});
+      }catch(e){}
+    }
+    if(!candidates.length){
+      mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">No prop lines available yet.</div>';
+      return;
+    }
+    var seen={},unique=[];
+    candidates
+      .filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null;})
+      .sort(function(a,b){return b.value-a.value;})
+      .forEach(function(p){var k=p.player.toLowerCase()+"|"+p._market;if(!seen[k]){seen[k]=1;unique.push(p);}});
+    var toEnrich=unique.slice(0,15);
+    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Enriching '+toEnrich.length+' candidates…</div>';
+    var savedSport=ST.sport,savedMkt=ST.market;
+    for(var i=0;i<toEnrich.length;i++){
+      if(ST.eventId!==eventId) return; // game changed
+      ST.sport=toEnrich[i]._sport; ST.market=toEnrich[i]._market;
+      try{await enrichWithConfidence(toEnrich[i]);}catch(e){}
+    }
+    ST.sport=savedSport; ST.market=savedMkt;
+    var qualified=toEnrich.filter(function(p){
+      if(p.enriched&&p.pdNoValue) return false;
+      if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
+      return p.value>=55;
+    });
+    qualified.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
+    renderGameTop5(qualified.slice(0,5));
+  }catch(e){
+    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Error loading picks.</div>';
+  }
+}
+
+function renderGameTop5(picks){
+  var mount=$("gameTop5Mount"); if(!mount) return;
+  var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
+  if(!picks.length){
+    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Not enough qualifying props found (55%+ confidence required).</div>';
+    return;
+  }
+  var html='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span></div>';
+  picks.forEach(function(p,i){
+    var conf=getEffectiveConf(p);
+    var tier=confTierOf(conf);
+    var sportKey=p._sport||ST.sport;
+    var tierCls="t-"+tier.t.toLowerCase();
+    var cardCls="tc-"+tier.t.toLowerCase();
+    var mktArr=MARKETS[sportKey]||[];
+    var mktDef=null;
+    for(var mi=0;mi<mktArr.length;mi++){if(mktArr[mi].k===(p._market||"")){mktDef=mktArr[mi];break;}}
+    var mktName=mktDef?mktDef.n:(p._market||"").replace(/_/g," ");
+    var side=p.pdSide||"Over";
+    var pdLine=p.pdLine!=null?p.pdLine:p.bestLine;
+    var differ=pdLine!=null&&p.bestLine!=null&&Math.abs(pdLine-p.bestLine)>=0.5;
+    var lineCls=side==="Over"?"over":"under";
+    var lineHtml=differ?
+      '<span class="t10-line-badge" style="text-decoration:line-through;opacity:.45">'+esc(fmtLine(p.bestLine,"Over"))+'</span><span style="color:var(--mut2);font-size:10px;margin:0 2px">→</span><span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine,side))+'</span>':
+      '<span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine||p.bestLine,side))+'</span>';
+    var snap=buildT10SnapLine(p,mktName);
+    var analysis=buildTop10Analysis(p,mktName);
+    html+=
+      '<div class="t10-card '+cardCls+'">'+
+        '<div class="t10-row-top">'+
+          '<div class="t10-col-info">'+
+            '<div class="t10-player">'+esc(p.player)+'</div>'+
+            '<div class="t10-sub">'+esc(mktName)+'</div>'+
+          '</div>'+
+          '<div class="t10-col-conf">'+
+            '<div class="t10-conf-pct">'+conf+'%</div>'+
+            '<span class="t10-tier '+tierCls+'">'+tier.t+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="t10-snap-row">'+
+          '<span class="t10-snap-text">'+esc(snap)+'</span>'+
+          lineHtml+
+        '</div>'+
+        '<div class="t10-foot">'+
+          '<button class="t10-why-btn" data-g5why="'+i+'">Why? &#9656;</button>'+
+          '<div class="t10-foot-btns">'+
+            '<button class="t10-parlay-btn" data-g5add="'+i+'">+ Parlay</button>'+
+            '<button class="t10-share-btn" data-g5share="'+i+'">Share ↗</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="t10-analysis t10-hidden" id="g5why-'+i+'">'+esc(analysis)+'</div>'+
+      '</div>';
+  });
+  mount.innerHTML=html;
+  mount.querySelectorAll("[data-g5why]").forEach(function(btn){
+    btn.onclick=function(){
+      var idx=btn.getAttribute("data-g5why");
+      var ael=document.getElementById("g5why-"+idx);
+      if(!ael) return;
+      var nowHidden=ael.classList.toggle("t10-hidden");
+      btn.innerHTML=nowHidden?"Why? &#9656;":"Why? &#9662;";
+    };
+  });
+  mount.querySelectorAll("[data-g5add]").forEach(function(btn){
+    btn.onclick=function(){
+      var idx=parseInt(btn.getAttribute("data-g5add"),10);
+      var p=picks[idx]; if(!p) return;
+      if(ST.parlayCart.some(function(x){return x.player===p.player;})){toast("Already in parlay");return;}
+      ST.parlayCart.push(p);
+      btn.textContent="✓ Added"; btn.classList.add("added");
+      toast(p.player+" added to parlay!");
+    };
+  });
+  mount.querySelectorAll("[data-g5share]").forEach(function(btn){
+    btn.onclick=function(){
+      var idx=parseInt(btn.getAttribute("data-g5share"),10);
+      var p=picks[idx]; if(!p) return;
+      var sk=p._sport||ST.sport;
+      var ma=MARKETS[sk]||[];
+      var md=null; for(var x=0;x<ma.length;x++){if(ma[x].k===(p._market||"")){md=ma[x];break;}}
+      copyText(buildTop10ShareItem(idx+1,p,md?md.n:(p._market||"").replace(/_/g," "),sk));
+      toast("Copied!");
+    };
+  });
+}
+
+async function loadGameTrends(){
+  var trMount=$("trendsMount");
+  var tm=$("tableMount");
+  if(!trMount) return;
+  if(tm) tm.style.display="none";
+  trMount.style.display="";
+  $("filterBar").style.display="none";
+  $("potgMount").innerHTML=""; $("lotdMount").innerHTML="";
+  var sb=$("summaryBar"); if(sb) sb.style.display="none";
+  if(!ST.eventId||!getKey()){
+    trMount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Connect your API key and select a game first.</p></div>'; return;
+  }
+  trMount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading trends for this game…</p></div>';
+  var mks=LOTD_MARKETS[ST.sport]||[];
+  var savedSport=ST.sport,savedMkt=ST.market,savedProps=ST.props,savedEid=ST.eventId;
+  var allTrends=[];
+  try{
+    for(var mi=0;mi<mks.length;mi++){
+      var mk=mks[mi];
+      try{
+        var mkData=await fetchOdds(savedEid,mk);
+        var mkProps=parseProps(mkData,mk);
+        if(mkProps.length){
+          ST.market=mk; ST.props=mkProps;
+          allTrends=allTrends.concat(calcPlayerStreakTrends());
+          allTrends=allTrends.concat(calcLineValueTrends());
+          allTrends=allTrends.concat(calcOddsMovementTrends());
+        }
+      }catch(e){console.warn("[Trends] market error",mk,e);}
+    }
+    ST.eventId=savedEid;
+    var totTrends=await calcTotalsTrends();
+    if(totTrends.length) allTrends=allTrends.concat(totTrends);
+    if(ST.sport==="baseball_mlb"){
+      var mTrends=await calcPlayerMatchupTrends();
+      if(mTrends.length) allTrends=allTrends.concat(mTrends);
+      var tsTrends=await calcTeamSituationalTrends();
+      if(tsTrends.length) allTrends=allTrends.concat(tsTrends);
+    }
+  }catch(e){console.error("[Trends] game trends error",e);}
+  ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
+  var seen={},unique=[];
+  allTrends.forEach(function(t){
+    var k=(t.player||"")+(t.type||"")+(t.record||"");
+    if(!seen[k]){seen[k]=1;unique.push(t);}
+  });
+  unique.sort(function(a,b){return b.conf-a.conf;});
+  _trendsData=unique; _trendsFilter="all";
+  if(!unique.length){
+    trMount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>No trends found for this game yet. Try a prop market first to load data.</p></div>'; return;
+  }
+  renderTrends(unique);
+}
 
 document.addEventListener("DOMContentLoaded",init);
 </script>
