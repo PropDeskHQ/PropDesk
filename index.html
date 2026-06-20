@@ -347,6 +347,43 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tiertbl{width:100%;border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:10px 0}
 .tiertbl th,.tiertbl td{padding:8px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--bd)}
 .tiertbl th{background:var(--surf2);font-size:11px;text-transform:uppercase;color:var(--mut2)}
+/* HOW IT WORKS */
+.hiw-section{margin-bottom:36px;border-top:1px solid var(--bd);padding-top:24px}
+.hiw-section-label{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.hiw-sources{display:flex;flex-direction:column;gap:14px;margin:16px 0}
+.hiw-source{display:flex;gap:14px;align-items:flex-start}
+.hiw-source-icon{font-size:18px;line-height:1;flex-shrink:0;margin-top:2px}
+.hiw-source-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px}
+.hiw-source-desc{font-size:13px;color:var(--mut);line-height:1.65}
+.hiw-callout{background:rgba(0,255,135,.06);border:1px solid rgba(0,255,135,.18);border-radius:10px;padding:14px 18px;font-size:13px;color:#a8ffcf;line-height:1.65;margin-top:18px}
+.hiw-points{display:flex;flex-direction:column;gap:14px;margin:16px 0}
+.hiw-point{display:flex;gap:13px;align-items:flex-start}
+.hiw-point-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:7px}
+.hiw-point div{font-size:13px;color:#ccc;line-height:1.7}
+.hiw-point strong{color:var(--text)}
+.hiw-tiers{margin-top:22px}
+.hiw-tiers-label{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);margin-bottom:10px}
+.hiw-tier-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:520px){.hiw-tier-grid{grid-template-columns:1fr}}
+.hiw-tier{padding:13px 15px;border-radius:10px;border:1px solid var(--bd2)}
+.hiw-tier-name{font-size:11px;font-weight:800;letter-spacing:.8px;margin-bottom:6px}
+.hiw-tier-desc{font-size:12px;color:var(--mut);line-height:1.6}
+.hiw-tier-lock{border-color:rgba(0,255,135,.25);background:rgba(0,255,135,.04)}
+.hiw-tier-lock .hiw-tier-name{color:var(--accent)}
+.hiw-tier-elite{border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.04)}
+.hiw-tier-elite .hiw-tier-name{color:var(--purple)}
+.hiw-tier-strong{border-color:rgba(79,159,255,.25);background:rgba(79,159,255,.04)}
+.hiw-tier-strong .hiw-tier-name{color:var(--blue)}
+.hiw-tier-good{border-color:rgba(255,204,0,.2);background:rgba(255,204,0,.03)}
+.hiw-tier-good .hiw-tier-name{color:var(--yellow)}
+.hiw-dont-list{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.hiw-dont{display:flex;gap:13px;align-items:flex-start}
+.hiw-dont-x{font-size:12px;font-weight:800;color:#ff5050;flex-shrink:0;margin-top:3px;letter-spacing:.5px}
+.hiw-dont div{font-size:13px;color:#ccc;line-height:1.7}
+.hiw-dont strong{color:var(--text)}
+.hiw-closing{border-top:1px solid var(--bd);padding-top:28px;margin-top:8px;margin-bottom:24px}
+.hiw-closing-mark{font-size:44px;line-height:1;color:var(--accent);font-family:Georgia,serif;margin-bottom:-2px;opacity:.5}
+.hiw-closing-text{font-size:15px;font-weight:600;color:var(--text);line-height:1.65;max-width:520px}
 
 /* TOAST */
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--accent);color:#000;font-weight:700;font-size:13px;padding:10px 18px;border-radius:10px;z-index:130;opacity:0;pointer-events:none;transition:.25s}
@@ -693,21 +730,137 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   <div class="page" id="page-how">
     <div class="doc">
       <h1>How It Works</h1>
-      <p class="lead">PropDesk pulls live odds from many US sportsbooks and scores each prop on value, not gut feel.</p>
-      <section><h3>1. Line Collection</h3><p>We query The Odds API for every available sportsbook line on a given player prop market. For each game and market we gather the line (for example 24.5 yards) and the American odds on both sides from every book that posts it.</p></section>
-      <section><h3>2. Consensus Line</h3><p>The consensus is the median line across all books. The median is more robust than an average because it ignores one outlier book that may be slow to move. This consensus becomes the reference point for measuring edge.</p></section>
-      <section><h3>3. Best Bet</h3><p>For Over/Under markets we pick the side that gives you the most free points versus consensus. If one book hangs 23.5 while everyone else is at 24.5, the Under at 24.5 or the Over at 23.5 carries real edge. Ties break to the best odds. For Yes/No markets such as anytime TD we simply find the best price.</p></section>
-      <section><h3>4. Value Score</h3><p>Every prop gets a 0-100 score built from line-shopping edge, odds quality, sportsbook vig, number of books posting, and how tightly books agree. Higher means more demonstrable edge.</p>
-        <table class="tiertbl"><thead><tr><th>Tier</th><th>Score</th><th>Meaning</th></tr></thead><tbody>
-          <tr><td style="color:var(--accent)">HOT</td><td>80-100</td><td>Strong, well-supported edge</td></tr>
-          <tr><td style="color:#7fe6a8">GOOD</td><td>65-79</td><td>Solid value worth a play</td></tr>
-          <tr><td style="color:var(--yellow)">FAIR</td><td>48-64</td><td>Marginal lean</td></tr>
-          <tr><td style="color:#ff9d4f">WEAK</td><td>32-47</td><td>Thin, proceed with caution</td></tr>
-          <tr><td style="color:var(--red)">PASS</td><td>0-31</td><td>No meaningful edge</td></tr>
-        </tbody></table></section>
-      <section><h3>5. Player Stats</h3><p>We pull season averages, recent game logs, and over-rate from official league sources (MLB Stats API) and ESPN (NFL, NBA, NHL) so you can sanity-check a line against actual production.</p></section>
-      <section><h3>6. Parlay Builder</h3><p>The builder assembles the best individual legs into a combined ticket and shows true combined odds and payout. Lay of the Day caps total odds near +500 and limits legs to keep correlation and variance reasonable.</p></section>
-      <section><h3>What We Don't Do</h3><ul><li>We do not predict outcomes or guarantee wins.</li><li>We do not place bets for you.</li><li>We do not sell picks. The analysis is computed locally in your browser.</li><li>We do not store your data on a server. Your API key and history live in your browser only.</li></ul></section>
+      <p class="lead">Real data. Honest math. You decide.</p>
+
+      <!-- 1. THE SHORT VERSION -->
+      <div class="hiw-section" style="border-top:none;padding-top:0">
+        <div class="hiw-section-label">The Short Version</div>
+        <p>PropDesk pulls real stats and real betting lines, runs them through a model built on actual game data, and shows you where the numbers disagree with the market. No guessing. No gut calls. No hype.</p>
+        <p>When we show you a confidence percentage, that number came from a player's real game log measured against the actual line being offered today — not a projection, not an algorithm trained on vibes.</p>
+      </div>
+
+      <!-- 2. WHERE DATA COMES FROM -->
+      <div class="hiw-section">
+        <div class="hiw-section-label">Where Our Data Comes From</div>
+        <p>Every number you see is sourced from live, real-world data. Nothing is estimated.</p>
+        <div class="hiw-sources">
+          <div class="hiw-source">
+            <div class="hiw-source-icon">📊</div>
+            <div>
+              <div class="hiw-source-title">Live betting lines from major US sportsbooks</div>
+              <div class="hiw-source-desc">Pulled fresh each time you load a market. We compare across books to find where the market disagrees with itself — that disagreement is often where the value is.</div>
+            </div>
+          </div>
+          <div class="hiw-source">
+            <div class="hiw-source-icon">🏟️</div>
+            <div>
+              <div class="hiw-source-title">Official league data feeds</div>
+              <div class="hiw-source-desc">Player game logs, team records, scoring margins, and standings come from official MLB, NHL, and ESPN data sources — the same feeds the leagues use publicly.</div>
+            </div>
+          </div>
+          <div class="hiw-source">
+            <div class="hiw-source-icon">⚾</div>
+            <div>
+              <div class="hiw-source-title">MLB starting pitcher data</div>
+              <div class="hiw-source-desc">ERA, WHIP, and recent form for today's confirmed starters, pulled directly from league records. Pitcher matchup is one of the biggest variables in baseball and we treat it that way.</div>
+            </div>
+          </div>
+          <div class="hiw-source">
+            <div class="hiw-source-icon">🌤️</div>
+            <div>
+              <div class="hiw-source-title">Live weather at outdoor stadiums</div>
+              <div class="hiw-source-desc">Real-time temperature and wind for outdoor MLB and NFL games. Shown when it's relevant — ignored when it's not.</div>
+            </div>
+          </div>
+          <div class="hiw-source">
+            <div class="hiw-source-icon">📅</div>
+            <div>
+              <div class="hiw-source-title">Season series history</div>
+              <div class="hiw-source-desc">Head-to-head results between teams this season, sourced directly from league records — not a third-party summary.</div>
+            </div>
+          </div>
+        </div>
+        <div class="hiw-callout">Every number you see is calculated from real game data — never estimated or made up.</div>
+      </div>
+
+      <!-- 3. PLAYER PROPS -->
+      <div class="hiw-section">
+        <div class="hiw-section-label">How We Score Player Props</div>
+        <p>When you pull up a prop market, PropDesk fetches the player's real game log and measures it against the line the books have set — not against a projected season total.</p>
+        <div class="hiw-points">
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Recent performance carries more weight than season totals.</strong> A player's role, minutes, and form change over a season. What they've done in the last 5 games tells a more honest story than what they did in October.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We require real data before we'll rate anything.</strong> Thin samples get flagged or excluded automatically. If we don't have enough games to be confident, we say so — or we say nothing at all.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>The line matters as much as the average.</strong> A player averaging 22 points doesn't make the Over on a 24.5 line a good bet. We measure actual hit rate at the specific line being offered today.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We look across books for mispricing.</strong> When three books agree and one is two points off, that's a signal worth surfacing. We track it in real time.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>For MLB, we weight the matchup.</strong> Strikeout props account for the opposing team's contact rate and the starter's handedness. A great pitcher facing a high-strikeout lineup hits different than the raw stat line suggests.</div></div>
+        </div>
+        <div class="hiw-tiers">
+          <div class="hiw-tiers-label">Confidence Tiers</div>
+          <div class="hiw-tier-grid">
+            <div class="hiw-tier hiw-tier-lock">
+              <div class="hiw-tier-name">🔒 LOCK</div>
+              <div class="hiw-tier-desc">Strongest signal. The player must have actually hit this mark in most of their recent games — not just a good season average. Requires multiple data points to align.</div>
+            </div>
+            <div class="hiw-tier hiw-tier-elite">
+              <div class="hiw-tier-name">⚡ ELITE</div>
+              <div class="hiw-tier-desc">High confidence across recent form, mid-term trend, and season data — with meaningful line value or a market signal layered on top.</div>
+            </div>
+            <div class="hiw-tier hiw-tier-strong">
+              <div class="hiw-tier-name">💪 STRONG</div>
+              <div class="hiw-tier-desc">Solid historical edge at the posted line. Worth a close look, especially when the matchup or situation supports it.</div>
+            </div>
+            <div class="hiw-tier hiw-tier-good">
+              <div class="hiw-tier-name">✅ GOOD</div>
+              <div class="hiw-tier-desc">A positive lean with real data behind it. Better used as a supporting play than a headliner — but the number is honest.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. MONEYLINES -->
+      <div class="hiw-section">
+        <div class="hiw-section-label">How We Grade Moneylines</div>
+        <p>We build a power rating for every team from their actual season data, then compare it to what the betting market is implying. When those two numbers disagree meaningfully, that's the edge.</p>
+        <div class="hiw-points">
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Power ratings come from real season performance</strong> — win percentage, scoring margin, and recent form. All three matter. A team with a winning record that's been consistently outscored is rated very differently than one that's earned it.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Home advantage is factored in per sport.</strong> The edge of playing at home is real, measurable, and different for baseball, basketball, hockey, and football. We treat each sport separately.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>In MLB, the starting pitcher is the single biggest variable.</strong> A great starter against a weak lineup can swing a game significantly. We pull confirmed starter data daily and weight it accordingly — it's never an afterthought.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>In NBA, back-to-back fatigue is a real, measurable edge.</strong> Teams playing the second night of a back-to-back underperform at a rate the market doesn't always fully price in. We flag it every time.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We never show a strong edge on one factor alone.</strong> LOCK and ELITE ratings on a moneyline require multiple independent signals pointing the same direction. One decent stat isn't enough to call the market wrong.</div></div>
+        </div>
+      </div>
+
+      <!-- 5. TRENDS -->
+      <div class="hiw-section">
+        <div class="hiw-section-label">How We Find Trends</div>
+        <p>Every trend on PropDesk is calculated from real completed games — not assumptions, not projections, not pattern-matching on tiny samples.</p>
+        <div class="hiw-points">
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Player streaks</strong> — hit rates over a player's last 5, 10, or 15 games at their actual prop line. We only surface a streak when the hit rate is genuinely meaningful, not a coin flip with a round number attached.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Situational patterns (MLB)</strong> — real splits based on pitcher handedness, batting order position, home/away, rest days, and opponent quality. Every subset requires a minimum number of real qualifying games before we'll call it a system.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Market mispricing</strong> — when the book line sits significantly below a player's season output, or well above their recent form, we flag the gap. These are objective mismatches between the number and the data, not opinions.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Sharp money signals</strong> — when multiple sportsbooks move a line in the same direction since opening, it often reflects informed action. We track cross-book movement in real time and surface it when the signal is clear.</div></div>
+        </div>
+        <div class="hiw-callout">We'd rather show you three real trends than ten weak ones. Small samples are filtered out automatically — even if that means a lighter board on a given day.</div>
+      </div>
+
+      <!-- 6. WHAT WE DON'T DO -->
+      <div class="hiw-section">
+        <div class="hiw-section-label">What We Don't Do</div>
+        <div class="hiw-dont-list">
+          <div class="hiw-dont"><div class="hiw-dont-x">✕</div><div><strong>We don't predict outcomes with certainty.</strong> Sports are unpredictable. Anyone who tells you otherwise is selling something. PropDesk shows you where the numbers point — you decide what to do with it.</div></div>
+          <div class="hiw-dont"><div class="hiw-dont-x">✕</div><div><strong>We don't force picks.</strong> Thin data, low sample sizes, and weak signals get filtered out automatically — even when that means fewer plays on a given day. We'd rather show you nothing than show you noise dressed up as confidence.</div></div>
+          <div class="hiw-dont"><div class="hiw-dont-x">✕</div><div><strong>We don't hide bad results.</strong> Every pick we surface is trackable. The record is what it is, unedited.</div></div>
+          <div class="hiw-dont"><div class="hiw-dont-x">✕</div><div><strong>We don't cherry-pick data.</strong> The model runs on the same rules for every player, every game, every sport. No manual overrides. No convenient omissions when the numbers aren't pretty.</div></div>
+          <div class="hiw-dont"><div class="hiw-dont-x">✕</div><div><strong>We don't sell picks.</strong> Everything is computed in your browser from live data. No subscription tier unlocks better picks. No VIP channel. No upsell.</div></div>
+        </div>
+      </div>
+
+      <!-- 7. CLOSING -->
+      <div class="hiw-closing">
+        <div class="hiw-closing-mark">"</div>
+        <div class="hiw-closing-text">PropDesk isn't about hot takes or hunches. It's stats, computed honestly, and shown to you straight. You make the call.</div>
+      </div>
+
     </div>
   </div>
 
