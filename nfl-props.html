@@ -562,10 +562,17 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   .ml-c3-name{font-size:14px}.ml-c3-odds{font-size:18px}.ml-c3-bar-nick{display:none}
 }
 /* GAME INFO STRIP */
-.gis-wrap{display:flex;align-items:flex-start;flex-wrap:wrap;gap:8px;background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px 14px;margin:12px 0 4px}
-.gis-chip{display:flex;flex-direction:column;gap:2px}
+.gis-wrap{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:14px;margin:12px 0 14px}
+.gis-shared{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid #222}
+.gis-shared-chip{display:flex;flex-direction:column;align-items:center;gap:3px}
+.gis-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.gis-col{display:flex;flex-direction:column;gap:10px}
+.gis-col:first-child{padding-right:12px;border-right:1px solid #1a1a1a}
+.gis-col:last-child{padding-left:14px}
+.gis-col-hdr{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text);margin-bottom:4px}
+.gis-stat{display:flex;flex-direction:column;gap:2px}
 .gis-lbl{font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--mut2)}
-.gis-val{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.gis-val{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* TOP 5 GAME SECTION */
 .g5-hdr{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
 .g5-title{font-size:15px;font-weight:800;color:var(--text)}
@@ -573,6 +580,14 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .g5-arrow{font-size:11px;font-weight:900;margin-left:3px;vertical-align:middle}
 .g5-up{color:var(--accent)}
 .g5-down{color:#ff5050}
+/* MONEYLINE REASONING */
+.ml-reason-wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.ml-reason{padding:12px 14px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid #1e1e1e}
+.ml-reason-hdr{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px}
+.ml-reason-hdr-pos{color:var(--accent)}
+.ml-reason-hdr-neg{color:var(--mut2)}
+.ml-reason p{font-size:12px;color:var(--mut);line-height:1.65;margin:0}
+@media(max-width:520px){.ml-reason-wrap{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -620,13 +635,14 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 
     <!-- Game detail — shown when a game is selected -->
     <div id="gameDetail" style="display:none">
-      <div id="gameInfoStrip"></div>
-
       <div class="lbl" style="margin-top:12px">Explore</div>
       <div class="tabrow prop" id="propTabs" style="margin-bottom:14px"></div>
 
-      <div id="gameMLMount"></div>
-      <div id="gameTop5Mount"></div>
+      <div id="gameInfoSection">
+        <div id="gameInfoStrip"></div>
+        <div id="gameMLMount"></div>
+        <div id="gameTop5Mount"></div>
+      </div>
 
       <div id="gameContentMount" style="display:none">
         <div class="filterbar" id="filterBar" style="display:none">
@@ -1784,11 +1800,19 @@ function renderSportTabs(){
     c.appendChild(b);
   });
 }
+function showGameInfoSection(){
+  var gi=$("gameInfoSection"); if(gi) gi.style.display="";
+  var cm=$("gameContentMount"); if(cm) cm.style.display="none";
+}
 function showGameContent(){
+  var gi=$("gameInfoSection"); if(gi) gi.style.display="none";
   var cm=$("gameContentMount"); if(cm) cm.style.display="";
 }
 function renderPropTabs(){
   var c=$("propTabs"); if(!c) return; c.innerHTML="";
+  var gi=el("button","pill"+(ST.market==="__gameinfo__"?" active":""),"Game Information");
+  gi.onclick=function(){ ST.market="__gameinfo__"; renderPropTabs(); showGameInfoSection(); };
+  c.appendChild(gi);
   var tp=el("button","pill"+(ST.market==="__trends__"?" active":""),"Trends");
   tp.onclick=function(){ ST.market="__trends__"; renderPropTabs(); showGameContent(); loadGameTrends(); };
   c.appendChild(tp);
@@ -5812,31 +5836,42 @@ function renderMoneylineCard(c){
     '</div>';
   }
 
-  /* Plain-English explanation built from c.adjustments */
-  function buildExplanation(){
-    var favName=favHome?c.home:c.away;
-    var undName=favHome?c.away:c.home;
+  /* Two-block reasoning from model factors */
+  function buildTwoBlockReasoning(){
+    if(c.noOdds) return "";
+    var adjs=c.adjustments||[];
+    if(!adjs.length&&!c.homeL10&&!c.awayL10) return "";
     var favSide=favHome?"home":"away";
     var undSide=favHome?"away":"home";
+    var favName=favHome?c.home:c.away;
+    var undName=favHome?c.away:c.home;
     var favProb=favHome?hp:ap;
-    var adjs=c.adjustments||[];
-    var out=[];
-    out.push("PropDesk gives the "+esc(favName)+" a "+favProb+"% win probability, "+edgePct+"% above what the books imply.");
+    var undProb=100-favProb;
+    var favImpl=favHome?c.homeImplied:c.awayImplied;
+    var undImpl=favHome?c.awayImplied:c.homeImplied;
+    var favL10=favHome?c.homeL10:c.awayL10;
+    var undL10=favHome?c.awayL10:c.homeL10;
     var favPit=adjs.filter(function(a){return a.isPitcher&&a.side===favSide;})[0];
     var undPit=adjs.filter(function(a){return a.isPitcher&&a.side===undSide;})[0];
-    if(favPit&&undPit){
-      out.push(esc(favName)+"'s "+esc(favPit.text)+" faces "+esc(undName)+"'s "+esc(undPit.text)+".");
-    }else if(favPit){
-      out.push(esc(favName)+" gets a boost from their starter: "+esc(favPit.text)+".");
-    }else if(undPit){
-      out.push(esc(undName)+"'s starter "+esc(undPit.text)+" is a factor in the model.");
-    }
-    var misc=adjs.filter(function(a){return !a.isPitcher;});
-    if(misc.length) out.push(misc.map(function(a){return esc(a.text);}).join("; ")+".");
-    return out.join(" ");
+    var favMisc=adjs.filter(function(a){return !a.isPitcher&&a.side===favSide;});
+    var undMisc=adjs.filter(function(a){return !a.isPitcher&&a.side===undSide;});
+    var whyFav=[];
+    whyFav.push("PropDesk grades "+esc(favName)+" at "+favProb+"%"+(favImpl!=null?" vs. the book's "+Math.round(favImpl*100)+"%":"")+", a "+edgePct+"-point edge.");
+    if(favPit) whyFav.push("Their starter, "+esc(favPit.text)+", is a net positive in the model.");
+    if(favL10) whyFav.push(esc(favName)+" have gone "+esc(favL10)+" over their last 10.");
+    if(favMisc.length) whyFav.push(favMisc.map(function(a){return esc(a.text);}).join("; ")+".");
+    var whyNot=[];
+    whyNot.push("PropDesk puts "+esc(undName)+" at "+undProb+"%"+(undImpl!=null?" vs. the book's "+Math.round(undImpl*100)+"%":"")+".");
+    if(undPit) whyNot.push("Their starter, "+esc(undPit.text)+", is a headwind in this matchup.");
+    if(undL10) whyNot.push("Recent form: "+esc(undL10)+" over their last 10.");
+    if(undMisc.length) whyNot.push(undMisc.map(function(a){return esc(a.text);}).join("; ")+".");
+    return '<div class="ml-reason-wrap">'+
+      '<div class="ml-reason"><div class="ml-reason-hdr ml-reason-hdr-pos">Why '+esc(mlNick(favName))+'</div><p>'+whyFav.join(" ")+'</p></div>'+
+      '<div class="ml-reason"><div class="ml-reason-hdr ml-reason-hdr-neg">Why not '+esc(mlNick(undName))+'</div><p>'+whyNot.join(" ")+'</p></div>'+
+    '</div>';
   }
 
-  var explainText=(!c.noOdds&&(c.adjustments||[]).length)?buildExplanation():"";
+  var reasonHtml=buildTwoBlockReasoning();
 
   return '<div class="ml-card2'+(c.tier?" ml-card2-edge":"")+'">'+
     '<div class="ml-c3-hdr">'+
@@ -5858,7 +5893,7 @@ function renderMoneylineCard(c){
     '</div>'+
     teamRow("away")+
     teamRow("home")+
-    (explainText?'<div class="ml-c3-explain"><p>'+explainText+'</p></div>':'')+
+    reasonHtml+
     (c.noOdds?'<p style="color:var(--mut2);font-size:11px;text-align:center;padding:4px 0;font-style:italic">Lines not yet posted</p>':'')+
     '<p class="ml-c3-disc">PropDesk win probability — team ratings, recent form, starting pitchers (MLB), back-to-back (NBA). Not a guarantee of outcome. 21+ where legal.</p>'+
   '</div>';
@@ -5913,29 +5948,42 @@ function renderGameInfoStrip(c,ev,extra){
   extra=extra||{};
   var timeStr="";
   try{var d=new Date(c.time);timeStr=d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",timeZone:"America/New_York"})+" ET";}catch(e){}
-  var chips=[];
-  if(timeStr) chips.push({l:"Time",v:timeStr});
-  chips.push({l:mlNick(c.away)+" Rec",v:c.awayRec||"—"});
-  chips.push({l:mlNick(c.home)+" Rec",v:c.homeRec||"—"});
-  if(c.awayL10) chips.push({l:mlNick(c.away)+" L10",v:c.awayL10});
-  if(c.homeL10) chips.push({l:mlNick(c.home)+" L10",v:c.homeL10});
   var adjs=c.adjustments||[];
   var awayPit=adjs.filter(function(a){return a.isPitcher&&a.side==="away";})[0];
   var homePit=adjs.filter(function(a){return a.isPitcher&&a.side==="home";})[0];
-  if(awayPit) chips.push({l:mlNick(c.away)+" SP",v:awayPit.text});
-  if(homePit) chips.push({l:mlNick(c.home)+" SP",v:homePit.text});
-  if(extra.series) chips.push({l:"Season Series",v:extra.series});
-  if(extra.weather){var w=extra.weather;chips.push({l:"Weather",v:w.temp+"\xb0F \xb7 "+w.wind+" mph "+w.dir});}
-  return '<div class="gis-wrap">'+
-    chips.map(function(ch){
-      return '<div class="gis-chip"><span class="gis-lbl">'+esc(ch.l)+'</span><span class="gis-val">'+esc(ch.v)+'</span></div>';
-    }).join('')+
+  // Shared header: time, series, weather
+  var shared=[];
+  if(timeStr) shared.push({l:"Time",v:timeStr});
+  if(extra.series) shared.push({l:"Season Series",v:extra.series});
+  if(extra.weather){var w=extra.weather;shared.push({l:"Weather",v:w.temp+"\xb0F \xb7 "+w.wind+" mph "+w.dir});}
+  var sharedHtml=shared.length?
+    '<div class="gis-shared">'+shared.map(function(ch){
+      return '<div class="gis-shared-chip"><span class="gis-lbl">'+esc(ch.l)+'</span><span class="gis-val">'+esc(ch.v)+'</span></div>';
+    }).join('')+'</div>':'';
+  function stat(l,v){
+    if(!v) return '';
+    return '<div class="gis-stat"><span class="gis-lbl">'+esc(l)+'</span><span class="gis-val">'+esc(v)+'</span></div>';
+  }
+  var awayCol='<div class="gis-col">'+
+    '<div class="gis-col-hdr">'+esc(mlNick(c.away))+' <span style="font-size:9px;font-weight:500;color:var(--mut2)">AWAY</span></div>'+
+    stat("Season Record",c.awayRec)+
+    stat("Last 10",c.awayL10)+
+    (awayPit?stat("Starting Pitcher",awayPit.text):'')+
   '</div>';
+  var homeCol='<div class="gis-col">'+
+    '<div class="gis-col-hdr">'+esc(mlNick(c.home))+' <span style="font-size:9px;font-weight:500;color:var(--mut2)">HOME</span></div>'+
+    stat("Season Record",c.homeRec)+
+    stat("Last 10",c.homeL10)+
+    (homePit?stat("Starting Pitcher",homePit.text):'')+
+  '</div>';
+  return '<div class="gis-wrap">'+sharedHtml+'<div class="gis-grid">'+awayCol+homeCol+'</div></div>';
 }
 
 function loadGameDetail(){
   var gd=$("gameDetail"); if(!gd) return;
   gd.style.display="";
+  ST.market="__gameinfo__";
+  var gi=$("gameInfoSection"); if(gi) gi.style.display="";
   var cm=$("gameContentMount"); if(cm) cm.style.display="none";
   $("filterBar").style.display="none";
   $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
