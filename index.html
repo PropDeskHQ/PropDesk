@@ -223,11 +223,13 @@ tbody tr.prow:hover{background:var(--surf2)}
 .gap-badge{font-size:11px;font-weight:700;color:var(--accent)}
 .gap-badge.gap-down{color:var(--blue)}
 .gap-zero{color:var(--mut);font-size:10px}
-.adj-ctrl{display:flex;align-items:center;gap:4px;margin-top:5px}
-.adj-btn{background:rgba(255,255,255,.07);border:1px solid var(--bd2);color:var(--mut2);font-size:13px;font-weight:700;width:20px;height:20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1;transition:background .1s,color .1s;flex-shrink:0}
-.adj-btn:hover{background:rgba(255,255,255,.15);color:var(--text)}
-.adj-line-lbl{font-size:12px;font-weight:700;color:var(--text);min-width:48px;text-align:center}
-.adj-tag{font-size:9px;font-weight:800;letter-spacing:.4px;color:var(--mut2);text-transform:uppercase;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px;border:1px solid var(--bd2)}
+.adj-ctrl{display:inline-flex;align-items:center;gap:5px}
+.adj-btn{background:none;border:1px solid rgba(0,232,122,.28);color:var(--accent);font-size:11px;font-weight:700;width:18px;height:18px;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1;transition:background .12s,border-color .12s;flex-shrink:0}
+.adj-btn:hover{background:rgba(0,232,122,.13);border-color:var(--accent)}
+.adj-val{font-size:14px;font-weight:800;color:var(--accent);letter-spacing:-.2px;white-space:nowrap;line-height:1}
+.adj-orig{font-size:10px;color:var(--mut2);white-space:nowrap;line-height:1;opacity:.7}
+.adj-reset{background:none;border:none;color:var(--mut2);font-size:12px;cursor:pointer;padding:0;line-height:1;opacity:.5;transition:opacity .12s;display:inline-flex;align-items:center}
+.adj-reset:hover{opacity:1;color:var(--text)}
 .pd-stats{font-size:11px;color:var(--mut2);display:flex;flex-direction:column;gap:2px}
 .pd-stats span{display:flex;gap:4px;align-items:center}
 .ps-lbl{color:var(--mut2)}
@@ -2186,17 +2188,20 @@ function updatePropPDDisplay(p){
   var shiftedUp=!thresh&&p.pdLine!=null&&rawBookLine!=null&&p.pdLine>rawBookLine;
   var shiftedDown=!thresh&&p.pdLine!=null&&rawBookLine!=null&&p.pdLine<rawBookLine;
   var gapHtml=thresh?"":(shiftedUp?'<span class="gap-badge" title="PropDesk raised line — player still hits it at this harder threshold">▲ +'+p.pdGap.toFixed(1)+'</span>':shiftedDown?'<span class="gap-badge gap-down" title="PropDesk lowered line to find the edge">▼ −'+p.pdGap.toFixed(1)+'</span>':'<span class="gap-zero">confirmed ✓</span>');
-  // Stepper — threshold markets in STEPPER_MARKETS with game log loaded
-  var stepperHtml="";
+  // Stepper markets: the ctrl IS the entire cell — no duplicate line label, no gap badge
   if(thresh&&STEPPER_MARKETS[p._market]&&p._vals&&p._vals.length>=3){
     var userAdj=p._userLine!=null;
-    stepperHtml=
+    cell.innerHTML=
       '<div class="adj-ctrl">'+
         '<button class="adj-btn" onclick="handleAdj(event,\'dn\',\''+p._id+'\')" title="Lower threshold">−</button>'+
-        '<span class="adj-line-lbl">'+esc(pdLabel)+'</span>'+
+        '<span class="adj-val">'+esc(pdLabel)+'</span>'+
         '<button class="adj-btn" onclick="handleAdj(event,\'up\',\''+p._id+'\')" title="Raise threshold">＋</button>'+
-        (userAdj?'<span class="adj-tag">adj</span><button class="adj-btn" onclick="handleAdj(event,\'reset\',\''+p._id+'\')" title="Reset to PropDesk line" style="font-size:10px">↺</button>':'')+
+        (userAdj?
+          '<span class="adj-orig">'+esc(threshLabel(p.pdLine,p._market))+'</span>'+
+          '<button class="adj-reset" onclick="handleAdj(event,\'reset\',\''+p._id+'\')" title="Reset to default">↺</button>'
+        :'')+
       '</div>';
+    return;
   }
   cell.innerHTML=
     '<div class="pd-cell">'+
@@ -2205,7 +2210,6 @@ function updatePropPDDisplay(p){
         '<span class="pd-line-val '+sideLow+'">'+esc(pdLabel)+'</span>'+
       '</div>'+
       gapHtml+
-      stepperHtml+
     '</div>';
 }
 
