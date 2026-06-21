@@ -189,7 +189,7 @@ input:focus,select:focus{border-color:var(--accent)}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);text-align:left;padding:11px 12px;border-bottom:1px solid var(--bd2);background:var(--surf2);position:sticky;top:calc(52px + var(--sbar-h,0px));z-index:5}
 tbody td{padding:11px 12px;border-bottom:1px solid var(--bd);vertical-align:top;font-size:13px;color:var(--text)}
-tbody tr.prow{transition:background .15s}
+tbody tr.prow{transition:background .15s;scroll-margin-top:calc(52px + var(--sbar-h,0px) + 48px)}
 tbody tr.prow:hover{background:var(--surf2)}
 .pl-name{font-weight:800;font-size:16px}
 .pl-meta{font-size:12px;color:var(--mut);margin-top:3px}
@@ -2462,8 +2462,10 @@ function renderSummaryBar(){
   bar.style.display=total?"block":"none";
   // Keep thead sticky below the summary bar so the first player row is never covered
   var sbarEl=bar.firstElementChild;
-  var sbarMargin=sbarEl?parseInt(window.getComputedStyle(sbarEl).marginTop)||0:0;
-  document.documentElement.style.setProperty('--sbar-h',(total?(bar.offsetHeight+sbarMargin):0)+'px');
+  var sbarCS=sbarEl?window.getComputedStyle(sbarEl):null;
+  var sbarMT=sbarCS?parseInt(sbarCS.marginTop)||0:0;
+  var sbarMB=sbarCS?parseInt(sbarCS.marginBottom)||0:0;
+  document.documentElement.style.setProperty('--sbar-h',(total?(bar.offsetHeight+sbarMT+sbarMB):0)+'px');
   if(!total) return;
   $("sb-total").textContent=total+" prop"+(total!==1?"s":"")+" analyzed";
   $("sb-lock").textContent="LOCK: "+locks;
