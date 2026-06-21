@@ -1148,20 +1148,47 @@ async function augmentWithMLBRoster(props, ev){
   var defLine=MARKET_DEFAULT_LINE[ST.market]!=null?MARKET_DEFAULT_LINE[ST.market]:null;
   function normN(n){ return n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/['.,-]/g,"").trim(); }
   var existingNorm=new Set(props.map(function(p){ return normN(p.player); }));
+
+  if(isPitcher){
+    // Pitcher markets: scope to today's two probable starters only.
+    // Full pitching staff stats are meaningless for starter-workload markets
+    // (outs, Ks, hits allowed, ER, walks are scaled to 6-7 innings, not 1-2 relief stints).
+    // mlFetchMLBProbables is cached on first call so no duplicate API hit.
+    var probables=await mlFetchMLBProbables();
+    // probables is keyed by mlNormKey(homeTeamName); each entry has .home and .away {id,name}
+    var pg=probables[mlNormKey(ev.home_team||"")]||null;
+    // If the home-team lookup misses, try away-team key as fallback (shouldn't happen but safe)
+    if(!pg) pg=probables[mlNormKey(ev.away_team||"")]||null;
+    if(!pg) return; // no probables posted for this game yet — show no pitcher props
+    var starters=[pg.home&&pg.home.name, pg.away&&pg.away.name].filter(Boolean);
+    starters.forEach(function(name){
+      if(!name||existingNorm.has(normN(name))) return;
+      existingNorm.add(normN(name));
+      props.push({
+        player:name, books:[], yesNo:false, _market:ST.market,
+        consensus:defLine, bestLine:defLine, lineSpread:0, bookCount:0,
+        bestOdds:null, bestBook:null, decOdds:1, edge:0, vig:4.5,
+        evOver:null, side:"Over", _synthetic:true, _noLine:true,
+        value:0, guardrailFlags:[], valueFlags:[]
+      });
+    });
+    return;
+  }
+
+  // Batter markets: full non-pitcher active roster (unchanged)
   var season=new Date().getFullYear();
   async function fetchPlayers(teamName){
     if(!teamName) return [];
     var tid=await mlbTeamId(teamName);
     if(!tid) return [];
-    var ckey=tid+"/"+season+"/"+(isPitcher?"P":"B");
+    var ckey=tid+"/"+season+"/B";
     if(_mlbRosterCache[ckey]) return _mlbRosterCache[ckey];
     try{
       var r=await fetch("https://statsapi.mlb.com/api/v1/teams/"+tid+"/roster?rosterType=active&season="+season,{signal:AbortSignal.timeout(7000)});
       if(!r.ok) return [];
       var d=await r.json();
       var out=(d.roster||[]).filter(function(pl){
-        var isPit=pl.position&&pl.position.type==="Pitcher";
-        return isPitcher?isPit:!isPit;
+        return pl.position&&pl.position.type!=="Pitcher";
       }).map(function(pl){ return (pl.person||{}).fullName||""; }).filter(Boolean);
       _mlbRosterCache[ckey]=out;
       return out;
