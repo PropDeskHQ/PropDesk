@@ -223,6 +223,11 @@ tbody tr.prow:hover{background:var(--surf2)}
 .gap-badge{font-size:11px;font-weight:700;color:var(--accent)}
 .gap-badge.gap-down{color:var(--blue)}
 .gap-zero{color:var(--mut);font-size:10px}
+.adj-ctrl{display:flex;align-items:center;gap:4px;margin-top:5px}
+.adj-btn{background:rgba(255,255,255,.07);border:1px solid var(--bd2);color:var(--mut2);font-size:13px;font-weight:700;width:20px;height:20px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1;transition:background .1s,color .1s;flex-shrink:0}
+.adj-btn:hover{background:rgba(255,255,255,.15);color:var(--text)}
+.adj-line-lbl{font-size:12px;font-weight:700;color:var(--text);min-width:48px;text-align:center}
+.adj-tag{font-size:9px;font-weight:800;letter-spacing:.4px;color:var(--mut2);text-transform:uppercase;background:rgba(255,255,255,.06);padding:1px 4px;border-radius:3px;border:1px solid var(--bd2)}
 .pd-stats{font-size:11px;color:var(--mut2);display:flex;flex-direction:column;gap:2px}
 .pd-stats span{display:flex;gap:4px;align-items:center}
 .ps-lbl{color:var(--mut2)}
@@ -1118,6 +1123,8 @@ function fmtLine(line, side){
   return s+" "+line;
 }
 function isThreshProp(p){ return !!(p._market && (THRESHOLD_MARKETS[ST.sport]||{})[p._market]); }
+// Markets where the user-adjustable line stepper is shown. Expand after each market is verified.
+var STEPPER_MARKETS={batter_hits:1};
 
 /* ============ MLB TEAM SITUATIONAL DATA (real history, no fabricated odds) ============ */
 var _mlbTeamsCache=null;
@@ -1782,6 +1789,34 @@ function compositeConf(vals, line, isOver){
   return composite;
 }
 
+// Recompute threshold confidence at a user-chosen line using game log data already in memory.
+// Applies the same post-enrichment adjustments as enrichWithConfidence (matchup, streak, thin-data, LOCK gate).
+function recomputeAdjConf(p,newLine){
+  var vals=p._vals;
+  if(!vals||vals.length<3) return null;
+  var raw=compositeConf(vals,newLine,true);
+  if(raw===null) return null;
+  var matchupAdj=0;
+  if((p.edge||0)>=1.0) matchupAdj+=0.03;
+  else if((p.edge||0)>=0.5) matchupAdj+=0.015;
+  if((p.lineSpread||0)>=2.0) matchupAdj+=0.02;
+  else if((p.lineSpread||0)>=1.0) matchupAdj+=0.01;
+  var streak=0;
+  for(var i=0;i<vals.length;i++){
+    var hit=vals[i]>newLine;
+    if(i===0){streak=hit?1:-1;continue;}
+    if(hit&&streak>0)streak++; else if(!hit&&streak<0)streak--; else break;
+  }
+  var sa=streak>=4?0.04:streak>=3?0.025:streak>=2?0.01:streak<=-4?-0.04:streak<=-3?-0.025:streak<=-2?-0.01:0;
+  var tp=vals.length<5?-0.07:(vals.length<10?-0.04:0);
+  var adj=Math.max(0.01,Math.min(0.97,raw+matchupAdj+sa+tp));
+  if(Math.round(adj*100)>=80){
+    var l5h=vals.slice(0,Math.min(5,vals.length)).filter(function(v){return v>newLine;}).length;
+    if(l5h<4) adj=Math.min(adj,0.799);
+  }
+  return adj;
+}
+
 // Find PropDesk Line: always seek a line different from the book line.
 // If already ≥62% at book: shift HARDER (up for Over) to find the sharpest qualifying line.
 // If below 62% at book: shift EASIER (down for Over) to find the first qualifying line.
@@ -2103,9 +2138,10 @@ function updatePropValueDisplay(p){
     if(vt&&vt.classList.contains("vt")){ vt.textContent=""; vt.className="vt t-pass"; }
     applyPropFlags(p); return;
   }
-  var isConf=p.pdConfidence!=null;
+  var dispConf=p._adjConfidence!=null?p._adjConfidence:p.pdConfidence;
+  var isConf=dispConf!=null;
   if(isConf){
-    var pct=Math.round(p.pdConfidence*100);
+    var pct=Math.round(dispConf*100);
     var tier=confTierOf(pct);
     var cur=parseInt(node.textContent)||0;
     node.className=tier.c;
@@ -2136,31 +2172,40 @@ function updatePropPDDisplay(p){
     return;
   }
   var rawBookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
-  var pdLine=p.pdLine;
-  var conf=p.pdConfidence;
-  var confPct=Math.round(conf*100);
+  var thresh=isThreshProp(p);
   var side=p.pdSide||"Over";
   var sideLow=side.toLowerCase();
-  var thresh=isThreshProp(p);
-  // Threshold: 65%+ green, 50%+ yellow, below red (informational — no cutoff)
-  // Over/under: 65%+ green, 62%+ yellow, below red (cutoff at 62%)
-  var cbCls=thresh
-    ?(conf>=0.65?"cb-strong":conf>=0.50?"cb-mod":"cb-none")
-    :(conf>=0.65?"cb-strong":conf>=0.62?"cb-mod":"cb-none");
-  // Build line labels — threshold markets use "1+ Goals" format
-  var pdLabel=thresh?threshLabel(pdLine,p._market):fmtLine(pdLine,side);
+  // Use user-adjusted line if set, otherwise PropDesk's line
+  var dispLine=thresh&&p._userLine!=null?p._userLine:p.pdLine;
+  var pdLabel=thresh?threshLabel(dispLine,p._market):fmtLine(p.pdLine,side);
+  var origLabel=thresh?threshLabel(p.pdLine,p._market):pdLabel;
   var bookLabel=thresh&&rawBookLine!=null?threshLabel(rawBookLine,p._market):(rawBookLine!=null?fmtLine(rawBookLine,side):"");
-  // Threshold: no gap badge; Over/Under: show direction of shift
-  var shiftedUp=!thresh&&pdLine!=null&&rawBookLine!=null&&pdLine>rawBookLine;
-  var shiftedDown=!thresh&&pdLine!=null&&rawBookLine!=null&&pdLine<rawBookLine;
+  // Strike-through: thresh shows PD original when user adjusted; O/U shows book when PD shifted
+  var strikeLabel=thresh?origLabel:bookLabel;
+  var showStrike=strikeLabel&&strikeLabel!==pdLabel;
+  var shiftedUp=!thresh&&p.pdLine!=null&&rawBookLine!=null&&p.pdLine>rawBookLine;
+  var shiftedDown=!thresh&&p.pdLine!=null&&rawBookLine!=null&&p.pdLine<rawBookLine;
   var gapHtml=thresh?"":(shiftedUp?'<span class="gap-badge" title="PropDesk raised line — player still hits it at this harder threshold">▲ +'+p.pdGap.toFixed(1)+'</span>':shiftedDown?'<span class="gap-badge gap-down" title="PropDesk lowered line to find the edge">▼ −'+p.pdGap.toFixed(1)+'</span>':'<span class="gap-zero">confirmed ✓</span>');
+  // Stepper — threshold markets in STEPPER_MARKETS with game log loaded
+  var stepperHtml="";
+  if(thresh&&STEPPER_MARKETS[p._market]&&p._vals&&p._vals.length>=3){
+    var userAdj=p._userLine!=null;
+    stepperHtml=
+      '<div class="adj-ctrl">'+
+        '<button class="adj-btn" onclick="handleAdj(event,\'dn\',\''+p._id+'\')" title="Lower threshold">−</button>'+
+        '<span class="adj-line-lbl">'+esc(pdLabel)+'</span>'+
+        '<button class="adj-btn" onclick="handleAdj(event,\'up\',\''+p._id+'\')" title="Raise threshold">＋</button>'+
+        (userAdj?'<span class="adj-tag">adj</span><button class="adj-btn" onclick="handleAdj(event,\'reset\',\''+p._id+'\')" title="Reset to PropDesk line" style="font-size:10px">↺</button>':'')+
+      '</div>';
+  }
   cell.innerHTML=
     '<div class="pd-cell">'+
       '<div style="display:flex;gap:6px;align-items:baseline">'+
-        (bookLabel&&bookLabel!==pdLabel?'<span class="pd-book-strike">'+esc(bookLabel)+'</span><span class="pd-arrow">→</span>':'')+
+        (showStrike?'<span class="pd-book-strike">'+esc(strikeLabel)+'</span><span class="pd-arrow">→</span>':'')+
         '<span class="pd-line-val '+sideLow+'">'+esc(pdLabel)+'</span>'+
       '</div>'+
       gapHtml+
+      stepperHtml+
     '</div>';
 }
 
@@ -2866,6 +2911,22 @@ function bindRowActions(){
       if(act==="parlay") return toggleParlayCart(p,b);
     };
   });
+}
+function handleAdj(e,dir,pid){
+  e.stopPropagation();
+  var p=findProp(pid);
+  if(!p||!p._vals||p._vals.length<3) return;
+  if(dir==="reset"){
+    p._userLine=null; p._adjConfidence=null;
+  } else {
+    var cur=p._userLine!=null?p._userLine:p.pdLine;
+    var nl=cur+(dir==="up"?1:-1);
+    if(nl<0.5||nl>9.5) return;
+    p._userLine=nl===p.pdLine?null:nl;
+    p._adjConfidence=p._userLine!=null?recomputeAdjConf(p,nl):null;
+  }
+  updatePropPDDisplay(p);
+  updatePropValueDisplay(p);
 }
 function sharePick(p){
   var pdSide=p.pdSide||p.side;
