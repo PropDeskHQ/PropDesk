@@ -1036,6 +1036,18 @@ var STAT_KEYS = {
   pitcher_walks:["baseOnBalls","walks","bb"]
 };
 
+// Composite markets: per-game value = sum of multiple API fields.
+// mlbGameLog and mlbSeasonAvg detect this and sum instead of single-field lookup.
+var STAT_COMPOSITE_KEYS={
+  batter_hits_runs_rbis:["hits","runs","rbi"]
+};
+// Single-field direct lookup (used for composite sums — no fallback alternatives).
+function pickStatDirect(statObj,key){
+  if(statObj[key]!=null) return statObj[key];
+  for(var _sk in statObj){ if(_sk.toLowerCase()===key.toLowerCase()) return statObj[_sk]; }
+  return null;
+}
+
 /* rate-stat name fragments shown to 3 decimals */
 var RATE_FRAGS = ["avg","obp","slg","ops","era","whip","pct","battingaverage","onbase","slugging","savepct","goalsagainst"];
 
@@ -2475,7 +2487,22 @@ function renderSummaryBar(){
   var sbarCS=sbarEl?window.getComputedStyle(sbarEl):null;
   var sbarMT=sbarCS?parseInt(sbarCS.marginTop)||0:0;
   var sbarMB=sbarCS?parseInt(sbarCS.marginBottom)||0:0;
-  document.documentElement.style.setProperty('--sbar-h',(total?(bar.offsetHeight+sbarMT+sbarMB):0)+'px');
+  var prevSbarH=parseFloat(document.documentElement.style.getPropertyValue('--sbar-h'))||0;
+  var newSbarH=total?(bar.offsetHeight+sbarMT+sbarMB):0;
+  document.documentElement.style.setProperty('--sbar-h',newSbarH+'px');
+  // When --sbar-h grows (summary bar appears), the sticky thead jumps DOWN by the delta.
+  // The first row was positioned just below the old thead and is now partially behind the new one.
+  // Compensate: after the CSS repaints, measure and scroll just enough to push the first row clear.
+  if(newSbarH>prevSbarH){
+    requestAnimationFrame(function(){
+      var fr=document.querySelector("#tableMount tbody tr.prow");
+      var th=document.querySelector("#tableMount thead");
+      if(!fr||!th) return;
+      var thB=th.getBoundingClientRect().bottom;
+      var rT=fr.getBoundingClientRect().top;
+      if(rT<thB+2) window.scrollBy({top:rT-thB-2,behavior:"instant"});
+    });
+  }
   if(!total) return;
   $("sb-total").textContent=total+" prop"+(total!==1?"s":"")+" analyzed";
   $("sb-lock").textContent="LOCK: "+locks;
@@ -3148,6 +3175,7 @@ async function mlbGameLog(id){
   var group=mlbGroup();
   var years=[new Date().getFullYear(), new Date().getFullYear()-1];
   var keys=STAT_KEYS[ST.market]||[];
+  var compositeKeys=STAT_COMPOSITE_KEYS[ST.market]||null;
   for(var y=0;y<years.length;y++){
     try{
       var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+id+"/stats?stats=gameLog&season="+years[y]+"&group="+group+"&limit=20");
@@ -3155,7 +3183,18 @@ async function mlbGameLog(id){
       if(d.stats && d.stats[0] && d.stats[0].splits && d.stats[0].splits.length){
         var vals=[],dates=[],gamePks=[],isHomeArr=[],opponents=[];
         d.stats[0].splits.slice().reverse().slice(0,15).forEach(function(sp){
-          var v=pickStat(sp.stat||{},keys);
+          var v;
+          if(compositeKeys){
+            var sum=0,ok=true;
+            for(var ci=0;ci<compositeKeys.length;ci++){
+              var f=pickStatDirect(sp.stat||{},compositeKeys[ci]);
+              if(f==null){ok=false;break;}
+              sum+=Number(f);
+            }
+            v=ok?sum:null;
+          } else {
+            v=pickStat(sp.stat||{},keys);
+          }
           if(v!=null){
             vals.push(Number(v));
             var dt=sp.date||(sp.game&&sp.game.gameDate)||"";
@@ -3180,15 +3219,27 @@ async function mlbGameLog(id){
   return null;
 }
 async function mlbSeasonAvg(id,group,keys,year){
+  var compositeKeys=STAT_COMPOSITE_KEYS[ST.market]||null;
   try{
     var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+id+"/stats?stats=season&season="+year+"&group="+group);
     var d=await r.json();
     if(d.stats && d.stats[0] && d.stats[0].splits && d.stats[0].splits[0]){
       var st=d.stats[0].splits[0].stat||{};
-      var total=pickStat(st,keys);
       var games=st.gamesPlayed||st.games||null;
-      if(total!=null && games) return Number(total)/Number(games);
-      if(total!=null) return Number(total);
+      if(compositeKeys){
+        var sum=0,ok=true;
+        for(var ci=0;ci<compositeKeys.length;ci++){
+          var f=pickStatDirect(st,compositeKeys[ci]);
+          if(f==null){ok=false;break;}
+          sum+=Number(f);
+        }
+        if(ok&&games) return sum/Number(games);
+        if(ok) return sum;
+      } else {
+        var total=pickStat(st,keys);
+        if(total!=null&&games) return Number(total)/Number(games);
+        if(total!=null) return Number(total);
+      }
     }
   }catch(e){}
   return null;
