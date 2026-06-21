@@ -73,7 +73,11 @@ input:focus,select:focus{border-color:var(--accent)}
 .pill{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:999px;padding:9px 20px;font-size:13px;font-weight:600;color:var(--text);transition:.15s;white-space:nowrap;text-align:center}
 .pill:hover{background:#222;border-color:#333}
 .pill.active{background:#00e87a;color:#000;border-color:transparent}
-.tabrow.prop .pill.active{background:var(--blue);color:#fff;border-color:transparent}
+/* Prop tab row — premium pill treatment */
+.tabrow.prop{gap:10px}
+.tabrow.prop .pill{color:#606060;border-color:#1e1e1e;padding:10px 22px;font-weight:600}
+.tabrow.prop .pill:hover{color:#aaa;background:#1c1c1c;border-color:#2a2a2a}
+.tabrow.prop .pill.active{background:rgba(79,159,255,.13);color:var(--blue);border-color:rgba(79,159,255,.42);box-shadow:0 0 0 1px rgba(79,159,255,.12),0 2px 16px rgba(79,159,255,.26);font-weight:700}
 /* Sport-selector tabs (4 buttons) fill the row equally */
 #sportTabs .pill,#t10SportTabs .pill,#trendsSportTabs .pill{flex:1;min-width:0}
 .lbl{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--mut2);text-transform:uppercase;margin:14px 0 7px}
@@ -599,17 +603,30 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   .ml-c3-name{font-size:14px}.ml-c3-odds{font-size:18px}.ml-c3-bar-nick{display:none}
 }
 /* GAME INFO STRIP */
-.gis-wrap{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:14px;margin:12px 0 14px}
-.gis-shared{display:flex;justify-content:center;gap:20px;flex-wrap:wrap;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid #222}
-.gis-shared-chip{display:flex;flex-direction:column;align-items:center;gap:3px}
-.gis-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
-.gis-col{display:flex;flex-direction:column;gap:10px}
-.gis-col:first-child{padding-right:12px;border-right:1px solid #1a1a1a}
-.gis-col:last-child{padding-left:14px}
-.gis-col-hdr{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text);margin-bottom:4px}
-.gis-stat{display:flex;flex-direction:column;gap:2px}
+.gis-wrap{background:#111;border:1px solid #1e1e1e;border-radius:12px;overflow:hidden;margin:10px 0 14px}
+.gis-header-bar{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;background:#0c0c0c;border-bottom:1px solid #1e1e1e;padding:8px 16px}
+.gis-header-chip{display:flex;align-items:center;gap:7px;padding:4px 14px}
+.gis-header-chip:not(:last-child){border-right:1px solid #222}
+.gis-header-chip-lbl{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2)}
+.gis-header-chip-val{font-size:12px;font-weight:700;color:var(--text)}
+.gis-grid{display:grid;grid-template-columns:1fr 1fr}
+.gis-col{display:flex;flex-direction:column;gap:10px;padding:14px 16px}
+.gis-col:first-child{border-right:1px solid #1e1e1e}
+.gis-team-hdr{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.gis-team-badge{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;padding:3px 8px;border-radius:5px;flex-shrink:0;line-height:1.4}
+.gis-team-badge-away{background:rgba(79,159,255,.12);color:var(--blue);border:1px solid rgba(79,159,255,.22)}
+.gis-team-badge-home{background:rgba(0,255,135,.1);color:var(--accent);border:1px solid rgba(0,255,135,.2)}
+.gis-team-name{font-size:17px;font-weight:800;color:var(--text);letter-spacing:-.3px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gis-stats-row{display:flex;gap:6px}
+.gis-stat-block{flex:1;background:#0c0c0c;border:1px solid #1a1a1a;border-radius:8px;padding:8px 10px;min-width:0}
+.gis-stat-lbl{font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--mut2);margin-bottom:4px}
+.gis-stat-val{font-size:15px;font-weight:800;color:var(--text);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gis-pitcher{padding-top:2px}
+.gis-pitcher-lbl{font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--mut2);margin-bottom:3px}
+.gis-pitcher-val{font-size:12px;font-weight:600;color:var(--mut);line-height:1.45}
+/* legacy refs kept for safety */
 .gis-lbl{font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--mut2)}
-.gis-val{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gis-val{font-size:13px;font-weight:700;color:var(--text)}
 /* TOP 5 GAME SECTION */
 .g5-hdr{display:flex;align-items:center;gap:8px;margin:18px 0 10px}
 .g5-title{font-size:15px;font-weight:800;color:var(--text)}
@@ -6196,32 +6213,36 @@ function renderGameInfoStrip(c,ev,extra){
   var adjs=c.adjustments||[];
   var awayPit=adjs.filter(function(a){return a.isPitcher&&a.side==="away";})[0];
   var homePit=adjs.filter(function(a){return a.isPitcher&&a.side==="home";})[0];
-  // Shared header: time, series, weather
-  var shared=[];
-  if(timeStr) shared.push({l:"Time",v:timeStr});
-  if(extra.series) shared.push({l:"Season Series",v:extra.series});
-  if(extra.weather){var w=extra.weather;shared.push({l:"Weather",v:w.temp+"\xb0F \xb7 "+w.wind+" mph "+w.dir});}
-  var sharedHtml=shared.length?
-    '<div class="gis-shared">'+shared.map(function(ch){
-      return '<div class="gis-shared-chip"><span class="gis-lbl">'+esc(ch.l)+'</span><span class="gis-val">'+esc(ch.v)+'</span></div>';
+  // Compact header bar: time · series · weather
+  var headerChips=[];
+  if(timeStr) headerChips.push({l:"Time",v:timeStr});
+  if(extra.series) headerChips.push({l:"Series",v:extra.series});
+  if(extra.weather){var w=extra.weather;headerChips.push({l:"Weather",v:w.temp+"\xb0F \xb7 "+w.wind+" mph "+w.dir});}
+  var headerHtml=headerChips.length?
+    '<div class="gis-header-bar">'+headerChips.map(function(ch){
+      return '<div class="gis-header-chip"><span class="gis-header-chip-lbl">'+esc(ch.l)+'</span><span class="gis-header-chip-val">'+esc(ch.v)+'</span></div>';
     }).join('')+'</div>':'';
-  function stat(l,v){
+  function statBlock(l,v){
     if(!v) return '';
-    return '<div class="gis-stat"><span class="gis-lbl">'+esc(l)+'</span><span class="gis-val">'+esc(v)+'</span></div>';
+    return '<div class="gis-stat-block"><div class="gis-stat-lbl">'+esc(l)+'</div><div class="gis-stat-val">'+esc(v)+'</div></div>';
   }
+  function pitcherRow(pit){
+    if(!pit) return '';
+    return '<div class="gis-pitcher"><div class="gis-pitcher-lbl">Starting Pitcher</div><div class="gis-pitcher-val">'+esc(pit.text)+'</div></div>';
+  }
+  var awayStats=[statBlock("Record",c.awayRec),statBlock("Last 10",c.awayL10)].filter(Boolean).join('');
+  var homeStats=[statBlock("Record",c.homeRec),statBlock("Last 10",c.homeL10)].filter(Boolean).join('');
   var awayCol='<div class="gis-col">'+
-    '<div class="gis-col-hdr">'+esc(mlNick(c.away))+' <span style="font-size:9px;font-weight:500;color:var(--mut2)">AWAY</span></div>'+
-    stat("Season Record",c.awayRec)+
-    stat("Last 10",c.awayL10)+
-    (awayPit?stat("Starting Pitcher",awayPit.text):'')+
+    '<div class="gis-team-hdr"><span class="gis-team-badge gis-team-badge-away">Away</span><span class="gis-team-name">'+esc(mlNick(c.away))+'</span></div>'+
+    (awayStats?'<div class="gis-stats-row">'+awayStats+'</div>':'')+
+    pitcherRow(awayPit)+
   '</div>';
   var homeCol='<div class="gis-col">'+
-    '<div class="gis-col-hdr">'+esc(mlNick(c.home))+' <span style="font-size:9px;font-weight:500;color:var(--mut2)">HOME</span></div>'+
-    stat("Season Record",c.homeRec)+
-    stat("Last 10",c.homeL10)+
-    (homePit?stat("Starting Pitcher",homePit.text):'')+
+    '<div class="gis-team-hdr"><span class="gis-team-badge gis-team-badge-home">Home</span><span class="gis-team-name">'+esc(mlNick(c.home))+'</span></div>'+
+    (homeStats?'<div class="gis-stats-row">'+homeStats+'</div>':'')+
+    pitcherRow(homePit)+
   '</div>';
-  return '<div class="gis-wrap">'+sharedHtml+'<div class="gis-grid">'+awayCol+homeCol+'</div></div>';
+  return '<div class="gis-wrap">'+headerHtml+'<div class="gis-grid">'+awayCol+homeCol+'</div></div>';
 }
 
 function loadGameDetail(){
