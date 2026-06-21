@@ -2110,6 +2110,16 @@ async function loadBoard(){
     populateBookSelect();
     $("filterBar").style.display="flex";
     renderTable(false);
+    // If the first data row has scrolled behind the sticky column header at load time,
+    // nudge the page up so it appears fully below the header (no layout changes, minimal scroll only).
+    requestAnimationFrame(function(){
+      var fr=document.querySelector("#tableMount tbody tr.prow");
+      var th=document.querySelector("#tableMount thead");
+      if(!fr||!th) return;
+      var thBottom=th.getBoundingClientRect().bottom;
+      var rowTop=fr.getBoundingClientRect().top;
+      if(rowTop<thBottom+2) window.scrollBy({top:rowTop-thBottom-2,behavior:"instant"});
+    });
     lazyLoadPlayerMeta();
     loadLOTD();
     // Re-arm Live if it was on before a reload
