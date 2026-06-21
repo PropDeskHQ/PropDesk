@@ -1047,6 +1047,15 @@ function pickStatDirect(statObj,key){
   for(var _sk in statObj){ if(_sk.toLowerCase()===key.toLowerCase()) return statObj[_sk]; }
   return null;
 }
+// ESPN composite markets: per-game value = sum of multiple ESPN game-log columns.
+// Each value is an array of alias-arrays — one inner array per component field.
+// Used by espnGameLog() to sum columns (e.g. PTS+REB+AST) per game row.
+var ESPN_COMPOSITE_KEYS={
+  player_points_rebounds_assists:[["points","pts"],["rebounds","reb","totalRebounds"],["assists","ast"]],
+  player_points_rebounds:[["points","pts"],["rebounds","reb","totalRebounds"]],
+  player_points_assists:[["points","pts"],["assists","ast"]],
+  player_rebounds_assists:[["rebounds","reb","totalRebounds"],["assists","ast"]]
+};
 
 /* rate-stat name fragments shown to 3 decimals */
 var RATE_FRAGS = ["avg","obp","slg","ops","era","whip","pct","battingaverage","onbase","slugging","savepct","goalsagainst"];
@@ -1060,7 +1069,8 @@ var YESNO_MARKETS = {player_anytime_td:1,player_first_td:1,player_first_basket:1
 var THRESHOLD_MARKETS = {
   icehockey_nhl: {
     player_goals:1, player_assists:1, player_points:1,
-    player_shots_on_goal:1, player_saves:1
+    player_shots_on_goal:1, player_saves:1,
+    player_anytime_goalscorer:1
   },
   baseball_mlb: {
     batter_hits:1, batter_total_bases:1, batter_rbis:1, batter_home_runs:1,
@@ -1075,6 +1085,7 @@ function isThreshMkt(marketKey){ return !!((THRESHOLD_MARKETS[ST.sport]||{})[mar
 var THRESHOLD_STAT_NAMES = {
   player_goals:"Goals", player_assists:"Assists", player_points:"Points",
   player_shots_on_goal:"Shots", player_saves:"Saves",
+  player_anytime_goalscorer:"Goals",
   batter_hits:"Hits", batter_total_bases:"Total Bases", batter_rbis:"RBIs",
   batter_home_runs:"Home Runs", batter_runs_scored:"Runs", batter_hits_runs_rbis:"H+R+RBI",
   pitcher_strikeouts:"Ks", pitcher_hits_allowed:"Hits Allowed",
@@ -1662,6 +1673,8 @@ async function enrichWithConfidence(p){
     if(!gl||!gl.values||gl.values.length<3){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
     var vals=gl.values;
     var bookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
+    // Anytime goalscorer has no posted numeric line — treat as "scores ≥1 goal" with implied 0.5 threshold
+    if(!bookLine && p._market==="player_anytime_goalscorer") bookLine=0.5;
     if(!bookLine){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
 
     // Store recent averages for chart use
@@ -2122,6 +2135,7 @@ async function loadBoard(){
     populateBookSelect();
     $("filterBar").style.display="flex";
     renderTable(false);
+    renderSummaryBar(); // Immediately hide stale counts from the previous market
     // If the first data row has scrolled behind the sticky column header at load time,
     // nudge the page up so it appears fully below the header (no layout changes, minimal scroll only).
     requestAnimationFrame(function(){
@@ -2473,8 +2487,8 @@ function bookColumns(){
 function renderSummaryBar(){
   var bar=$("summaryBar");
   if(!bar) return;
-  // Use ALL enriched props (not filtered) for accurate counts
-  var allEnriched=ST.props.filter(function(p){return p.enriched&&!p.pdNoValue&&p.pdConfidence!=null;});
+  // Count only props currently visible in the table so chips stay in sync with what's rendered
+  var allEnriched=filteredProps().filter(function(p){return p.enriched&&!p.pdNoValue&&p.pdConfidence!=null;});
   var locks=0,elites=0,goods=0;
   allEnriched.forEach(function(p){
     var pct=Math.round(p.pdConfidence*100);
@@ -3308,10 +3322,12 @@ async function mlbPitcherHands(ids){
 
 async function espnGameLog(id){
   var path=ESPN_PATH[ST.sport];
+  var compositeGroups=ESPN_COMPOSITE_KEYS[ST.market]||null;
   var keys=STAT_KEYS[ST.market]||[];
   try{
     var r=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/gamelog");
     var d=await r.json();
+    if(compositeGroups) return parseEspnGamelogComposite(d,compositeGroups);
     return parseEspnGamelog(d,keys);
   }catch(e){ return null; }
 }
@@ -3375,6 +3391,54 @@ function parseEspnGamelog(d,keys){
   var avgMins=minsArr.length?avg(minsArr):null;
   return {values:vals.slice(0,15), seasonAvg:avg(vals), dates:dates.slice(0,15), avgMins:avgMins};
 }
+// Composite ESPN game log parser — sums multiple columns per game row.
+// fieldGroups: array of alias-arrays, one per component field (e.g. [["pts","points"],["reb","rebounds"]]).
+// Returns the same shape as parseEspnGamelog so the rest of the pipeline is unchanged.
+function parseEspnGamelogComposite(d,fieldGroups){
+  if(!d) return null;
+  var names=d.names||d.labels||[];
+  var labels=d.labels||d.names||[];
+  var idxArr=[];
+  for(var fi=0;fi<fieldGroups.length;fi++){
+    var idx=findColIdx(names,fieldGroups[fi]);
+    if(idx<0) idx=findColIdx(labels,fieldGroups[fi]);
+    if(idx<0) return null;
+    idxArr.push(idx);
+  }
+  var minKeys=["min","minutes","avgminutes","mpg","toi","timeonice"];
+  var minIdx=findColIdx(names,minKeys);
+  if(minIdx<0) minIdx=findColIdx(labels,minKeys);
+  var events=[];
+  if(d.seasonTypes) events=collectEspnEvents(d.seasonTypes);
+  if(!events.length&&d.events) events=collectEspnEvents(d.events);
+  var vals=[],dates=[],minsArr=[];
+  events.forEach(function(ev){
+    if(!ev||!ev.stats) return;
+    var sum=0,ok=true;
+    for(var fi=0;fi<idxArr.length;fi++){
+      var ci=idxArr[fi];
+      if(ci>=ev.stats.length){ok=false;break;}
+      var num=parseFloat(String(ev.stats[ci]).replace(/[^0-9.\-]/g,""));
+      if(isNaN(num)){ok=false;break;}
+      sum+=num;
+    }
+    if(ok){
+      vals.push(sum);
+      var dt=ev.gameDate||ev.date||ev.gameDatez||"";
+      var mD=dt.match(/(\d{4}-\d{2}-\d{2})/);
+      dates.push(mD?mD[1]:"");
+      if(minIdx>=0&&minIdx<ev.stats.length){
+        var ms=String(ev.stats[minIdx]);
+        var mmss=ms.match(/^(\d+):(\d+)/);
+        if(mmss) minsArr.push(parseInt(mmss[1])+parseInt(mmss[2])/60);
+        else{var mn=parseFloat(ms.replace(/[^0-9.]/g,""));if(!isNaN(mn)&&mn>0)minsArr.push(mn);}
+      }
+    }
+  });
+  if(!vals.length) return null;
+  var avgMins=minsArr.length?avg(minsArr):null;
+  return {values:vals.slice(0,15),seasonAvg:avg(vals),dates:dates.slice(0,15),avgMins:avgMins};
+}
 
 /* ============ FULL STATS for Stats expand ============ */
 async function getFullStats(name){
@@ -3424,7 +3488,8 @@ async function nhlGameLog(nhlId){
   var nhlField={
     player_goals:"goals", player_assists:"assists",
     player_points:"points", player_shots_on_goal:"shots",
-    player_saves:"saves"
+    player_saves:"saves",
+    player_anytime_goalscorer:"goals"
   }[ST.market]||"points";
   var yr=new Date().getFullYear();
   var seasons=[(yr-1)+""+yr,(yr-2)+""+(yr-1)];
@@ -3988,6 +4053,7 @@ async function silentRefresh(){
     applyMovement();
     populateBookSelect();
     renderTable(true);
+    renderSummaryBar(); // Clear stale counts — fresh props are unenriched, re-enrichment starts below
     lazyLoadPlayerMeta();
   }catch(e){}
 }
