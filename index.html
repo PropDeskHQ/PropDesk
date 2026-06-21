@@ -201,6 +201,7 @@ tbody tr.prow:hover{background:var(--surf2)}
 .bb.over{color:var(--accent)}
 .bb.under{color:var(--blue)}
 .bb.yes{color:var(--accent)}
+.bb.no-line{color:var(--mut2);font-weight:500}
 .ev{font-weight:700;font-variant-numeric:tabular-nums}
 .ev.pos{color:var(--accent)}
 .ev.neg{color:var(--red)}
@@ -987,6 +988,8 @@ var LOTD_MARKETS = {
   icehockey_nhl:["player_goals","player_shots_on_goal","player_assists","player_points","player_saves"],
   baseball_mlb:["batter_hits","batter_total_bases","batter_rbis","batter_home_runs","batter_runs_scored","pitcher_strikeouts"]
 };
+// Markets that show every roster batter regardless of confidence — "Best Bets Only" is the narrow filter
+var FULL_ROSTER_MARKETS={batter_hits:1};
 
 var ESPN_PATH = {
   americanfootball_nfl:"football/nfl",
@@ -1101,6 +1104,45 @@ async function mlbTeamId(name){
   });
   return hits.length?hits[0].id:null;
 }
+
+// Augment ST.props with active roster batters who have no posted odds line
+var _mlbRosterCache={};
+async function augmentWithRosterBatters(props, ev){
+  if(!ev) return;
+  function normN(n){ return n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/['.,-]/g,"").trim(); }
+  var existingNorm=new Set(props.map(function(p){ return normN(p.player); }));
+  var season=new Date().getFullYear();
+  async function fetchBatters(teamName){
+    if(!teamName) return [];
+    var tid=await mlbTeamId(teamName);
+    if(!tid) return [];
+    var ckey=tid+"/"+season;
+    if(_mlbRosterCache[ckey]) return _mlbRosterCache[ckey];
+    try{
+      var r=await fetch("https://statsapi.mlb.com/api/v1/teams/"+tid+"/roster?rosterType=active&season="+season,{signal:AbortSignal.timeout(7000)});
+      if(!r.ok) return [];
+      var d=await r.json();
+      var batters=(d.roster||[]).filter(function(pl){
+        return pl.position&&pl.position.type!=="Pitcher";
+      }).map(function(pl){ return (pl.person||{}).fullName||""; }).filter(Boolean);
+      _mlbRosterCache[ckey]=batters;
+      return batters;
+    }catch(e){ return []; }
+  }
+  var results=await Promise.all([fetchBatters(ev.home_team),fetchBatters(ev.away_team)]);
+  results[0].concat(results[1]).forEach(function(name){
+    if(!name||existingNorm.has(normN(name))) return;
+    existingNorm.add(normN(name));
+    props.push({
+      player:name, books:[], yesNo:false, _market:"batter_hits",
+      consensus:0.5, bestLine:0.5, lineSpread:0, bookCount:0,
+      bestOdds:null, bestBook:null, decOdds:1, edge:0, vig:4.5,
+      evOver:null, side:"Over", _synthetic:true, _noLine:true,
+      value:0, guardrailFlags:[], valueFlags:[]
+    });
+  });
+}
+
 // Division rank + win% — cached once per day, shared across every team trend lookup that day
 var _standingsCache=null;
 async function mlbStandingsRank(teamId){
@@ -1845,8 +1887,8 @@ function updatePropValueDisplay(p){
   var isConf=p.pdConfidence!=null;
   if(isConf){
     var pct=Math.round(p.pdConfidence*100);
-    // Below 55% — hide the row just like pdNoValue rows
-    if(pct<55&&!ST_showNoValue){ var hr=node.closest("tr"); if(hr) hr.style.display="none"; return; }
+    // Below 55% — hide unless "Show All" is on or this is a full-roster market
+    if(pct<55&&!ST_showNoValue&&!FULL_ROSTER_MARKETS[p._market]){ var hr=node.closest("tr"); if(hr) hr.style.display="none"; return; }
     var tier=confTierOf(pct);
     var cur=parseInt(node.textContent)||0;
     node.className=tier.c;
@@ -2055,6 +2097,12 @@ async function loadBoard(){
     ST.props=parseProps(data, ST.market);
     console.log("[PropDesk] "+ST.sport+" / "+ST.market+" — "+ST.props.length+" props from API");
     _propStore[ST.sport+"|"+ST.market]=ST.props;
+    // Augment with roster batters who have no posted odds line
+    if(FULL_ROSTER_MARKETS[ST.market]){
+      var _ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
+      await augmentWithRosterBatters(ST.props, _ev);
+      console.log("[PropDesk] After roster augment: "+ST.props.length+" total ("+ST.market+")");
+    }
     if(!ST.props.length){
       $("tableMount").innerHTML='<div class="empty">No '+esc(marketName(ST.market))+' lines posted for this game yet. Try another market.</div>';
       return;
@@ -2368,14 +2416,16 @@ function filteredProps(){
   var results=ST.props.filter(function(p){
     var qOk=!q||p.player.toLowerCase().indexOf(q)>=0;
     if(!qOk) return false;
-    // All enriched no-value rows: hidden by default, revealed by toggle
-    if(p.enriched&&p.pdNoValue){ return ST_showNoValue; }
-    // Pre-enrichment: hide low phase-1 scores
-    if(!p.enriched&&p.value<50) return false;
-    // Hide <55% confidence — always invisible unless "Show All" is on
-    if(p.enriched&&p.pdConfidence!=null&&!p.pdNoValue&&Math.round(p.pdConfidence*100)<55&&!ST_showNoValue) return false;
-    // L5 avg ice-cold filter: if L5 avg is >40% below the book line, player is ice cold — hide
-    if(!ST_showNoValue&&p.enriched&&p.l5Avg!=null&&p.bestLine!=null&&p.bestLine>0){
+    var mkt=p._market||ST.market;
+    var fullRoster=!!FULL_ROSTER_MARKETS[mkt];
+    // All enriched no-value rows: hidden by default, revealed by toggle or full-roster mode
+    if(p.enriched&&p.pdNoValue){ return ST_showNoValue||fullRoster; }
+    // Pre-enrichment: hide low phase-1 scores (synthetic roster entries bypass this)
+    if(!p.enriched&&p.value<50&&!p._synthetic) return false;
+    // Hide <55% confidence — skipped for full-roster markets which show all
+    if(!fullRoster&&p.enriched&&p.pdConfidence!=null&&!p.pdNoValue&&Math.round(p.pdConfidence*100)<55&&!ST_showNoValue) return false;
+    // L5 avg ice-cold filter — skipped for full-roster markets
+    if(!fullRoster&&!ST_showNoValue&&p.enriched&&p.l5Avg!=null&&p.bestLine!=null&&p.bestLine>0){
       if(p.l5Avg < p.bestLine*0.6) return false;
     }
     // "Best Bets Only" filter — LOCK+ELITE only (≥67%)
@@ -2472,10 +2522,10 @@ function rowHtml(p,cols,idx,silent){
   var isThresh=isThreshProp(p);
   // Book line display — threshold markets show "1+ Goals" instead of "Over 0.5"
   var bookLine=p.bestLine!=null?p.bestLine:"";
-  var bbcls=isThresh?"over":(p.side==="Under"?"under":(p.side==="Yes"?"yes":"over"));
-  var bb=isThresh&&bookLine!==""
+  var bbcls=p._noLine?"no-line":(isThresh?"over":(p.side==="Under"?"under":(p.side==="Yes"?"yes":"over")));
+  var bb=p._noLine?"—":(isThresh&&bookLine!==""
     ? threshLabel(bookLine,p._market)
-    : (bookLine!==""?fmtLine(bookLine,p.side):"");
+    : (bookLine!==""?fmtLine(bookLine,p.side):""));
   var ev=p.evOver;
   var evHtml=(ev==null)?'<span class="ev">-</span>':'<span class="ev '+(ev>=0?"pos":"neg")+'">'+(ev>=0?"+":"")+ev.toFixed(1)+'%</span>';
   var meta=p._metaLoaded?(p._meta?esc(p._meta):''):'';
