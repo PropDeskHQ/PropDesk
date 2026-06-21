@@ -988,8 +988,17 @@ var LOTD_MARKETS = {
   icehockey_nhl:["player_goals","player_shots_on_goal","player_assists","player_points","player_saves"],
   baseball_mlb:["batter_hits","batter_total_bases","batter_rbis","batter_home_runs","batter_runs_scored","pitcher_strikeouts"]
 };
-// Markets that show every roster batter regardless of confidence — "Best Bets Only" is the narrow filter
-var FULL_ROSTER_MARKETS={batter_hits:1};
+// Default implied line for synthetic roster entries that have no posted book line.
+// Threshold markets: lowest natural line (1+ hit, 2+ TB, etc.). Null = use season avg.
+var MARKET_DEFAULT_LINE={
+  batter_hits:0.5, batter_total_bases:1.5, batter_rbis:0.5,
+  batter_home_runs:0.5, batter_runs_scored:0.5, batter_hits_runs_rbis:2.5,
+  batter_strikeouts:0.5,
+  pitcher_strikeouts:4.5, pitcher_hits_allowed:4.5, pitcher_earned_runs:2.5,
+  pitcher_outs:14.5, pitcher_walks:1.5
+};
+// Full-roster display is now the universal default — this variable is no longer used as a gate
+var FULL_ROSTER_MARKETS={};
 
 var ESPN_PATH = {
   americanfootball_nfl:"football/nfl",
@@ -1128,42 +1137,189 @@ async function mlbTeamId(name){
   return hits.length?hits[0].id:null;
 }
 
-// Augment ST.props with active roster batters who have no posted odds line
+// Augment props with every active roster player for the current sport/market.
+// Synthetic entries get _noLine:true so the book-line cell renders "—".
+// Each sport has its own fetcher; augmentWithRoster() dispatches to the right one.
+
 var _mlbRosterCache={};
-async function augmentWithRosterBatters(props, ev){
+async function augmentWithMLBRoster(props, ev){
   if(!ev) return;
+  var isPitcher=!!PITCHER_MARKETS[ST.market];
+  var defLine=MARKET_DEFAULT_LINE[ST.market]!=null?MARKET_DEFAULT_LINE[ST.market]:null;
   function normN(n){ return n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/['.,-]/g,"").trim(); }
   var existingNorm=new Set(props.map(function(p){ return normN(p.player); }));
   var season=new Date().getFullYear();
-  async function fetchBatters(teamName){
+  async function fetchPlayers(teamName){
     if(!teamName) return [];
     var tid=await mlbTeamId(teamName);
     if(!tid) return [];
-    var ckey=tid+"/"+season;
+    var ckey=tid+"/"+season+"/"+(isPitcher?"P":"B");
     if(_mlbRosterCache[ckey]) return _mlbRosterCache[ckey];
     try{
       var r=await fetch("https://statsapi.mlb.com/api/v1/teams/"+tid+"/roster?rosterType=active&season="+season,{signal:AbortSignal.timeout(7000)});
       if(!r.ok) return [];
       var d=await r.json();
-      var batters=(d.roster||[]).filter(function(pl){
-        return pl.position&&pl.position.type!=="Pitcher";
+      var out=(d.roster||[]).filter(function(pl){
+        var isPit=pl.position&&pl.position.type==="Pitcher";
+        return isPitcher?isPit:!isPit;
       }).map(function(pl){ return (pl.person||{}).fullName||""; }).filter(Boolean);
-      _mlbRosterCache[ckey]=batters;
-      return batters;
+      _mlbRosterCache[ckey]=out;
+      return out;
     }catch(e){ return []; }
   }
-  var results=await Promise.all([fetchBatters(ev.home_team),fetchBatters(ev.away_team)]);
+  var results=await Promise.all([fetchPlayers(ev.home_team),fetchPlayers(ev.away_team)]);
   results[0].concat(results[1]).forEach(function(name){
     if(!name||existingNorm.has(normN(name))) return;
     existingNorm.add(normN(name));
     props.push({
-      player:name, books:[], yesNo:false, _market:"batter_hits",
-      consensus:0.5, bestLine:0.5, lineSpread:0, bookCount:0,
+      player:name, books:[], yesNo:false, _market:ST.market,
+      consensus:defLine, bestLine:defLine, lineSpread:0, bookCount:0,
       bestOdds:null, bestBook:null, decOdds:1, edge:0, vig:4.5,
       evOver:null, side:"Over", _synthetic:true, _noLine:true,
       value:0, guardrailFlags:[], valueFlags:[]
     });
   });
+}
+
+// ESPN team roster — used for NBA and NFL.
+// Fetches all players for both teams and adds synthetic entries.
+var _espnTeamCache={};
+async function augmentWithEspnRoster(props, ev){
+  if(!ev) return;
+  var sportPath=ESPN_PATH[ST.sport];
+  if(!sportPath) return;
+  function normN(n){ return n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/['.,-]/g,"").trim(); }
+  var existingNorm=new Set(props.map(function(p){ return normN(p.player); }));
+  // Resolve team name → ESPN team id (cached per sport)
+  var mapKey=sportPath+"|teams";
+  if(!_espnTeamCache[mapKey]){
+    try{
+      var r=await fetch("https://site.api.espn.com/apis/site/v2/sports/"+sportPath+"/teams?limit=100",{signal:AbortSignal.timeout(7000)});
+      var dm=r.ok?await r.json():{};
+      var map={};
+      var leagues=((dm.sports||[{}])[0].leagues||[{}]);
+      (leagues[0].teams||[]).forEach(function(t){
+        var n=function(s){return s.toLowerCase().replace(/[^a-z0-9]/g,"");};
+        if(t.team){
+          map[n(t.team.displayName||"")]=t.team.id;
+          map[n(t.team.shortDisplayName||"")]=t.team.id;
+          map[n(t.team.name||"")]=t.team.id;
+        }
+      });
+      _espnTeamCache[mapKey]=map;
+    }catch(e){ _espnTeamCache[mapKey]={}; }
+  }
+  var teamMap=_espnTeamCache[mapKey];
+  async function getEspnRoster(teamName){
+    if(!teamName) return [];
+    var nk=teamName.toLowerCase().replace(/[^a-z0-9]/g,"");
+    var id=teamMap[nk]||null;
+    if(!id){ for(var k in teamMap){ if(k.indexOf(nk)>=0||nk.indexOf(k)>=0){id=teamMap[k];break;} } }
+    if(!id) return [];
+    var rkey=sportPath+"|"+id;
+    if(_espnTeamCache[rkey]) return _espnTeamCache[rkey];
+    try{
+      var r2=await fetch("https://site.api.espn.com/apis/site/v2/sports/"+sportPath+"/teams/"+id+"/roster",{signal:AbortSignal.timeout(7000)});
+      if(!r2.ok){ _espnTeamCache[rkey]=[]; return []; }
+      var d2=await r2.json();
+      var names=[];
+      (d2.athletes||[]).forEach(function(group){
+        (group.items||[]).forEach(function(pl){ if(pl.displayName||pl.fullName) names.push(pl.displayName||pl.fullName||""); });
+      });
+      _espnTeamCache[rkey]=names;
+      return names;
+    }catch(e){ _espnTeamCache[rkey]=[]; return []; }
+  }
+  var results=await Promise.all([getEspnRoster(ev.home_team),getEspnRoster(ev.away_team)]);
+  results[0].concat(results[1]).forEach(function(name){
+    if(!name||existingNorm.has(normN(name))) return;
+    existingNorm.add(normN(name));
+    props.push({
+      player:name, books:[], yesNo:false, _market:ST.market,
+      consensus:null, bestLine:null, lineSpread:0, bookCount:0,
+      bestOdds:null, bestBook:null, decOdds:1, edge:0, vig:4.5,
+      evOver:null, side:"Over", _synthetic:true, _noLine:true,
+      value:0, guardrailFlags:[], valueFlags:[]
+    });
+  });
+}
+
+// NHL roster via NHL official API — used for icehockey_nhl.
+var _nhlTeamAbbrevCache=null;
+var _nhlRosterCache={};
+async function augmentWithNHLRoster(props, ev){
+  if(!ev) return;
+  function normN(n){ return n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/['.,-]/g,"").trim(); }
+  var existingNorm=new Set(props.map(function(p){ return normN(p.player); }));
+  // Build team name → abbreviation map from standings
+  if(!_nhlTeamAbbrevCache){
+    try{
+      var r=await fetch("https://api-web.nhle.com/v1/standings/now",{signal:AbortSignal.timeout(7000)});
+      var dm=r.ok?await r.json():{};
+      var map={};
+      (dm.standings||[]).forEach(function(t){
+        var abbr=(t.teamAbbrev&&t.teamAbbrev.default)||"";
+        var full=(t.teamName&&t.teamName.default)||"";
+        var n=function(s){return s.toLowerCase().replace(/[^a-z0-9]/g,"");};
+        if(abbr&&full){ map[n(full)]=abbr; map[n(abbr)]=abbr; }
+      });
+      _nhlTeamAbbrevCache=map;
+    }catch(e){ _nhlTeamAbbrevCache={}; }
+  }
+  async function getNHLRoster(teamName){
+    if(!teamName) return [];
+    var nk=teamName.toLowerCase().replace(/[^a-z0-9]/g,"");
+    var abbr=_nhlTeamAbbrevCache[nk]||null;
+    if(!abbr){ for(var k in _nhlTeamAbbrevCache){ if(k.indexOf(nk)>=0||nk.indexOf(k)>=0){abbr=_nhlTeamAbbrevCache[k];break;} } }
+    if(!abbr) return [];
+    if(_nhlRosterCache[abbr]) return _nhlRosterCache[abbr];
+    try{
+      var r2=await fetch("https://api-web.nhle.com/v1/roster/"+abbr+"/current",{signal:AbortSignal.timeout(7000)});
+      if(!r2.ok){ _nhlRosterCache[abbr]=[]; return []; }
+      var d2=await r2.json();
+      var isSavesMkt=ST.market==="player_saves";
+      var names=[];
+      // Goalies only for saves; all skaters for other markets
+      if(isSavesMkt){
+        (d2.goalies||[]).forEach(function(pl){
+          var fn=(pl.firstName&&pl.firstName.default)||"";
+          var ln=(pl.lastName&&pl.lastName.default)||"";
+          if(fn&&ln) names.push(fn+" "+ln);
+        });
+      } else {
+        ["forwards","defensemen"].forEach(function(pos){
+          (d2[pos]||[]).forEach(function(pl){
+            var fn=(pl.firstName&&pl.firstName.default)||"";
+            var ln=(pl.lastName&&pl.lastName.default)||"";
+            if(fn&&ln) names.push(fn+" "+ln);
+          });
+        });
+      }
+      _nhlRosterCache[abbr]=names;
+      return names;
+    }catch(e){ _nhlRosterCache[abbr]=[]; return []; }
+  }
+  var results=await Promise.all([getNHLRoster(ev.home_team),getNHLRoster(ev.away_team)]);
+  results[0].concat(results[1]).forEach(function(name){
+    if(!name||existingNorm.has(normN(name))) return;
+    existingNorm.add(normN(name));
+    props.push({
+      player:name, books:[], yesNo:false, _market:ST.market,
+      consensus:null, bestLine:null, lineSpread:0, bookCount:0,
+      bestOdds:null, bestBook:null, decOdds:1, edge:0, vig:4.5,
+      evOver:null, side:"Over", _synthetic:true, _noLine:true,
+      value:0, guardrailFlags:[], valueFlags:[]
+    });
+  });
+}
+
+// Top-level dispatcher — called from loadBoard() and silentRefresh() for every non-moneyline market.
+async function augmentWithRoster(props, ev){
+  if(!ev||ST.market==="_h2h"||YESNO_MARKETS[ST.market]) return;
+  if(ST.sport==="baseball_mlb") await augmentWithMLBRoster(props, ev);
+  else if(ST.sport==="basketball_nba") await augmentWithEspnRoster(props, ev);
+  else if(ST.sport==="icehockey_nhl") await augmentWithNHLRoster(props, ev);
+  // NFL: position-specific filters vary per market; skip roster augmentation for now
 }
 
 // Division rank + win% — cached once per day, shared across every team trend lookup that day
@@ -1670,11 +1826,19 @@ function computeValue(p){
 async function enrichWithConfidence(p){
   try{
     var gl=await getGameLog(p.player);
-    if(!gl||!gl.values||gl.values.length<3){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
+    if(!gl||!gl.values||gl.values.length<3){
+      p.enriched=true; p.thinData=true;
+      if(p.guardrailFlags.indexOf("THIN_DATA")<0) p.guardrailFlags.push("THIN_DATA");
+      updatePropValueDisplay(p); updatePropPDDisplay(p); return;
+    }
     var vals=gl.values;
     var bookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
     // Anytime goalscorer has no posted numeric line — treat as "scores ≥1 goal" with implied 0.5 threshold
     if(!bookLine && p._market==="player_anytime_goalscorer") bookLine=0.5;
+    // Synthetic roster entries with no posted line: derive starting line from season average
+    if(!bookLine && p._synthetic && gl.seasonAvg!=null){
+      bookLine=Math.max(0.5, Math.round(gl.seasonAvg*2)/2);
+    }
     if(!bookLine){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
 
     // Store recent averages for chart use
@@ -1903,17 +2067,14 @@ function updatePropValueDisplay(p){
   var node=document.getElementById("vsc-"+p._id);
   if(!node) return;
   var vt=node.nextElementSibling;
-  if(p.pdNoValue){
+  if(p.thinData||p.pdNoValue){
     node.textContent="—"; node.className="t-pass";
     if(vt&&vt.classList.contains("vt")){ vt.textContent=""; vt.className="vt t-pass"; }
-    if(!ST_showNoValue){ var nr=node.closest("tr"); if(nr) nr.style.display="none"; }
     applyPropFlags(p); return;
   }
   var isConf=p.pdConfidence!=null;
   if(isConf){
     var pct=Math.round(p.pdConfidence*100);
-    // Below 55% — hide unless "Show All" is on or this is a full-roster market
-    if(pct<55&&!ST_showNoValue&&!FULL_ROSTER_MARKETS[p._market]){ var hr=node.closest("tr"); if(hr) hr.style.display="none"; return; }
     var tier=confTierOf(pct);
     var cur=parseInt(node.textContent)||0;
     node.className=tier.c;
@@ -1935,6 +2096,10 @@ function updatePropValueDisplay(p){
 function updatePropPDDisplay(p){
   var cell=document.getElementById("pdcell-"+p._id);
   if(!cell) return;
+  if(p.thinData){
+    cell.innerHTML='<span class="pd-line-val no-val" title="Fewer than 3 games of data for this stat">Thin Data</span>';
+    return;
+  }
   if(!p.pdResult){
     cell.innerHTML='<span class="pd-line-val no-val">NO VALUE</span>';
     return;
@@ -2122,12 +2287,10 @@ async function loadBoard(){
     ST.props=parseProps(data, ST.market);
     console.log("[PropDesk] "+ST.sport+" / "+ST.market+" — "+ST.props.length+" props from API");
     _propStore[ST.sport+"|"+ST.market]=ST.props;
-    // Augment with roster batters who have no posted odds line
-    if(FULL_ROSTER_MARKETS[ST.market]){
-      var _ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
-      await augmentWithRosterBatters(ST.props, _ev);
-      console.log("[PropDesk] After roster augment: "+ST.props.length+" total ("+ST.market+")");
-    }
+    // Augment with full active roster — adds every player without a posted odds line
+    var _ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
+    await augmentWithRoster(ST.props, _ev);
+    console.log("[PropDesk] After roster augment: "+ST.props.length+" total ("+ST.market+")");
     if(!ST.props.length){
       $("tableMount").innerHTML='<div class="empty">No '+esc(marketName(ST.market))+' lines posted for this game yet. Try another market.</div>';
       return;
@@ -2450,28 +2613,20 @@ function lotdText(legs){
 function filteredProps(){
   var q=($("searchIn").value||"").toLowerCase().trim();
   var results=ST.props.filter(function(p){
-    var qOk=!q||p.player.toLowerCase().indexOf(q)>=0;
-    if(!qOk) return false;
-    var mkt=p._market||ST.market;
-    var fullRoster=!!FULL_ROSTER_MARKETS[mkt];
-    // All enriched no-value rows: hidden by default, revealed by toggle or full-roster mode
-    if(p.enriched&&p.pdNoValue){ return ST_showNoValue||fullRoster; }
-    // Pre-enrichment: hide low phase-1 scores (synthetic roster entries bypass this)
-    if(!p.enriched&&p.value<50&&!p._synthetic) return false;
-    // Hide <55% confidence — skipped for full-roster markets which show all
-    if(!fullRoster&&p.enriched&&p.pdConfidence!=null&&!p.pdNoValue&&Math.round(p.pdConfidence*100)<55&&!ST_showNoValue) return false;
-    // L5 avg ice-cold filter — skipped for full-roster markets
-    if(!fullRoster&&!ST_showNoValue&&p.enriched&&p.l5Avg!=null&&p.bestLine!=null&&p.bestLine>0){
-      if(p.l5Avg < p.bestLine*0.6) return false;
+    // Search filter
+    if(q&&p.player.toLowerCase().indexOf(q)<0) return false;
+    // "Best Bets Only" toggle — restrict to LOCK+ELITE (≥67%); thin-data and no-value excluded
+    if(ST_bestOnly){
+      if(!p.enriched) return false;
+      if(p.thinData||p.pdNoValue||p.pdConfidence==null) return false;
+      if(Math.round(p.pdConfidence*100)<67) return false;
     }
-    // "Best Bets Only" filter — LOCK+ELITE only (≥67%)
-    if(ST_bestOnly&&p.enriched&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)<67) return false;
     return true;
   });
-  // Sort highest confidence first
+  // Sort highest confidence first; unenriched / thin-data / no-value sink to the bottom
   results.sort(function(a,b){
-    var ca=a.pdConfidence!=null&&!a.pdNoValue?a.pdConfidence:(a.value/100);
-    var cb=b.pdConfidence!=null&&!b.pdNoValue?b.pdConfidence:(b.value/100);
+    var ca=a.pdConfidence!=null&&!a.pdNoValue&&!a.thinData?a.pdConfidence:(a._synthetic?-1:(a.value/100));
+    var cb=b.pdConfidence!=null&&!b.pdNoValue&&!b.thinData?b.pdConfidence:(b._synthetic?-1:(b.value/100));
     return cb-ca;
   });
   return results;
@@ -4050,6 +4205,8 @@ async function silentRefresh(){
     var data=await fetchOdds(ST.eventId,ST.market);
     ST.props=parseProps(data,ST.market);
     _propStore[ST.sport+"|"+ST.market]=ST.props;
+    var _sev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
+    await augmentWithRoster(ST.props, _sev);
     applyMovement();
     populateBookSelect();
     renderTable(true);
