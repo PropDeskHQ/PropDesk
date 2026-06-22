@@ -6734,7 +6734,7 @@ function updateBestPlaysDisplay(eventId,remaining){
 }
 
 // Background enrichment — triggered on game select, not on Best Plays page visit.
-// Fetches all markets for the game and enriches up to PER_MKT props each.
+// Fetches all markets for the game and enriches every eligible player — no per-market cap.
 // Updates Best Plays display progressively as each market completes.
 async function startGameEnrichment(eventId){
   var taskId=Date.now();
@@ -6746,7 +6746,6 @@ async function startGameEnrichment(eventId){
     .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]; });
   var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
   var BATCH=5;
-  var PER_MKT=20; // enrich more per market — game logs are cached across markets
   try{
     for(var mi=0;mi<allMkts.length;mi+=BATCH){
       if(_gameEnrichTaskId[eventId]!==taskId) return;
@@ -6757,20 +6756,13 @@ async function startGameEnrichment(eventId){
           var mk=batch[bi];
           if(_gameEnrichTaskId[eventId]!==taskId) return;
           if((_gamePropsCache[eventId]||{})[mk]) continue; // already cached via user navigation
-          var isLong=(mk==="batter_home_runs"||mk==="player_first_td"||mk==="player_first_goalscorer"||mk==="player_first_basket");
           var mkProps=parseProps(mkData,mk).filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null;});
           mkProps.forEach(function(p){p._market=mk;p._sport=sport;p._game=gameLabel;});
-          mkProps.sort(function(a,b){
-            var sa=a.value+(isThreshMkt(mk)&&a.bestLine!=null&&a.bestLine<=0.5?20:0)-(isLong?6:0);
-            var sb=b.value+(isThreshMkt(mk)&&b.bestLine!=null&&b.bestLine<=0.5?20:0)-(isLong?6:0);
-            return sb-sa;
-          });
           if(!_gamePropsCache[eventId]) _gamePropsCache[eventId]={};
           _gamePropsCache[eventId][mk]=mkProps;
-          var toEnrich=mkProps.slice(0,PER_MKT);
-          for(var pi=0;pi<toEnrich.length;pi++){
+          for(var pi=0;pi<mkProps.length;pi++){
             if(_gameEnrichTaskId[eventId]!==taskId) return;
-            try{await enrichWithConfidence(toEnrich[pi]);}catch(e){}
+            try{await enrichWithConfidence(mkProps[pi]);}catch(e){}
           }
           updateBestPlaysDisplay(eventId,allMkts.length-Math.min(mi+bi+1,allMkts.length));
         }
