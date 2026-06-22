@@ -2321,7 +2321,7 @@ function renderGames(){
     var when=dt.toLocaleDateString([], {month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
     var b=el("button","game"+(ev.id===ST.eventId?" active":""));
     b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
-    b.onclick=function(){ ST.eventId=ev.id; localStorage.setItem("pe_event",ev.id); _glCache={}; _qsCache={}; renderGames(); startGameEnrichment(ev.id); loadGameDetail(); };
+    b.onclick=function(){ ST.eventId=ev.id; localStorage.setItem("pe_event",ev.id); _glCache={}; _qsCache={}; _gamePropsCache={}; _gameEnrichTaskId={}; renderGames(); startGameEnrichment(ev.id); loadGameDetail(); };
     c.appendChild(b);
   });
 }
