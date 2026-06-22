@@ -6694,7 +6694,7 @@ function loadGameDetail(){
   var mlM=$("gameMLMount");
   if(mlM) mlM.innerHTML='';
   var t5M=$("gameTop5Mount");
-  if(t5M) t5M.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:20px;font-size:13px">Scanning all markets…</div>';
+  if(t5M) t5M.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:20px;font-size:13px">Scanning all markets…</div>';
   loadMoneylineBoard();
   loadGameTop5();
   loadPropOfDay();
@@ -6737,7 +6737,7 @@ async function loadGameTop5(){
       }catch(e){}
     }
     if(!altPool.length){
-      mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">No prop lines available yet.</div>';
+      mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">No prop lines available yet.</div>';
       return;
     }
     // Guaranteed market diversity: two slots per market first, then global fill to 24.
@@ -6761,7 +6761,7 @@ async function loadGameTop5(){
       var k=e.prop.player.toLowerCase()+"|"+e.mkt;
       if(!seen[k]){seen[k]=1;toEnrich.push(e);}
     });
-    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Enriching '+toEnrich.length+' candidates…</div>';
+    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Enriching '+toEnrich.length+' candidates…</div>';
     var savedMkt=ST.market;
     for(var i=0;i<toEnrich.length;i++){
       if(ST.eventId!==eventId) return; // game changed mid-run
@@ -6773,15 +6773,14 @@ async function loadGameTop5(){
       .map(function(e){return e.prop;})
       .filter(function(p){
         if(p.enriched&&(p.pdNoValue||p.thinData)) return false;
-        if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
-        return p.value>=55;
+        if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=80;
+        return p.value>=80;
       });
     qualified.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
-    var _top5=qualified.slice(0,5);
     try{
       var _hist=JSON.parse(localStorage.getItem("pe_g5_hist")||"{}");
       var _newH={};
-      _top5.forEach(function(p){
+      qualified.forEach(function(p){
         var k=(p.player||"").toLowerCase()+"|"+(p._market||"");
         var cur=getEffectiveConf(p);
         _newH[k]=cur;
@@ -6790,9 +6789,9 @@ async function loadGameTop5(){
       Object.keys(_newH).forEach(function(k){_hist[k]=_newH[k];});
       localStorage.setItem("pe_g5_hist",JSON.stringify(_hist));
     }catch(e){}
-    renderGameTop5(_top5);
+    renderGameTop5(qualified);
   }catch(e){
-    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Error loading picks.</div>';
+    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Error loading picks.</div>';
   }
 }
 
@@ -6800,10 +6799,10 @@ function renderGameTop5(picks){
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
-    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Not enough qualifying props found (55%+ confidence required).</div>';
+    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">No plays above 80% confidence for this game.</div>';
     return;
   }
-  var html='<div class="g5-hdr"><span class="g5-title">Top 5 Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span></div>';
+  var html='<div class="g5-hdr"><span class="g5-title">Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span></div>';
   picks.forEach(function(p,i){
     var conf=getEffectiveConf(p);
     var tier=confTierOf(conf);
