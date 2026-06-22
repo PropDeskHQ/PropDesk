@@ -193,6 +193,7 @@ tbody tr.prow{transition:background .15s;scroll-margin-top:calc(52px + var(--sba
 tbody tr.prow:hover{background:var(--surf2)}
 tbody tr.prow td:nth-child(2),tbody tr.prow td:nth-child(3),tbody tr.prow td:nth-child(4){vertical-align:middle;text-align:center}
 thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4){text-align:center}
+.col-val-center{display:flex;flex-direction:column;align-items:center}
 .pl-name{font-weight:800;font-size:16px}
 .pl-meta{font-size:12px;color:var(--mut);margin-top:3px}
 .pl-acts{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px;margin-top:7px}
@@ -2168,11 +2169,11 @@ function updatePropPDDisplay(p){
   var cell=document.getElementById("pdcell-"+p._id);
   if(!cell) return;
   if(p.thinData){
-    cell.innerHTML='<span class="pd-line-val no-val" title="Fewer than 3 games of data for this stat">Thin Data</span>';
+    cell.innerHTML='<div class="col-val-center"><span class="pd-line-val no-val" title="Fewer than 3 games of data for this stat">Thin Data</span></div>';
     return;
   }
   if(!p.pdResult){
-    cell.innerHTML='<span class="pd-line-val no-val">NO VALUE</span>';
+    cell.innerHTML='<div class="col-val-center"><span class="pd-line-val no-val">NO VALUE</span></div>';
     return;
   }
   var rawBookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
@@ -2194,7 +2195,7 @@ function updatePropPDDisplay(p){
   if(thresh&&STEPPER_MARKETS[p._market]&&p._vals&&p._vals.length>=3){
     var userAdj=p._userLine!=null;
     cell.innerHTML=
-      '<div class="adj-ctrl">'+
+      '<div class="col-val-center"><div class="adj-ctrl">'+
         '<button class="adj-btn" onclick="handleAdj(event,\'dn\',\''+p._id+'\')" title="Lower threshold">−</button>'+
         '<span class="adj-val">'+esc(pdLabel)+'</span>'+
         '<button class="adj-btn" onclick="handleAdj(event,\'up\',\''+p._id+'\')" title="Raise threshold">＋</button>'+
@@ -2202,17 +2203,17 @@ function updatePropPDDisplay(p){
           '<span class="adj-orig">'+esc(threshLabel(p.pdLine,p._market))+'</span>'+
           '<button class="adj-reset" onclick="handleAdj(event,\'reset\',\''+p._id+'\')" title="Reset to default">↺</button>'
         :'')+
-      '</div>';
+      '</div></div>';
     return;
   }
   cell.innerHTML=
-    '<div class="pd-cell">'+
+    '<div class="col-val-center"><div class="pd-cell">'+
       '<div style="display:flex;gap:6px;align-items:baseline">'+
         (showStrike?'<span class="pd-book-strike">'+esc(strikeLabel)+'</span><span class="pd-arrow">→</span>':'')+
         '<span class="pd-line-val '+sideLow+'">'+esc(pdLabel)+'</span>'+
       '</div>'+
       gapHtml+
-    '</div>';
+    '</div></div>';
 }
 
 function applyPropFlags(p){
@@ -2839,17 +2840,17 @@ function rowHtml(p,cols,idx,silent){
     // Threshold: no gap badge — line never shifts; O/U: show gap if line shifted
     var gapHtml=isThresh?"":(p.pdGap>0?'<span class="gap-badge">▲ '+p.pdGap.toFixed(1)+' pts</span>':'<span class="gap-zero">at book line</span>');
     pdCellContent=
-      '<div class="pd-cell">'+
+      '<div class="col-val-center"><div class="pd-cell">'+
         '<div style="display:flex;gap:6px;align-items:baseline">'+
           (bookLineLabel&&bookLineLabel!==pdLineLabel?'<span class="pd-book-strike">'+esc(bookLineLabel)+'</span><span class="pd-arrow">→</span>':'')+
           '<span class="pd-line-val '+sideLow+'">'+esc(pdLineLabel)+'</span>'+
         '</div>'+
         gapHtml+
-      '</div>';
+      '</div></div>';
   } else if(p.pdNoValue){
-    pdCellContent='<span class="pd-line-val no-val">—</span>';
+    pdCellContent='<div class="col-val-center"><span class="pd-line-val no-val">—</span></div>';
   } else {
-    pdCellContent='<span class="pd-loading">—</span>';
+    pdCellContent='<div class="col-val-center"><span class="pd-loading">—</span></div>';
   }
 
   var h='<tr class="'+rcls+'" '+style+' data-pid="'+p._id+'">'+
@@ -2866,14 +2867,14 @@ function rowHtml(p,cols,idx,silent){
         (function(){ var inCart=ST.parlayCart&&ST.parlayCart.find(function(c){return c._id===p._id;}); return '<button class="mini mpb-add'+(inCart?' in-cart':'')+'" data-act="parlay" data-pid="'+p._id+'">'+(inCart?'✓ Added':'＋ Parlay')+'</button>'; })()+
       '</div>'+
     '</td>'+
-    '<td><span class="bb '+bbcls+'">'+esc(bb)+'</span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'</div>':'')+'</td>'+
+    '<td><div class="col-val-center"><span class="bb '+bbcls+'">'+esc(bb)+'</span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'</div>':'')+'</div></td>'+
     '<td id="pdcell-'+p._id+'">'+pdCellContent+'</td>';
   // Confidence column — show X% when enriched, — while pending
   var isConf=p.pdConfidence!=null&&!p.pdNoValue;
   var confPct=isConf?Math.round(p.pdConfidence*100):null;
   var ct=isConf?confTierOf(confPct):{c:"t-pass",t:""};
   var dispStr=silent?(isConf?(confPct+"%"):(p.pdNoValue?"—":String(p.value))):"—";
-  h+='<td><span class="vs"><b id="vsc-'+p._id+'" class="'+ct.c+'">'+dispStr+'</b><span class="vt '+ct.c+'">'+ct.t+'</span></span></td>';
+  h+='<td><div class="col-val-center"><span class="vs"><b id="vsc-'+p._id+'" class="'+ct.c+'">'+dispStr+'</b><span class="vt '+ct.c+'">'+ct.t+'</span></span></div></td>';
   cols.forEach(function(bk){ h+='<td>'+bookCellHtml(p,bk)+'</td>'; });
   h+='</tr>';
   return h;
