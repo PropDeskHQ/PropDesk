@@ -1529,6 +1529,9 @@ var ST_showNoValue=false; // show pdNoValue / hidden rows
 var ST_bestOnly=false;    // show only LOCK + ELITE (≥67%)
 // Cross-sport props accumulator — keyed by "sport|market", values are ST.props arrays (live refs)
 var _propStore={};
+// Per-game enriched prop cache — keyed by eventId, then market key. Lets Best Plays read
+// already-enriched props from every market the user has visited without a re-fetch.
+var _gamePropsCache={};
 
 /* ============ MATH ============ */
 function impliedProb(o){ o=Number(o); if(o>0) return 100/(o+100); return Math.abs(o)/(Math.abs(o)+100); }
@@ -2370,6 +2373,8 @@ async function loadBoard(){
     ST.props=parseProps(data, ST.market);
     console.log("[PropDesk] "+ST.sport+" / "+ST.market+" — "+ST.props.length+" props from API");
     _propStore[ST.sport+"|"+ST.market]=ST.props;
+    if(!_gamePropsCache[ST.eventId]) _gamePropsCache[ST.eventId]={};
+    _gamePropsCache[ST.eventId][ST.market]=ST.props;
     // Augment with full active roster — adds every player without a posted odds line
     var _ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
     await augmentWithRoster(ST.props, _ev);
@@ -4304,6 +4309,8 @@ async function silentRefresh(){
     var data=await fetchOdds(ST.eventId,ST.market);
     ST.props=parseProps(data,ST.market);
     _propStore[ST.sport+"|"+ST.market]=ST.props;
+    if(!_gamePropsCache[ST.eventId]) _gamePropsCache[ST.eventId]={};
+    _gamePropsCache[ST.eventId][ST.market]=ST.props;
     var _sev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
     await augmentWithRoster(ST.props, _sev);
     applyMovement();
@@ -6705,101 +6712,106 @@ async function loadGameTop5(){
   var eventId=ST.eventId;
   var ev=(ST.events||[]).filter(function(e){return e.id===eventId;})[0];
   if(!ev||!getKey()) return;
-  var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
-  // Scan ALL non-moneyline non-yesno markets — same full universe as the market bar
   var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;})
     .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]; });
+
+  // Collect all 80%+ props from already-enriched markets in the cache
+  function collectQualified(){
+    var cached=_gamePropsCache[eventId]||{};
+    var all=[];
+    Object.keys(cached).forEach(function(mk){
+      (cached[mk]||[]).forEach(function(p){
+        if(!p._market) p._market=mk;
+        if(!p._sport) p._sport=ST.sport;
+        if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=80){
+          all.push(p);
+        }
+      });
+    });
+    all.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
+    return all;
+  }
+
+  // Render current results, with optional "still scanning" footer
+  function renderWithStatus(remaining){
+    var q=collectQualified();
+    renderGameTop5(q, remaining>0);
+    if(q.length&&remaining>0){
+      var s=document.createElement("div");
+      s.style.cssText="text-align:center;color:var(--mut);font-size:11px;padding:6px 0 10px";
+      s.textContent="Scanning "+remaining+" more market"+(remaining!==1?"s":"")+"…";
+      var m=$("gameTop5Mount"); if(m) m.appendChild(s);
+    }
+  }
+
+  // Phase 1: show immediately from whatever markets the user has already visited
+  var visited=Object.keys(_gamePropsCache[eventId]||{});
+  var unvisited=allMkts.filter(function(mk){ return visited.indexOf(mk)<0; });
+  renderWithStatus(unvisited.length);
+  if(!unvisited.length) return;
+
+  // Phase 2: background-enrich unvisited markets, updating display as each batch lands
+  var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
+  var BATCH=5;
+  var PER_MKT=8; // top 8 candidates per unvisited market (no cross-market cap)
   try{
-    // altPool mirrors Prop of Day's approach: adjusted compScore levels the market playing field
-    var altPool=[]; // [{prop, mkt, score}]
-    var BATCH=5;
-    for(var mi=0;mi<allMkts.length;mi+=BATCH){
+    for(var mi=0;mi<unvisited.length;mi+=BATCH){
       if(ST.eventId!==eventId) return;
-      var batch=allMkts.slice(mi,Math.min(mi+BATCH,allMkts.length));
+      var batch=unvisited.slice(mi,Math.min(mi+BATCH,unvisited.length));
       try{
         var mkData=await fetchOdds(eventId,batch.join(","));
-        batch.forEach(function(mk){
-          // Home runs and first-scorer props inflate bookCount without real edge; cap them
-          var isLongshot=(mk==="batter_home_runs"||mk==="player_first_td"||mk==="player_first_goalscorer"||mk==="player_first_basket");
-          parseProps(mkData,mk).forEach(function(p){
-            if(p.bestOdds==null||p.yesNo||p.bestLine==null) return;
-            p._market=mk; p._sport=ST.sport; p._game=gameLabel;
-            // Apply same compScore normalisation as Prop of Day
-            var compScore=p.value;
-            if(p.bestLine<=0.5) compScore=Math.min(compScore,62);
-            if(isLongshot) compScore=Math.min(compScore,56);
-            // Low-line threshold markets (1+ Hit, 1+ Goal, etc.) score 50-56 in phase 1
-            // but 70-80% after enrichment — boost so they compete for enrichment slots
-            var boost=(isThreshMkt(mk)&&p.bestLine<=0.5)?20:0;
-            if(compScore>=44) altPool.push({prop:p,mkt:mk,score:compScore+boost});
+        for(var bi=0;bi<batch.length;bi++){
+          var mk=batch[bi];
+          var isLong=(mk==="batter_home_runs"||mk==="player_first_td"||mk==="player_first_goalscorer"||mk==="player_first_basket");
+          var mkProps=parseProps(mkData,mk).filter(function(p){ return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null; });
+          mkProps.forEach(function(p){ p._market=mk; p._sport=ST.sport; p._game=gameLabel; });
+          // Pre-enrichment ranking: boost threshold props; penalise longhots
+          mkProps.sort(function(a,b){
+            var sa=a.value+(isThreshMkt(mk)&&a.bestLine!=null&&a.bestLine<=0.5?20:0)-(isLong?6:0);
+            var sb=b.value+(isThreshMkt(mk)&&b.bestLine!=null&&b.bestLine<=0.5?20:0)-(isLong?6:0);
+            return sb-sa;
           });
-        });
+          if(!_gamePropsCache[eventId]) _gamePropsCache[eventId]={};
+          _gamePropsCache[eventId][mk]=mkProps; // register whole list; enriched ones update in-place
+          var toEnrich=mkProps.slice(0,PER_MKT);
+          var savedMkt=ST.market;
+          ST.market=mk;
+          for(var pi=0;pi<toEnrich.length;pi++){
+            if(ST.eventId!==eventId){ST.market=savedMkt;return;}
+            try{await enrichWithConfidence(toEnrich[pi]);}catch(e){}
+          }
+          ST.market=savedMkt;
+        }
       }catch(e){}
+      if(ST.eventId!==eventId) return;
+      var done=Math.min(mi+BATCH,unvisited.length);
+      renderWithStatus(unvisited.length-done);
     }
-    if(!altPool.length){
-      mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">No prop lines available yet.</div>';
-      return;
-    }
-    // Guaranteed market diversity: two slots per market first, then global fill to 24.
-    // Prevents batter_hits (most books posted) from claiming every enrichment slot before
-    // Home Runs or RBIs are ever evaluated on actual confidence.
-    var perMkt={};
-    altPool.forEach(function(e){ if(!perMkt[e.mkt]) perMkt[e.mkt]=[]; perMkt[e.mkt].push(e); });
-    var seen={}, toEnrich=[];
-    Object.keys(perMkt).forEach(function(mk){
-      perMkt[mk].sort(function(a,b){return b.score-a.score;});
-      var added=0;
-      perMkt[mk].forEach(function(e){
-        if(added>=2) return;
-        var k=e.prop.player.toLowerCase()+"|"+mk;
-        if(!seen[k]){seen[k]=1;toEnrich.push(e);added++;}
-      });
+  }catch(e){}
+
+  // Final render with trend-delta tracking applied
+  var q=collectQualified();
+  try{
+    var _hist=JSON.parse(localStorage.getItem("pe_g5_hist")||"{}");
+    var _newH={};
+    q.forEach(function(p){
+      var k=(p.player||"").toLowerCase()+"|"+(p._market||"");
+      var cur=getEffectiveConf(p);
+      _newH[k]=cur;
+      if(_hist[k]!=null){var diff=cur-_hist[k];p._confTrend=diff>=1?"up":diff<=-1?"down":"same";}
     });
-    altPool.sort(function(a,b){return b.score-a.score;});
-    altPool.forEach(function(e){
-      if(toEnrich.length>=24) return;
-      var k=e.prop.player.toLowerCase()+"|"+e.mkt;
-      if(!seen[k]){seen[k]=1;toEnrich.push(e);}
-    });
-    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Enriching '+toEnrich.length+' candidates…</div>';
-    var savedMkt=ST.market;
-    for(var i=0;i<toEnrich.length;i++){
-      if(ST.eventId!==eventId) return; // game changed mid-run
-      ST.market=toEnrich[i].mkt;
-      try{await enrichWithConfidence(toEnrich[i].prop);}catch(e){}
-    }
-    ST.market=savedMkt;
-    var qualified=toEnrich
-      .map(function(e){return e.prop;})
-      .filter(function(p){
-        if(p.enriched&&(p.pdNoValue||p.thinData)) return false;
-        if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=80;
-        return p.value>=80;
-      });
-    qualified.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
-    try{
-      var _hist=JSON.parse(localStorage.getItem("pe_g5_hist")||"{}");
-      var _newH={};
-      qualified.forEach(function(p){
-        var k=(p.player||"").toLowerCase()+"|"+(p._market||"");
-        var cur=getEffectiveConf(p);
-        _newH[k]=cur;
-        if(_hist[k]!=null){var diff=cur-_hist[k];p._confTrend=diff>=1?"up":diff<=-1?"down":"same";}
-      });
-      Object.keys(_newH).forEach(function(k){_hist[k]=_newH[k];});
-      localStorage.setItem("pe_g5_hist",JSON.stringify(_hist));
-    }catch(e){}
-    renderGameTop5(qualified);
-  }catch(e){
-    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">Error loading picks.</div>';
-  }
+    Object.keys(_newH).forEach(function(k){_hist[k]=_newH[k];});
+    localStorage.setItem("pe_g5_hist",JSON.stringify(_hist));
+  }catch(e){}
+  renderGameTop5(q, false);
 }
 
-function renderGameTop5(picks){
+function renderGameTop5(picks,isScanning){
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
-    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">No plays above 80% confidence for this game.</div>';
+    var emptyMsg=isScanning?'Scanning markets for 80%+ plays…':'No plays above 80% confidence for this game.';
+    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
     return;
   }
   var html='<div class="g5-hdr"><span class="g5-title">Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span></div>';
