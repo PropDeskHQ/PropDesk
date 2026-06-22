@@ -1129,7 +1129,14 @@ function fmtLine(line, side){
 }
 function isThreshProp(p){ return !!(p._market && (THRESHOLD_MARKETS[ST.sport]||{})[p._market]); }
 // Markets where the user-adjustable line stepper is shown. Expand after each market is verified.
-var STEPPER_MARKETS={batter_hits:1};
+var STEPPER_MARKETS={
+  batter_hits:1, batter_total_bases:1, batter_rbis:1, batter_home_runs:1,
+  batter_runs_scored:1, batter_hits_runs_rbis:1,
+  pitcher_strikeouts:1, pitcher_hits_allowed:1, pitcher_earned_runs:1,
+  pitcher_outs:1, pitcher_walks:1,
+  player_goals:1, player_assists:1, player_points:1,
+  player_shots_on_goal:1, player_saves:1
+};
 
 /* ============ MLB TEAM SITUATIONAL DATA (real history, no fabricated odds) ============ */
 var _mlbTeamsCache=null;
