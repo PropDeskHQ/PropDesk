@@ -1532,6 +1532,8 @@ var _propStore={};
 // Per-game enriched prop cache — keyed by eventId, then market key. Lets Best Plays read
 // already-enriched props from every market the user has visited without a re-fetch.
 var _gamePropsCache={};
+// Task-ID tracker — cancels stale enrichment runs when the user switches games.
+var _gameEnrichTaskId={};
 
 /* ============ MATH ============ */
 function impliedProb(o){ o=Number(o); if(o>0) return 100/(o+100); return Math.abs(o)/(Math.abs(o)+100); }
@@ -1629,6 +1631,7 @@ async function fetchEvents(){
     renderGames();
     // Auto-restore last selected game if it's still in today's slate
     if(ST.eventId && ST.events.some(function(e){return e.id===ST.eventId;})){
+      startGameEnrichment(ST.eventId);
       loadGameDetail();
     } else {
       ST.eventId=null;
@@ -2318,7 +2321,7 @@ function renderGames(){
     var when=dt.toLocaleDateString([], {month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
     var b=el("button","game"+(ev.id===ST.eventId?" active":""));
     b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
-    b.onclick=function(){ ST.eventId=ev.id; localStorage.setItem("pe_event",ev.id); _glCache={}; _qsCache={}; renderGames(); loadGameDetail(); };
+    b.onclick=function(){ ST.eventId=ev.id; localStorage.setItem("pe_event",ev.id); _glCache={}; _qsCache={}; renderGames(); startGameEnrichment(ev.id); loadGameDetail(); };
     c.appendChild(b);
   });
 }
@@ -6707,94 +6710,88 @@ function loadGameDetail(){
   loadPropOfDay();
 }
 
-async function loadGameTop5(){
-  var mount=$("gameTop5Mount"); if(!mount) return;
-  var eventId=ST.eventId;
-  var ev=(ST.events||[]).filter(function(e){return e.id===eventId;})[0];
-  if(!ev||!getKey()) return;
-  var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;})
-    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]; });
-
-  // Collect all 80%+ props from already-enriched markets in the cache
-  function collectQualified(){
-    var cached=_gamePropsCache[eventId]||{};
-    var all=[];
-    Object.keys(cached).forEach(function(mk){
-      (cached[mk]||[]).forEach(function(p){
-        if(!p._market) p._market=mk;
-        if(!p._sport) p._sport=ST.sport;
-        if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=80){
-          all.push(p);
-        }
-      });
+// Collect and render Best Plays from the cache for a given game.
+// Called by both loadGameTop5 and startGameEnrichment as each market completes.
+function updateBestPlaysDisplay(eventId,remaining){
+  if(ST.eventId!==eventId) return;
+  var cached=_gamePropsCache[eventId]||{};
+  var q=[];
+  Object.keys(cached).forEach(function(mk){
+    (cached[mk]||[]).forEach(function(p){
+      if(!p._market) p._market=mk;
+      if(!p._sport) p._sport=ST.sport;
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=80) q.push(p);
     });
-    all.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
-    return all;
+  });
+  q.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
+  renderGameTop5(q,remaining>0);
+  if(q.length&&remaining>0){
+    var s=document.createElement("div");
+    s.style.cssText="text-align:center;color:var(--mut);font-size:11px;padding:6px 0 10px";
+    s.textContent="Scanning "+remaining+" more market"+(remaining!==1?"s":"")+"…";
+    var m=$("gameTop5Mount"); if(m) m.appendChild(s);
   }
+}
 
-  // Render current results, with optional "still scanning" footer
-  function renderWithStatus(remaining){
-    var q=collectQualified();
-    renderGameTop5(q, remaining>0);
-    if(q.length&&remaining>0){
-      var s=document.createElement("div");
-      s.style.cssText="text-align:center;color:var(--mut);font-size:11px;padding:6px 0 10px";
-      s.textContent="Scanning "+remaining+" more market"+(remaining!==1?"s":"")+"…";
-      var m=$("gameTop5Mount"); if(m) m.appendChild(s);
-    }
-  }
-
-  // Phase 1: show immediately from whatever markets the user has already visited
-  var visited=Object.keys(_gamePropsCache[eventId]||{});
-  var unvisited=allMkts.filter(function(mk){ return visited.indexOf(mk)<0; });
-  renderWithStatus(unvisited.length);
-  if(!unvisited.length) return;
-
-  // Phase 2: background-enrich unvisited markets, updating display as each batch lands
+// Background enrichment — triggered on game select, not on Best Plays page visit.
+// Fetches all markets for the game and enriches up to PER_MKT props each.
+// Updates Best Plays display progressively as each market completes.
+async function startGameEnrichment(eventId){
+  var taskId=Date.now();
+  _gameEnrichTaskId[eventId]=taskId;
+  var ev=(ST.events||[]).filter(function(e){return e.id===eventId;})[0];
+  var sport=ST.sport;
+  if(!ev||!getKey()) return;
+  var allMkts=(MARKETS[sport]||[]).map(function(m){return m.k;})
+    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]; });
   var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
   var BATCH=5;
-  var PER_MKT=8; // top 8 candidates per unvisited market (no cross-market cap)
+  var PER_MKT=20; // enrich more per market — game logs are cached across markets
   try{
-    for(var mi=0;mi<unvisited.length;mi+=BATCH){
-      if(ST.eventId!==eventId) return;
-      var batch=unvisited.slice(mi,Math.min(mi+BATCH,unvisited.length));
+    for(var mi=0;mi<allMkts.length;mi+=BATCH){
+      if(_gameEnrichTaskId[eventId]!==taskId) return;
+      var batch=allMkts.slice(mi,Math.min(mi+BATCH,allMkts.length));
       try{
         var mkData=await fetchOdds(eventId,batch.join(","));
         for(var bi=0;bi<batch.length;bi++){
           var mk=batch[bi];
+          if(_gameEnrichTaskId[eventId]!==taskId) return;
+          if((_gamePropsCache[eventId]||{})[mk]) continue; // already cached via user navigation
           var isLong=(mk==="batter_home_runs"||mk==="player_first_td"||mk==="player_first_goalscorer"||mk==="player_first_basket");
-          var mkProps=parseProps(mkData,mk).filter(function(p){ return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null; });
-          mkProps.forEach(function(p){ p._market=mk; p._sport=ST.sport; p._game=gameLabel; });
-          // Pre-enrichment ranking: boost threshold props; penalise longhots
+          var mkProps=parseProps(mkData,mk).filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null;});
+          mkProps.forEach(function(p){p._market=mk;p._sport=sport;p._game=gameLabel;});
           mkProps.sort(function(a,b){
             var sa=a.value+(isThreshMkt(mk)&&a.bestLine!=null&&a.bestLine<=0.5?20:0)-(isLong?6:0);
             var sb=b.value+(isThreshMkt(mk)&&b.bestLine!=null&&b.bestLine<=0.5?20:0)-(isLong?6:0);
             return sb-sa;
           });
           if(!_gamePropsCache[eventId]) _gamePropsCache[eventId]={};
-          _gamePropsCache[eventId][mk]=mkProps; // register whole list; enriched ones update in-place
+          _gamePropsCache[eventId][mk]=mkProps;
           var toEnrich=mkProps.slice(0,PER_MKT);
-          var savedMkt=ST.market;
-          ST.market=mk;
           for(var pi=0;pi<toEnrich.length;pi++){
-            if(ST.eventId!==eventId){ST.market=savedMkt;return;}
+            if(_gameEnrichTaskId[eventId]!==taskId) return;
             try{await enrichWithConfidence(toEnrich[pi]);}catch(e){}
           }
-          ST.market=savedMkt;
+          updateBestPlaysDisplay(eventId,allMkts.length-Math.min(mi+bi+1,allMkts.length));
         }
       }catch(e){}
-      if(ST.eventId!==eventId) return;
-      var done=Math.min(mi+BATCH,unvisited.length);
-      renderWithStatus(unvisited.length-done);
     }
   }catch(e){}
-
-  // Final render with trend-delta tracking applied
-  var q=collectQualified();
+  // Final pass: apply trend-delta tracking then re-render
+  var cached=_gamePropsCache[eventId]||{};
+  var qFinal=[];
+  Object.keys(cached).forEach(function(mk){
+    (cached[mk]||[]).forEach(function(p){
+      if(!p._market) p._market=mk;
+      if(!p._sport) p._sport=sport;
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=80) qFinal.push(p);
+    });
+  });
+  qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
   try{
     var _hist=JSON.parse(localStorage.getItem("pe_g5_hist")||"{}");
     var _newH={};
-    q.forEach(function(p){
+    qFinal.forEach(function(p){
       var k=(p.player||"").toLowerCase()+"|"+(p._market||"");
       var cur=getEffectiveConf(p);
       _newH[k]=cur;
@@ -6803,7 +6800,20 @@ async function loadGameTop5(){
     Object.keys(_newH).forEach(function(k){_hist[k]=_newH[k];});
     localStorage.setItem("pe_g5_hist",JSON.stringify(_hist));
   }catch(e){}
-  renderGameTop5(q, false);
+  if(ST.eventId===eventId) renderGameTop5(qFinal,false);
+}
+
+// Lightweight: just ensures enrichment is running and shows current cache state.
+// startGameEnrichment (called on game select) does all the heavy lifting.
+async function loadGameTop5(){
+  var eventId=ST.eventId;
+  var ev=(ST.events||[]).filter(function(e){return e.id===eventId;})[0];
+  if(!ev||!getKey()) return;
+  var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;})
+    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]; });
+  if(!_gameEnrichTaskId[eventId]) startGameEnrichment(eventId);
+  var cachedMkts=Object.keys((_gamePropsCache[eventId]||{}));
+  updateBestPlaysDisplay(eventId,Math.max(0,allMkts.length-cachedMkts.length));
 }
 
 function renderGameTop5(picks,isScanning){
