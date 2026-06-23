@@ -1807,6 +1807,26 @@ function compositeConf(vals, line, isOver){
   return composite;
 }
 
+// Find the stat-derived PropDesk line: threshold where weighted hit-rate is closest to 65%.
+// thresh=true  → steps at X.5 (0.5,1.5,2.5…) for integer-outcome threshold markets (hits, goals…)
+// thresh=false → steps at 0.5, result rounded to nearest whole number for decimal O/U markets
+function findStatLine(vals,thresh){
+  if(!vals||vals.length<3) return null;
+  var TARGET=0.65;
+  var step=thresh?1.0:0.5;
+  var maxSearch=Math.max.apply(null,vals)+1.5;
+  var bestLine=0.5;
+  var bestDist=1.0; // initial worst-case
+  for(var l=0.5;l<=maxSearch;l=+(l+step).toFixed(1)){
+    var c=compositeConf(vals,l,true);
+    if(c===null) break;
+    var dist=Math.abs(c-TARGET);
+    if(dist<bestDist){ bestDist=dist; bestLine=l; }
+    if(c===0) break; // hit rate at 0%, no point going higher
+  }
+  return thresh?bestLine:Math.max(1,Math.round(bestLine));
+}
+
 // Recompute threshold confidence at a user-chosen line using game log data already in memory.
 // Applies the same post-enrichment adjustments as enrichWithConfidence (matchup, streak, thin-data, LOCK gate).
 function recomputeAdjConf(p,newLine){
@@ -1814,11 +1834,6 @@ function recomputeAdjConf(p,newLine){
   if(!vals||vals.length<3) return null;
   var raw=compositeConf(vals,newLine,true);
   if(raw===null) return null;
-  var matchupAdj=0;
-  if((p.edge||0)>=1.0) matchupAdj+=0.03;
-  else if((p.edge||0)>=0.5) matchupAdj+=0.015;
-  if((p.lineSpread||0)>=2.0) matchupAdj+=0.02;
-  else if((p.lineSpread||0)>=1.0) matchupAdj+=0.01;
   var streak=0;
   for(var i=0;i<vals.length;i++){
     var hit=vals[i]>newLine;
@@ -1827,7 +1842,7 @@ function recomputeAdjConf(p,newLine){
   }
   var sa=streak>=4?0.04:streak>=3?0.025:streak>=2?0.01:streak<=-4?-0.04:streak<=-3?-0.025:streak<=-2?-0.01:0;
   var tp=vals.length<5?-0.07:(vals.length<10?-0.04:0);
-  var adj=Math.max(0.01,Math.min(0.97,raw+matchupAdj+sa+tp));
+  var adj=Math.max(0.01,Math.min(0.97,raw+sa+tp));
   if(Math.round(adj*100)>=80){
     var l5h=vals.slice(0,Math.min(5,vals.length)).filter(function(v){return v>newLine;}).length;
     if(l5h<4) adj=Math.min(adj,0.799);
@@ -1998,9 +2013,7 @@ async function enrichWithConfidence(p){
       var wSzn=sznGap>=2?88:sznGap>=1?73:sznGap>=0?59:sznGap>=-1?38:18;
       // 4. Days rest + pitch depth (15%) — 5-day rotation = 85
       var wRest=daysRest>=7?82:daysRest>=5?72:daysRest>=4?55:25;
-      // 5. Line edge vs consensus (10%)
-      var wEdge=(p.edge||0)>=1.0?88:(p.edge||0)>=0.5?72:50;
-      var composite=(wOpp*0.30)+(wL5*0.25)+(wSzn*0.20)+(wRest*0.15)+(wEdge*0.10);
+      var composite=(wOpp*0.33)+(wL5*0.28)+(wSzn*0.22)+(wRest*0.17);
       // ── Pitcher K pipeline debug — open browser console to inspect ───────
       console.log("[PropDesk Pitcher K]", p.player, {
         bookLine: bookLine,
@@ -2008,19 +2021,21 @@ async function enrichWithConfidence(p){
         l5K: +l5K.toFixed(2), sznK: +sznK.toFixed(2),
         daysRest: daysRest,
         oppTeam: oppTeam, oppKPct: oppKPct!=null ? +(oppKPct*100).toFixed(1)+"%" : null,
-        wOpp: wOpp, wL5: wL5, wSzn: wSzn, wRest: wRest, wEdge: wEdge,
+        wOpp: wOpp, wL5: wL5, wSzn: wSzn, wRest: wRest,
         composite: +composite.toFixed(1),
         finalScore: Math.round(Math.min(95,composite))
       });
       p.value=Math.round(Math.min(95,composite));
-      // Confidence = historical hit rate at book line
-      var kConfRaw=compositeConf(vals,bookLine,true);
+      // Confidence = historical hit rate at stat-derived line (closest to 65%)
+      var statLineK=findStatLine(vals,true);
+      var kConfRaw=statLineK!==null?compositeConf(vals,statLineK,true):null;
+      var kConfAtBook=compositeConf(vals,bookLine,true);
       p.pdSide="Over";
-      p.pdLine=bookLine;
-      p.pdGap=0;
+      p.pdLine=statLineK||bookLine;
+      p.pdGap=statLineK!==null?+(Math.abs(statLineK-bookLine).toFixed(1)):0;
       p.pdConfidence=kConfRaw!=null?kConfRaw:Math.max(0.01,composite/100);
-      p.pdConfAtBook=p.pdConfidence;
-      p.pdResult={line:bookLine,confidence:p.pdConfidence,gap:0,confAtBook:p.pdConfidence};
+      p.pdConfAtBook=kConfAtBook!=null?kConfAtBook:p.pdConfidence;
+      p.pdResult={line:p.pdLine,confidence:p.pdConfidence,gap:p.pdGap,confAtBook:p.pdConfAtBook};
       p.hitRate14=+(p.pdConfidence*100).toFixed(1);
       p.enriched=true;
       // Positive flags
@@ -2036,47 +2051,40 @@ async function enrichWithConfidence(p){
 
     if(thresh){
       // ── Threshold markets (NHL goals, MLB hits…) ──────────────────────
-      // Show raw confidence at the book line. No shifting — never change a
-      // "1+ Goals" to "0+ Goals". Always surface with real confidence %.
-      var confRaw=compositeConf(vals,bookLine,true);
-      if(confRaw===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
+      // Use stat-derived line (closest to 65% hit-rate) as the PropDesk anchor.
+      // Book line is display-only context stored in pdConfAtBook.
+      var statLine=findStatLine(vals,true);
+      if(statLine===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
+      var confAtStat=compositeConf(vals,statLine,true);
+      var confAtBook=compositeConf(vals,bookLine,true);
+      if(confAtStat===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
       p.pdSide="Over";
-      p.pdLine=bookLine;
-      p.pdGap=0;
-      p.pdConfidence=confRaw;
-      p.pdConfAtBook=confRaw;
-      p.hitRate14=+(confRaw*100).toFixed(1);
-      // Score = straight confidence %; tier labels will reflect it naturally
-      p.value=Math.round(confRaw*100);
-      p.pdResult={line:bookLine,confidence:confRaw,gap:0,confAtBook:confRaw};
+      p.pdLine=statLine;
+      p.pdGap=+(Math.abs(statLine-bookLine).toFixed(1));
+      p.pdConfidence=confAtStat;
+      p.pdConfAtBook=confAtBook!=null?confAtBook:confAtStat;
+      p.hitRate14=+(confAtStat*100).toFixed(1);
+      p.value=Math.round(confAtStat*100);
+      p.pdResult={line:statLine,confidence:confAtStat,gap:p.pdGap,confAtBook:p.pdConfAtBook};
       p.enriched=true;
     } else {
       // ── True over/under markets (NBA, NFL…) — always Over ─────────────
-      // Shift the line up from book line until 62% Over confidence.
-      // If no shifted line qualifies, fall back to showing raw book-line
-      // Over confidence — we never recommend Under.
+      // Use stat-derived line (closest to 65% hit-rate, rounded to whole number).
+      // Book line is display-only context stored in pdConfAtBook.
       p.pdSide="Over";
-      var overResult=findPropDeskLine(vals,bookLine,true);
-      if(overResult){
-        p.pdResult=overResult;
-        p.pdLine=overResult.line;
-        p.pdGap=overResult.gap;
-        p.pdConfidence=overResult.confidence;
-        p.pdConfAtBook=overResult.confAtBook;
-        p.hitRate14=+(overResult.confidence*100).toFixed(1);
-        p.value=Math.round(overResult.confidence*100);
-      } else {
-        // No shifted line clears 62% — show raw hit rate at book line
-        var rawOverConf=compositeConf(vals,bookLine,true);
-        if(rawOverConf===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
-        p.pdResult={line:bookLine,confidence:rawOverConf,gap:0,confAtBook:rawOverConf};
-        p.pdLine=bookLine;
-        p.pdGap=0;
-        p.pdConfidence=rawOverConf;
-        p.pdConfAtBook=rawOverConf;
-        p.hitRate14=+(rawOverConf*100).toFixed(1);
-        p.value=Math.round(rawOverConf*100);
+      var statLineOU=findStatLine(vals,false);
+      var confAtStatOU=statLineOU!==null?compositeConf(vals,statLineOU,true):null;
+      var confAtBookOU=compositeConf(vals,bookLine,true);
+      if(confAtStatOU===null||statLineOU===null){
+        p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return;
       }
+      p.pdLine=statLineOU;
+      p.pdGap=+(Math.abs(statLineOU-bookLine).toFixed(1));
+      p.pdConfidence=confAtStatOU;
+      p.pdConfAtBook=confAtBookOU!=null?confAtBookOU:confAtStatOU;
+      p.hitRate14=+(confAtStatOU*100).toFixed(1);
+      p.value=Math.round(confAtStatOU*100);
+      p.pdResult={line:statLineOU,confidence:confAtStatOU,gap:p.pdGap,confAtBook:p.pdConfAtBook};
       p.enriched=true;
     }
 
@@ -2102,12 +2110,6 @@ async function enrichWithConfidence(p){
     if(p.pdGap>0&&p.valueFlags.indexOf("LINE_ADJ")<0) p.valueFlags.push("LINE_ADJ");
 
     // ── Post-enrichment confidence adjustments ────────────────────────────
-    // Matchup (20%): market signals — free points edge + sharp split
-    var matchupAdj=0;
-    if((p.edge||0)>=1.0) matchupAdj+=0.03;
-    else if((p.edge||0)>=0.5) matchupAdj+=0.015;
-    if((p.lineSpread||0)>=2.0) matchupAdj+=0.02;
-    else if((p.lineSpread||0)>=1.0) matchupAdj+=0.01;
     // Streak/trend (10%): consecutive hits or misses at current line
     var streakAdj=0;
     var s=p.streak||0;
@@ -2119,7 +2121,7 @@ async function enrichWithConfidence(p){
     var thinPenalty=vals.length<5?-0.07:(vals.length<10?-0.04:0);
     // Apply all adjustments to pdConfidence (clamp 0.01–0.97)
     if(p.pdConfidence!=null){
-      p.pdConfidence=Math.max(0.01,Math.min(0.97,p.pdConfidence+matchupAdj+streakAdj+thinPenalty));
+      p.pdConfidence=Math.max(0.01,Math.min(0.97,p.pdConfidence+streakAdj+thinPenalty));
       p.pdResult.confidence=p.pdConfidence;
       p.hitRate14=+(p.pdConfidence*100).toFixed(1);
       p.value=Math.round(p.pdConfidence*100);
