@@ -1809,26 +1809,6 @@ function compositeConf(vals, line, isOver){
   return composite;
 }
 
-// Find the stat-derived PropDesk line: threshold where weighted hit-rate is closest to 65%.
-// thresh=true  → steps at X.5 (0.5,1.5,2.5…) for integer-outcome threshold markets (hits, goals…)
-// thresh=false → steps at 0.5, result rounded to nearest whole number for decimal O/U markets
-function findStatLine(vals,thresh){
-  if(!vals||vals.length<3) return null;
-  var TARGET=0.65;
-  var step=thresh?1.0:0.5;
-  var maxSearch=Math.max.apply(null,vals)+1.5;
-  var bestLine=0.5;
-  var bestDist=1.0; // initial worst-case
-  for(var l=0.5;l<=maxSearch;l=+(l+step).toFixed(1)){
-    var c=compositeConf(vals,l,true);
-    if(c===null) break;
-    var dist=Math.abs(c-TARGET);
-    if(dist<bestDist){ bestDist=dist; bestLine=l; }
-    if(c===0) break; // hit rate at 0%, no point going higher
-  }
-  return thresh?bestLine:Math.max(1,Math.round(bestLine));
-}
-
 // Recompute threshold confidence at a user-chosen line using game log data already in memory.
 // Applies the same post-enrichment adjustments as enrichWithConfidence (matchup, streak, thin-data, LOCK gate).
 function recomputeAdjConf(p,newLine){
@@ -2028,16 +2008,14 @@ async function enrichWithConfidence(p){
         finalScore: Math.round(Math.min(95,composite))
       });
       p.value=Math.round(Math.min(95,composite));
-      // Confidence = historical hit rate at stat-derived line (closest to 65%)
-      var statLineK=findStatLine(vals,true);
-      var kConfRaw=statLineK!==null?compositeConf(vals,statLineK,true):null;
-      var kConfAtBook=compositeConf(vals,bookLine,true);
+      // Confidence = historical hit rate at book line
+      var kConfRaw=compositeConf(vals,bookLine,true);
       p.pdSide="Over";
-      p.pdLine=statLineK||bookLine;
-      p.pdGap=statLineK!==null?+(Math.abs(statLineK-bookLine).toFixed(1)):0;
+      p.pdLine=bookLine;
+      p.pdGap=0;
       p.pdConfidence=kConfRaw!=null?kConfRaw:Math.max(0.01,composite/100);
-      p.pdConfAtBook=kConfAtBook!=null?kConfAtBook:p.pdConfidence;
-      p.pdResult={line:p.pdLine,confidence:p.pdConfidence,gap:p.pdGap,confAtBook:p.pdConfAtBook};
+      p.pdConfAtBook=p.pdConfidence;
+      p.pdResult={line:bookLine,confidence:p.pdConfidence,gap:0,confAtBook:p.pdConfidence};
       p.hitRate14=+(p.pdConfidence*100).toFixed(1);
       p.enriched=true;
       // Positive flags
@@ -2053,40 +2031,44 @@ async function enrichWithConfidence(p){
 
     if(thresh){
       // ── Threshold markets (NHL goals, MLB hits…) ──────────────────────
-      // Use stat-derived line (closest to 65% hit-rate) as the PropDesk anchor.
-      // Book line is display-only context stored in pdConfAtBook.
-      var statLine=findStatLine(vals,true);
-      if(statLine===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
-      var confAtStat=compositeConf(vals,statLine,true);
-      var confAtBook=compositeConf(vals,bookLine,true);
-      if(confAtStat===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
+      // Confidence = hit rate at the book's actual posted line.
+      var confRaw=compositeConf(vals,bookLine,true);
+      if(confRaw===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
       p.pdSide="Over";
-      p.pdLine=statLine;
-      p.pdGap=+(Math.abs(statLine-bookLine).toFixed(1));
-      p.pdConfidence=confAtStat;
-      p.pdConfAtBook=confAtBook!=null?confAtBook:confAtStat;
-      p.hitRate14=+(confAtStat*100).toFixed(1);
-      p.value=Math.round(confAtStat*100);
-      p.pdResult={line:statLine,confidence:confAtStat,gap:p.pdGap,confAtBook:p.pdConfAtBook};
+      p.pdLine=bookLine;
+      p.pdGap=0;
+      p.pdConfidence=confRaw;
+      p.pdConfAtBook=confRaw;
+      p.hitRate14=+(confRaw*100).toFixed(1);
+      p.value=Math.round(confRaw*100);
+      p.pdResult={line:bookLine,confidence:confRaw,gap:0,confAtBook:confRaw};
       p.enriched=true;
     } else {
       // ── True over/under markets (NBA, NFL…) — always Over ─────────────
-      // Use stat-derived line (closest to 65% hit-rate, rounded to whole number).
-      // Book line is display-only context stored in pdConfAtBook.
+      // Shift the line up from book line until 62% Over confidence.
+      // If no shifted line qualifies, fall back to showing raw book-line
+      // Over confidence — we never recommend Under.
       p.pdSide="Over";
-      var statLineOU=findStatLine(vals,false);
-      var confAtStatOU=statLineOU!==null?compositeConf(vals,statLineOU,true):null;
-      var confAtBookOU=compositeConf(vals,bookLine,true);
-      if(confAtStatOU===null||statLineOU===null){
-        p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return;
+      var overResult=findPropDeskLine(vals,bookLine,true);
+      if(overResult){
+        p.pdResult=overResult;
+        p.pdLine=overResult.line;
+        p.pdGap=overResult.gap;
+        p.pdConfidence=overResult.confidence;
+        p.pdConfAtBook=overResult.confAtBook;
+        p.hitRate14=+(overResult.confidence*100).toFixed(1);
+        p.value=Math.round(overResult.confidence*100);
+      } else {
+        var rawOverConf=compositeConf(vals,bookLine,true);
+        if(rawOverConf===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
+        p.pdResult={line:bookLine,confidence:rawOverConf,gap:0,confAtBook:rawOverConf};
+        p.pdLine=bookLine;
+        p.pdGap=0;
+        p.pdConfidence=rawOverConf;
+        p.pdConfAtBook=rawOverConf;
+        p.hitRate14=+(rawOverConf*100).toFixed(1);
+        p.value=Math.round(rawOverConf*100);
       }
-      p.pdLine=statLineOU;
-      p.pdGap=+(Math.abs(statLineOU-bookLine).toFixed(1));
-      p.pdConfidence=confAtStatOU;
-      p.pdConfAtBook=confAtBookOU!=null?confAtBookOU:confAtStatOU;
-      p.hitRate14=+(confAtStatOU*100).toFixed(1);
-      p.value=Math.round(confAtStatOU*100);
-      p.pdResult={line:statLineOU,confidence:confAtStatOU,gap:p.pdGap,confAtBook:p.pdConfAtBook};
       p.enriched=true;
     }
 
