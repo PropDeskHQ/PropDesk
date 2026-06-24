@@ -992,6 +992,10 @@ var MARKETS = {
   ]
 };
 
+// MLB markets hidden from the pill nav and excluded from Best Plays scanning.
+// Underlying data/confidence logic is intact — remove a key here to re-enable.
+var MLB_HIDDEN_MARKETS={batter_strikeouts:1,pitcher_hits_allowed:1,pitcher_earned_runs:1,pitcher_outs:1};
+
 var LOTD_MARKETS = {
   americanfootball_nfl:["player_pass_yds","player_rush_yds","player_reception_yds","player_pass_tds","player_receptions"],
   basketball_nba:["player_points","player_rebounds","player_assists","player_threes","player_steals","player_blocks","player_points_rebounds_assists"],
@@ -2309,7 +2313,7 @@ function renderPropTabs(){
   var tp=el("button","pill"+(ST.market==="__trends__"?" active":""),"Trends");
   tp.onclick=function(){ ST.market="__trends__"; renderPropTabs(); showGameContent(); loadGameTrends(); };
   c.appendChild(tp);
-  (MARKETS[ST.sport]||[]).filter(function(m){return m.k!=="_h2h";}).forEach(function(m){
+  (MARKETS[ST.sport]||[]).filter(function(m){return m.k!=="_h2h"&&!MLB_HIDDEN_MARKETS[m.k];}).forEach(function(m){
     var b=el("button","pill"+(m.k===ST.market?" active":""),m.n);
     b.onclick=function(){ ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); showGameContent(); if(ST.eventId) loadBoard(); };
     c.appendChild(b);
@@ -6721,6 +6725,7 @@ function updateBestPlaysDisplay(eventId,remaining){
   var cached=_gamePropsCache[eventId]||{};
   var q=[];
   Object.keys(cached).forEach(function(mk){
+    if(MLB_HIDDEN_MARKETS[mk]) return;
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
@@ -6747,7 +6752,7 @@ async function startGameEnrichment(eventId){
   var sport=ST.sport;
   if(!ev||!getKey()) return;
   var allMkts=(MARKETS[sport]||[]).map(function(m){return m.k;})
-    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]; });
+    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]&&!MLB_HIDDEN_MARKETS[k]; });
   var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
   var BATCH=5;
   try{
@@ -6808,7 +6813,7 @@ async function loadGameTop5(){
   var ev=(ST.events||[]).filter(function(e){return e.id===eventId;})[0];
   if(!ev||!getKey()) return;
   var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;})
-    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]; });
+    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]&&!MLB_HIDDEN_MARKETS[k]; });
   if(!_gameEnrichTaskId[eventId]) startGameEnrichment(eventId);
   var cachedMkts=Object.keys((_gamePropsCache[eventId]||{}));
   updateBestPlaysDisplay(eventId,Math.max(0,allMkts.length-cachedMkts.length));
