@@ -2031,6 +2031,17 @@ async function enrichWithConfidence(p){
 
     if(thresh){
       // ── Threshold markets (NHL goals, MLB hits…) ──────────────────────
+      // Alt-line-only guard: batter markets with consensus above the ceiling mean
+      // no standard-line bookmakers covered this player (e.g. ESPNBet-only at 3.5).
+      // Pitcher and hockey markets are not capped — their standard lines are high.
+      var _BMAX={batter_hits:1.5,batter_rbis:1.5,batter_home_runs:1.5,
+                 batter_runs_scored:1.5,batter_total_bases:3.5,batter_hits_runs_rbis:3.5};
+      var _mktMax=_BMAX[p._market];
+      if(_mktMax!=null&&bookLine>_mktMax){
+        p.thinData=true;
+        if(p.guardrailFlags.indexOf("ALT_LINE_ONLY")<0) p.guardrailFlags.push("ALT_LINE_ONLY");
+        p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return;
+      }
       // Confidence = hit rate at the book's actual posted line.
       var confRaw=compositeConf(vals,bookLine,true);
       if(confRaw===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
