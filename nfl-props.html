@@ -1674,7 +1674,9 @@ function parseProps(data,marketKey){
       if(!pname) return;
       if(!byPlayer[pname]) byPlayer[pname]={over:null,under:null,yes:null,point:null};
       var side=(oc.name||"").toLowerCase();
-      if(side==="over"){ byPlayer[pname].over=oc.price; byPlayer[pname].point=oc.point; }
+      if(side==="over"){
+        if(byPlayer[pname].point===null||oc.point<byPlayer[pname].point){ byPlayer[pname].over=oc.price; byPlayer[pname].point=oc.point; }
+      }
       else if(side==="under"){ byPlayer[pname].under=oc.price; byPlayer[pname].point=oc.point; }
       else if(side==="yes"){ byPlayer[pname].yes=oc.price; if(oc.point!=null) byPlayer[pname].point=oc.point; }
       else { byPlayer[pname].yes=oc.price; if(oc.point!=null) byPlayer[pname].point=oc.point; }
