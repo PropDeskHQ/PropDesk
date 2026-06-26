@@ -4883,9 +4883,8 @@ function renderPlayHistory(){
   }
 
   /* ─── FOOTER ─── */
-  html+='<div style="margin-top:24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  html+='<div style="margin-top:24px">';
   html+='<div style="font-size:10px;color:var(--mut)">'+all.length+' plays · ~'+storeKB+'KB used</div>';
-  html+='<button class="btn" id="phClearBtn" style="color:var(--red);border-color:var(--red);font-size:11px">Clear History ('+all.length+')</button>';
   html+='</div></div>';
 
   mount.innerHTML=html;
@@ -4917,11 +4916,6 @@ function renderPlayHistory(){
     exportPlayHistStats(all,allRes,allHits,allRate,rate7,rate30,r7.length,r30.length,sportMap,mktMap,TIER_DEF,tierMap,streaks,hotMkts,coldMkts);
   };
   var blk=$('phBulkBtn'); if(blk) blk.onclick=function(){ _phBulkResolve(pastPending); };
-  var clr=$('phClearBtn'); if(clr) clr.onclick=function(){
-    if(confirm('This will permanently delete all '+all.length+' logged plays. This cannot be undone.')){
-      localStorage.removeItem(PLAY_HIST_KEY); _histFilters={sport:"all",result:"all",days:"all"}; _histSearch=""; renderPlayHistory();
-    }
-  };
 }
 
 function _phBulkResolve(pastPending){
