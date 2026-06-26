@@ -4896,9 +4896,10 @@ function renderPlayHistory(){
         }
       }
 
+      var undoBtn='<button class="btn ph-undo" data-i="'+i+'" style="margin-left:6px;font-size:10px;color:var(--mut);background:none;border:1px solid var(--bd2);border-radius:4px;padding:2px 7px;cursor:pointer">Undo</button>';
       var res;
-      if(e.result==="hit") res='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">HIT</span>';
-      else if(e.result==="miss") res='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">MISS</span>';
+      if(e.result==="hit") res='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">HIT</span>'+undoBtn;
+      else if(e.result==="miss") res='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">MISS</span>'+undoBtn;
       else res=
         '<button class="btn ph-hit" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:6px;margin-right:6px">✓ Hit</button>'+
         '<button class="btn ph-miss" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>';
@@ -4946,6 +4947,14 @@ function renderPlayHistory(){
       var res=b.classList.contains('ph-hit')?"hit":"miss";
       var h=loadPlayHist();
       h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market) e.result=res; });
+      savePlayHist(h); renderPlayHistory();
+    };
+  });
+  mount.querySelectorAll('.ph-undo').forEach(function(b){
+    b.onclick=function(){
+      var idx=parseInt(b.getAttribute('data-i')), entry=filtered[idx]; if(!entry) return;
+      var h=loadPlayHist();
+      h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market) e.result="pending"; });
       savePlayHist(h); renderPlayHistory();
     };
   });
