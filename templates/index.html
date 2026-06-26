@@ -1906,7 +1906,7 @@ function computeValue(p){
 // Phase 2: full confidence analysis using real game log
 async function enrichWithConfidence(p){
   try{
-    var gl=await getGameLog(p.player, p._market||ST.market);
+    var gl=await getGameLog(p.player);
     if(!gl||!gl.values||gl.values.length<3){
       p.enriched=true; p.thinData=true;
       if(p.guardrailFlags.indexOf("THIN_DATA")<0) p.guardrailFlags.push("THIN_DATA");
@@ -3010,7 +3010,7 @@ function clearActiveBtns(tr){
 async function renderAnalyze(p){
   var mount=$("exp-"+p._id);
   if(!mount) return;
-  var gl=await getGameLog(p.player, p._market||ST.market).catch(function(){return null;});
+  var gl=await getGameLog(p.player).catch(function(){return null;});
   var bookLine=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:0);
   var vals=gl&&gl.values?gl.values:(p._vals||[]);
   var dates=gl&&gl.dates?gl.dates:(p._dates||[]);
@@ -3249,7 +3249,7 @@ function lazyLoadPlayerMeta(){
       applyMeta(p);
       if(!p._quickStatsLoaded){
         p._quickStatsLoaded=true;
-        getQuickStatsData(p.player, m, p._market||ST.market).then(function(qs){
+        getQuickStatsData(p.player, m).then(function(qs){
           p._quickStats=qs&&qs.length?qs:[];
           applyQuickStats(p);
           // Enrich all props — stagger by rank so API calls don't all fire at once
@@ -3315,10 +3315,9 @@ var _fsCache={};  // full-stats cache keyed by date+sport+name — refreshes dai
 var _CACHE_TTL=10*60*1000; // 10 minutes
 function _cacheGet(store,key){ var e=store[key]; if(e===undefined) return undefined; if(Date.now()-e.t>_CACHE_TTL){ delete store[key]; return undefined; } return e.v; }
 function _cacheSet(store,key,val){ store[key]={v:val,t:Date.now()}; }
-async function getQuickStatsData(name, meta, market){
+async function getQuickStatsData(name, meta){
   // Include market in key so L5/High refresh when player switches prop type
-  var _mk=market||ST.market;
-  var key=ST.sport+"|"+_mk+"|"+name;
+  var key=ST.sport+"|"+ST.market+"|"+name;
   var _qsCached=_cacheGet(_qsCache,key);
   if(_qsCached!==undefined) return _qsCached;
   var result=null;
@@ -3414,7 +3413,7 @@ async function getQuickStatsData(name, meta, market){
     /* ---- L5 AVG + Season High (all sports, appended after main stats) ---- */
     if(result&&result.length&&meta&&meta.id){
       try{
-        var gl2=ST.sport==="baseball_mlb"?await mlbGameLog(meta.id,_mk):await espnGameLog(meta.id,_mk);
+        var gl2=ST.sport==="baseball_mlb"?await mlbGameLog(meta.id):await espnGameLog(meta.id);
         if(gl2&&gl2.values&&gl2.values.length>0){
           var gv=gl2.values;
           var l5=gv.slice(0,5).reduce(function(a,x){return a+x;},0)/Math.min(5,gv.length);
@@ -3430,16 +3429,15 @@ async function getQuickStatsData(name, meta, market){
 }
 
 /* ============ GAME LOG for charts ============ */
-async function getGameLog(name, market){
-  var _mk=market||ST.market;
-  var ckey=ST.sport+"|"+_mk+"|"+name;
+async function getGameLog(name){
+  var ckey=ST.sport+"|"+ST.market+"|"+name;
   var cached=_cacheGet(_glCache,ckey);
   if(cached!==undefined) return cached;
   var result=null;
   if(ST.sport==="baseball_mlb"){
     var meta=await getMeta(name);
     if(!meta||!meta.id){ _cacheSet(_glCache,ckey,null); return null; }
-    try{ result=await mlbGameLog(meta.id,_mk); }catch(e){}
+    try{ result=await mlbGameLog(meta.id); }catch(e){}
   } else if(ST.sport==="icehockey_nhl"){
     // NHL official API gives reliable game log data; ESPN unreliable for NHL
     var nhlId=await nhlSearch(name);
@@ -3447,22 +3445,21 @@ async function getGameLog(name, market){
     // Fallback to ESPN if NHL API yields nothing
     if(!result){
       var _meta=await getMeta(name);
-      if(_meta&&_meta.id){ try{ result=await espnGameLog(_meta.id,_mk); }catch(e){} }
+      if(_meta&&_meta.id){ try{ result=await espnGameLog(_meta.id); }catch(e){} }
     }
   } else {
     var meta=await getMeta(name);
     if(!meta||!meta.id){ _cacheSet(_glCache,ckey,null); return null; }
-    try{ result=await espnGameLog(meta.id,_mk); }catch(e){}
+    try{ result=await espnGameLog(meta.id); }catch(e){}
   }
   _cacheSet(_glCache,ckey,result);
   return result;
 }
-async function mlbGameLog(id, market){
-  var _mk=market||ST.market;
+async function mlbGameLog(id){
   var group=mlbGroup();
   var years=[new Date().getFullYear(), new Date().getFullYear()-1];
-  var keys=STAT_KEYS[_mk]||[];
-  var compositeKeys=STAT_COMPOSITE_KEYS[_mk]||null;
+  var keys=STAT_KEYS[ST.market]||[];
+  var compositeKeys=STAT_COMPOSITE_KEYS[ST.market]||null;
   for(var y=0;y<years.length;y++){
     try{
       var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+id+"/stats?stats=gameLog&season="+years[y]+"&group="+group+"&limit=20");
@@ -3496,7 +3493,7 @@ async function mlbGameLog(id, market){
           }
         });
         if(vals.length){
-          var savg=await mlbSeasonAvg(id,group,keys,years[y],_mk);
+          var savg=await mlbSeasonAvg(id,group,keys,years[y]);
           return {values:vals, seasonAvg:savg!=null?savg:avg(vals), dates:dates,
             gamePks:gamePks, isHomeArr:isHomeArr, opponents:opponents, playerId:id};
         }
@@ -3505,8 +3502,8 @@ async function mlbGameLog(id, market){
   }
   return null;
 }
-async function mlbSeasonAvg(id,group,keys,year,market){
-  var compositeKeys=STAT_COMPOSITE_KEYS[market||ST.market]||null;
+async function mlbSeasonAvg(id,group,keys,year){
+  var compositeKeys=STAT_COMPOSITE_KEYS[ST.market]||null;
   try{
     var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+id+"/stats?stats=season&season="+year+"&group="+group);
     var d=await r.json();
@@ -3593,11 +3590,10 @@ async function mlbPitcherHands(ids){
   return out;
 }
 
-async function espnGameLog(id, market){
-  var _mk=market||ST.market;
+async function espnGameLog(id){
   var path=ESPN_PATH[ST.sport];
-  var compositeGroups=ESPN_COMPOSITE_KEYS[_mk]||null;
-  var keys=STAT_KEYS[_mk]||[];
+  var compositeGroups=ESPN_COMPOSITE_KEYS[ST.market]||null;
+  var keys=STAT_KEYS[ST.market]||[];
   try{
     var r=await fetch("https://site.web.api.espn.com/apis/common/v3/sports/"+path+"/athletes/"+id+"/gamelog");
     var d=await r.json();
@@ -6795,6 +6791,9 @@ async function startGameEnrichment(eventId){
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
+  console.log("[BP] startGameEnrichment final pass — "+qFinal.length+" props at 80%+:");
+  qFinal.forEach(function(p){ console.log("  [BP]",p.player,"|",p._market,"| pdConf:",+(( p.pdConfidence||0)*100).toFixed(1)+"%","| enriched:",p.enriched,"| thinData:",!!p.thinData,"| pdNoValue:",!!p.pdNoValue); });
+  if(!qFinal.length) console.log("  [BP] none qualified — full cache dump:"); Object.keys(_gamePropsCache[eventId]||{}).forEach(function(mk){ (_gamePropsCache[eventId][mk]||[]).forEach(function(p){ console.log("    [cache]",p.player,mk,"pdConf:",p.pdConfidence,"enriched:",p.enriched,"thinData:",!!p.thinData); }); });
   try{
     var _hist=JSON.parse(localStorage.getItem("pe_g5_hist")||"{}");
     var _newH={};
@@ -6824,6 +6823,8 @@ async function loadGameTop5(){
 }
 
 function renderGameTop5(picks,isScanning){
+  console.log("[BP] renderGameTop5 called — "+picks.length+" props received, isScanning:"+isScanning);
+  picks.forEach(function(p){ console.log("  [render]",p.player,"|",p._market,"| pdConf:",+(( p.pdConfidence||0)*100).toFixed(1)+"%"); });
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
