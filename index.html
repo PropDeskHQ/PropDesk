@@ -4703,11 +4703,14 @@ function renderPlayHistory(){
   all.forEach(function(e){ var k=e.player+"|"+e.market; if(!pmMap[k]) pmMap[k]=[]; pmMap[k].push(e); });
 
   /* ════ BUILD HTML ════ */
+  var allPending=all.filter(function(e){return e.result==="pending";}).length;
+  var showTrendCols=all.length>=10;
+  var hasStreak=topMkts.some(function(k){return mktMap[k].bestStreak>0;});
   var html='<div style="padding:16px">';
 
   /* title row */
-  html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:16px">';
-  html+='<div style="font-size:18px;font-weight:800">History of Hits</div>';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:20px">';
+  html+='<div style="font-size:18px;font-weight:800">Play History</div>';
   html+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
   html+='<button class="btn" id="phBulkBtn" style="font-size:11px">Resolve Pending'+(pastPending.length?' ('+pastPending.length+')':'')+'</button>';
   html+='<button class="btn" id="phExportBtn" style="font-size:11px">Export CSV</button>';
@@ -4718,45 +4721,63 @@ function renderPlayHistory(){
 
   /* ─── SECTION 1: OVERALL RECORD ─── */
   html+=_phSectionHdr("Overall Record");
-  var rateColor=_phRateColor(allRate), rateBarW=allRate!==null?allRate:0;
-  html+='<div style="margin-bottom:14px">';
-  html+='<div style="font-size:28px;font-weight:800;color:'+rateColor+';margin-bottom:2px">'+(allRate!==null?allRate+'%':'–')+'</div>';
-  html+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+allHits+' hits / '+allRes.length+' resolved · '+all.filter(function(e){return e.result==="pending";}).length+' pending</div>';
-  html+='<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px">';
-  html+='<div style="background:'+rateColor+';width:'+rateBarW+'%;height:100%;border-radius:4px"></div></div>';
-  html+='<div style="display:flex;gap:24px">';
-  html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 7 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate7)+'">'+_phRateStr(rate7)+'</div><div style="font-size:9px;color:var(--mut)">'+r7.length+' resolved</div></div>';
-  html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate30)+'">'+_phRateStr(rate30)+'</div><div style="font-size:9px;color:var(--mut)">'+r30.length+' resolved</div></div>';
-  html+='</div></div>';
+  if(allRes.length===0){
+    html+='<div style="margin-bottom:32px">';
+    html+='<div style="font-size:28px;font-weight:800;color:var(--mut);margin-bottom:6px">–</div>';
+    html+='<div style="font-size:12px;color:var(--mut)">'+(allPending>0?allPending+' pending · ':'')+'Resolve plays to see hit rate</div>';
+    html+='</div>';
+  } else {
+    var rateColor=_phRateColor(allRate), rateBarW=allRate!==null?allRate:0;
+    html+='<div style="margin-bottom:32px">';
+    html+='<div style="font-size:28px;font-weight:800;color:'+rateColor+';margin-bottom:2px">'+(allRate!==null?allRate+'%':'–')+'</div>';
+    html+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+allHits+' hits / '+allRes.length+' resolved · '+allPending+' pending</div>';
+    html+='<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px">';
+    html+='<div style="background:'+rateColor+';width:'+rateBarW+'%;height:100%;border-radius:4px"></div></div>';
+    html+='<div style="display:flex;gap:24px">';
+    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 7 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate7)+'">'+_phRateStr(rate7)+'</div><div style="font-size:9px;color:var(--mut)">'+r7.length+' resolved</div></div>';
+    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate30)+'">'+_phRateStr(rate30)+'</div><div style="font-size:9px;color:var(--mut)">'+r30.length+' resolved</div></div>';
+    html+='</div></div>';
+  }
 
   /* ─── SECTION 2: BY SPORT ─── */
   var sportKeys=Object.keys(sportMap);
   if(sportKeys.length){
     html+=_phSectionHdr("By Sport");
-    html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate'],
-      sportKeys.map(function(s){
-        var m=sportMap[s], rate=_phRate(m.hits,m.hits+m.misses);
-        return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+esc(s)+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;color:var(--accent)">'+m.hits+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;color:var(--red)">'+m.misses+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+m.pending+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td></tr>';
-      }),true);
+    if(allRes.length===0){
+      html+='<div style="font-size:11px;color:var(--mut);margin-bottom:32px">Hit rates will appear once plays are resolved.</div>';
+    } else {
+      html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate'],
+        sportKeys.map(function(s){
+          var m=sportMap[s], rate=_phRate(m.hits,m.hits+m.misses);
+          return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+esc(s)+'</td>'+
+            '<td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
+            '<td style="padding:5px 8px;font-size:11px;color:var(--accent)">'+m.hits+'</td>'+
+            '<td style="padding:5px 8px;font-size:11px;color:var(--red)">'+m.misses+'</td>'+
+            '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+m.pending+'</td>'+
+            '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td></tr>';
+        }),true);
+      html+='<div style="margin-bottom:16px"></div>';
+    }
   }
 
   /* ─── SECTION 3: BY MARKET ─── */
   if(topMkts.length){
     html+=_phSectionHdr("By Market (Top 10 by Volume)");
-    html+=_phTbl(['Market','Plays','Hit Rate','Best Streak','Avg Conf'],
+    var mktHdrs=['Market','Plays','Hit Rate','Avg Conf'];
+    if(hasStreak) mktHdrs.splice(3,0,'Best Streak');
+    html+=_phTbl(mktHdrs,
       topMkts.map(function(k){
         var m=mktMap[k], rate=_phRate(m.hits,m.hits+m.misses);
-        return '<tr><td style="padding:5px 8px;font-size:11px">'+esc(k)+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px">'+m.bestStreak+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px">'+(m.plays>0?Math.round(m.confSum/m.plays)+'%':'–')+'</td></tr>';
+        var rateCell=rate!==null
+          ?'<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+rate+'%</td>'
+          :'<td style="padding:5px 8px;font-size:11px;color:var(--mut)">Pending</td>';
+        var row='<tr><td style="padding:5px 8px;font-size:11px">'+esc(k)+'</td>'+
+          '<td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+rateCell;
+        if(hasStreak) row+='<td style="padding:5px 8px;font-size:11px">'+(m.bestStreak||'–')+'</td>';
+        row+='<td style="padding:5px 8px;font-size:11px">'+(m.plays>0?Math.round(m.confSum/m.plays)+'%':'–')+'</td></tr>';
+        return row;
       }),true);
+    html+='<div style="margin-bottom:16px"></div>';
   }
 
   /* ─── SECTION 4: CONFIDENCE TIER CALIBRATION ─── */
@@ -4774,38 +4795,44 @@ function renderPlayHistory(){
           '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+t.exp+'%</td>'+
           '<td style="padding:5px 8px;font-size:11px;font-weight:700;color:'+gapColor+'">'+(gap===null?"–":(gap>=0?"+":"")+gap+"%")+'</td></tr>';
       }),true);
+    html+='<div style="margin-bottom:16px"></div>';
   }
 
   /* ─── SECTION 5: STREAKS & TRENDS ─── */
   html+=_phSectionHdr("Streaks & Trends");
-  var curS=streaks.cur, bH=streaks.bHit, bM=streaks.bMiss;
-  var curStr=curS.len?(curS.len+" "+(curS.dir?"hit":"miss")+" streak"):"No resolved plays yet";
-  html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:12px">';
-  html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">CURRENT STREAK</div><div style="font-size:15px;font-weight:800;color:'+(curS.len?(curS.dir?"var(--accent)":"var(--red)"):"var(--mut)")+'">'+curStr+'</div></div>';
-  html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST HIT STREAK</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(bH.len?bH.len+" hits":"–")+'</div>'+(bH.len?'<div style="font-size:9px;color:var(--mut)">'+bH.start+(bH.start!==bH.end?" → "+bH.end:"")+'</div>':"")+'</div>';
-  html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">WORST MISS STREAK</div><div style="font-size:15px;font-weight:800;color:var(--red)">'+(bM.len?bM.len+" misses":"–")+'</div>'+(bM.len?'<div style="font-size:9px;color:var(--mut)">'+bM.start+(bM.start!==bM.end?" → "+bM.end:"")+'</div>':"")+'</div>';
-  html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST SPORT (MONTH)</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(monthRanked.length?monthRanked[0].s+" "+monthRanked[0].rate+"%":"–")+'</div></div>';
-  html+='</div>';
-  if(hotMkts.length||coldMkts.length){
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">';
-    if(hotMkts.length){
-      html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">HOT MARKETS</div>';
-      hotMkts.forEach(function(m){ html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--accent);font-weight:700">'+m.rate+'%</span></div>'; });
-      html+='</div>';
-    }
-    if(coldMkts.length){
-      html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">COLD MARKETS</div>';
-      coldMkts.forEach(function(m){ html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--red);font-weight:700">'+m.rate+'%</span></div>'; });
-      html+='</div>';
-    }
+  if(allRes.length<5){
+    html+='<div style="font-size:11px;color:var(--mut);margin-bottom:32px">Streak data available after 5 resolved plays.</div>';
+  } else {
+    var curS=streaks.cur, bH=streaks.bHit, bM=streaks.bMiss;
+    var curStr=curS.len?(curS.len+" "+(curS.dir?"hit":"miss")+" streak"):"—";
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px">';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">CURRENT STREAK</div><div style="font-size:15px;font-weight:800;color:'+(curS.len?(curS.dir?"var(--accent)":"var(--red)"):"var(--mut)")+'">'+curStr+'</div></div>';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST HIT STREAK</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(bH.len?bH.len+" hits":"–")+'</div>'+(bH.len?'<div style="font-size:9px;color:var(--mut)">'+bH.start+(bH.start!==bH.end?" → "+bH.end:"")+'</div>':"")+'</div>';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">WORST MISS STREAK</div><div style="font-size:15px;font-weight:800;color:var(--red)">'+(bM.len?bM.len+" misses":"–")+'</div>'+(bM.len?'<div style="font-size:9px;color:var(--mut)">'+bM.start+(bM.start!==bM.end?" → "+bM.end:"")+'</div>':"")+'</div>';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST SPORT (MONTH)</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(monthRanked.length?monthRanked[0].s+" "+monthRanked[0].rate+"%":"–")+'</div></div>';
     html+='</div>';
+    if(hotMkts.length||coldMkts.length){
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">';
+      if(hotMkts.length){
+        html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">HOT MARKETS</div>';
+        hotMkts.forEach(function(m){ html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--accent);font-weight:700">'+m.rate+'%</span></div>'; });
+        html+='</div>';
+      }
+      if(coldMkts.length){
+        html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">COLD MARKETS</div>';
+        coldMkts.forEach(function(m){ html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--red);font-weight:700">'+m.rate+'%</span></div>'; });
+        html+='</div>';
+      }
+      html+='</div>';
+    }
+    html+='<div style="margin-bottom:16px"></div>';
   }
 
   /* ─── SECTION 6: 30-DAY CHART ─── */
   if(allRes.length){
     html+=_phSectionHdr("Rolling 30-Day Hit Rate");
     html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px 10px 8px;margin-bottom:4px">'+_ph30DayChartSvg(all)+'</div>';
-    html+='<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mut);margin-bottom:4px"><span>30 days ago</span><span>Today</span></div>';
+    html+='<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mut);margin-bottom:32px"><span>30 days ago</span><span>Today</span></div>';
   }
 
   /* ─── FILTER ROW ─── */
@@ -4830,61 +4857,65 @@ function renderPlayHistory(){
   if(!filtered.length){
     html+='<div class="empty" style="padding:24px 0">'+(all.length?'No plays match the current filters.':'Open a game — 80%+ props will auto-log here.')+'</div>';
   } else {
-    var TH='text-align:left;padding:7px 10px;font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bd);white-space:nowrap;cursor:pointer;user-select:none';
+    var TH='text-align:left;padding:8px 10px;font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bd);white-space:nowrap;cursor:pointer;user-select:none';
+    var TH_S='text-align:left;padding:8px 10px;font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bd);white-space:nowrap';
     function sh(c,label){
       var arr=_histSort.col===c?(_histSort.dir==="asc"?" ↑":" ↓"):"";
       return '<th style="'+TH+'" data-sort="'+c+'">'+label+arr+'</th>';
     }
     html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
-    html+='<thead><tr>'+sh("date","Date")+sh("player","Player")+'<th style="'+TH+'">Market</th><th style="'+TH+'">Line</th>'+sh("confidence","Conf")+'<th style="'+TH+'">Trend</th><th style="'+TH+'">Days Since</th><th style="'+TH+'">Game</th>'+sh("result","Result")+'</tr></thead><tbody>';
+    html+='<thead><tr>'+sh("date","Date")+sh("player","Player")+'<th style="'+TH_S+'">Market</th><th style="'+TH_S+'">Line</th>'+sh("confidence","Conf");
+    if(showTrendCols) html+='<th style="'+TH_S+'">Trend</th><th style="'+TH_S+'">Days Since</th>';
+    html+='<th style="'+TH_S+'">Game</th>'+sh("result","Result")+'</tr></thead><tbody>';
     filtered.forEach(function(e,i){
       var tier=confTierOf(e.confidence||0);
       var isPP=e.result==="pending"&&e.date<today;
-      var rowStyle='border-bottom:1px solid var(--bd2);'+(isPP?"border-left:2px solid var(--yellow);":"");
+      var rowStyle='border-bottom:1px solid var(--bd);'+(isPP?"border-left:3px solid var(--yellow);":"");
 
-      /* trend arrow */
-      var pmArr=pmMap[e.player+"|"+e.market]||[];
-      var pmIdx=pmArr.findIndex(function(x){ return x.loggedAt===e.loggedAt; });
-      var prev=pmIdx>=0&&pmIdx<pmArr.length-1?pmArr[pmIdx+1]:null;
-      var trendHtml="<span style='color:var(--mut)'>—</span>";
-      if(prev&&prev.confidence!=null){
-        var diff=(e.confidence||0)-(prev.confidence||0);
-        trendHtml=diff>0?'<span style="color:var(--accent)">↑</span>':diff<0?'<span style="color:var(--red)">↓</span>':"<span style='color:var(--mut)'>—</span>";
+      var trendHtml="", dsSince="";
+      if(showTrendCols){
+        var pmArr=pmMap[e.player+"|"+e.market]||[];
+        var pmIdx=pmArr.findIndex(function(x){ return x.loggedAt===e.loggedAt; });
+        var prev=pmIdx>=0&&pmIdx<pmArr.length-1?pmArr[pmIdx+1]:null;
+        trendHtml="<span style='color:var(--mut)'>—</span>";
+        if(prev&&prev.confidence!=null){
+          var diff=(e.confidence||0)-(prev.confidence||0);
+          trendHtml=diff>0?'<span style="color:var(--accent)">↑</span>':diff<0?'<span style="color:var(--red)">↓</span>':"<span style='color:var(--mut)'>—</span>";
+        }
+        dsSince="—";
+        if(prev&&prev.date){
+          var diff2=Math.round((new Date(e.date)-new Date(prev.date))/86400000);
+          dsSince=diff2===0?"today":diff2+"d";
+        }
       }
 
-      /* days since last play */
-      var dsSince="—";
-      if(prev&&prev.date){
-        var diff2=Math.round((new Date(e.date)-new Date(prev.date))/86400000);
-        dsSince=diff2===0?"today":diff2+"d";
-      }
-
-      /* result badge */
       var res;
-      if(e.result==="hit") res='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px">HIT</span>';
-      else if(e.result==="miss") res='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px">MISS</span>';
-      else res='<span style="color:var(--mut);font-size:10px;margin-right:4px">PENDING</span>'+
-        '<button class="btn ph-hit" data-i="'+i+'" style="font-size:9px;padding:2px 6px;color:var(--accent);border-color:var(--accent)">✓</button> '+
-        '<button class="btn ph-miss" data-i="'+i+'" style="font-size:9px;padding:2px 6px;color:var(--red);border-color:var(--red)">✗</button>';
+      if(e.result==="hit") res='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">HIT</span>';
+      else if(e.result==="miss") res='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">MISS</span>';
+      else res=
+        '<button class="btn ph-hit" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:6px;margin-right:6px">✓ Hit</button>'+
+        '<button class="btn ph-miss" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>';
 
       html+='<tr style="'+rowStyle+'">';
-      html+='<td style="padding:7px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
-      html+='<td style="padding:7px 10px;font-weight:700">'+esc(e.player||"")+'</td>';
-      html+='<td style="padding:7px 10px;color:var(--mut);white-space:nowrap">'+esc(e.marketDisplay||e.market||"")+'</td>';
-      html+='<td style="padding:7px 10px">'+esc(e.line||"")+'</td>';
-      html+='<td style="padding:7px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span></td>';
-      html+='<td style="padding:7px 10px;text-align:center">'+trendHtml+'</td>';
-      html+='<td style="padding:7px 10px;text-align:center;color:var(--mut)">'+dsSince+'</td>';
-      html+='<td style="padding:7px 10px;color:var(--mut);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(e.game||"")+'">'+esc(e.game||"")+'</td>';
-      html+='<td style="padding:7px 10px;white-space:nowrap">'+res+'</td>';
+      html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
+      html+='<td style="padding:9px 10px;font-weight:700">'+esc(e.player||"")+'</td>';
+      html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.marketDisplay||e.market||"")+'</td>';
+      html+='<td style="padding:9px 10px">'+esc(e.line||"")+'</td>';
+      html+='<td style="padding:9px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span></td>';
+      if(showTrendCols){
+        html+='<td style="padding:9px 10px;text-align:center">'+trendHtml+'</td>';
+        html+='<td style="padding:9px 10px;text-align:center;color:var(--mut)">'+dsSince+'</td>';
+      }
+      html+='<td style="padding:9px 10px;color:var(--mut);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(e.game||"")+'">'+esc(e.game||"")+'</td>';
+      html+='<td style="padding:9px 10px;white-space:nowrap">'+res+'</td>';
       html+='</tr>';
     });
     html+='</tbody></table></div>';
   }
 
   /* ─── FOOTER ─── */
-  html+='<div style="margin-top:24px">';
-  html+='<div style="font-size:10px;color:var(--mut)">'+all.length+' plays · ~'+storeKB+'KB used</div>';
+  html+='<div style="margin-top:24px;padding-bottom:8px">';
+  html+='<div style="font-size:10px;color:var(--mut2)">'+all.length+' plays · ~'+storeKB+'KB</div>';
   html+='</div></div>';
 
   mount.innerHTML=html;
