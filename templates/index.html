@@ -738,18 +738,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 
   <!-- HISTORY PAGE -->
   <div class="page" id="page-history">
-    <div class="doc">
-      <h1>History &amp; Tracking</h1>
-      <p class="lead">Saved picks and parlays. Mark results to track win rate and ROI.</p>
-    </div>
-    <div class="filterbar" style="margin-top:0">
-      <span class="fb-lbl">Unit size ($):</span>
-      <input class="search" id="unitIn" style="width:90px" placeholder="10" type="number" min="0">
-      <button class="btn" id="saveUnit">Save</button>
-      <button class="btn" id="clearHist" style="margin-left:auto">Clear All</button>
-    </div>
-    <div class="hist-summary" id="histSummary"></div>
-    <div id="histList"></div>
+    <div id="playHistMount"></div>
   </div>
 
   <!-- HOW IT WORKS -->
@@ -4484,63 +4473,175 @@ function profitOf(item){
   if(item.result==="loss") return -1;
   return 0;
 }
-function renderHistory(){
-  var hist=loadHist();
-  var unit=getUnit();
-  $("unitIn").value = unit? unit:"";
-  var wins=0,losses=0,pending=0,push=0,profitUnits=0,settled=0;
-  hist.forEach(function(it){
-    if(it.result==="win") wins++; else if(it.result==="loss") losses++; else if(it.result==="push") push++; else pending++;
-    if(it.result==="win"||it.result==="loss"){ settled++; profitUnits+=profitOf(it); }
-  });
-  var winRate=(wins+losses)>0?(wins/(wins+losses)*100):0;
-  var roi=settled>0?(profitUnits/settled*100):0;
-  var profitDollars=unit?(profitUnits*unit):0;
-  var sum=[
-    ["Total", hist.length], ["Wins", wins], ["Losses", losses], ["Pending", pending],
-    ["Win Rate", (wins+losses)>0?winRate.toFixed(0)+"%":"-"],
-    ["Units", (profitUnits>=0?"+":"")+profitUnits.toFixed(2)]
-  ];
-  if(unit){ sum.push(["Profit", (profitDollars>=0?"+$":"-$")+Math.abs(profitDollars).toFixed(2)]); sum.push(["ROI", (roi>=0?"+":"")+roi.toFixed(1)+"%"]); }
-  $("histSummary").innerHTML=sum.map(function(s){
-    var col=s[0]==="Wins"?"var(--accent)":s[0]==="Losses"?"var(--red)":"";
-    return '<div class="statcard"><div class="sc-l">'+esc(s[0])+'</div><div class="sc-v" style="'+(col?"color:"+col:"")+'">'+esc(s[1])+'</div></div>';
-  }).join("");
+function renderHistory(){ renderPlayHistory(); }
 
-  var list=$("histList");
-  if(!hist.length){ list.innerHTML='<div class="empty">No saved picks yet. Save picks from the Props board to track them here.</div>'; return; }
-  list.innerHTML="";
-  hist.forEach(function(it){
-    var d=new Date(it.date), det, sub;
-    if(it.type==="parlay"){
-      det=it.legs.length+"-leg Parlay "+fmtOdds(it.odds);
-      sub=it.legs.map(function(l){ return l.player+" "+l.bet; }).join("  /  ");
-    } else { det=it.player+" "+it.bet; sub=it.market; }
-    var box=el("div","hist-item");
-    box.innerHTML=
-      '<div class="hi-top"><span class="hi-badge '+(it.type==="parlay"?"parlay":"pick")+'">'+(it.type==="parlay"?"Parlay":"Pick")+'</span>'+
-        '<span class="hi-sub">'+esc(it.sportLabel||sportLabel(it.sport))+'</span>'+
-        '<span class="vt '+tierOf(it.value).c+'" style="font-size:10px;font-weight:800">'+it.value+'/100</span>'+
-        '<span class="hi-date">'+d.toLocaleDateString([], {month:"short",day:"numeric"})+'</span></div>'+
-      '<div class="hi-det">'+esc(det)+'</div>'+
-      '<div class="hi-sub">'+esc(sub)+'</div>'+
-      '<div class="hi-acts">'+
-        '<button class="wl win'+(it.result==="win"?" on":"")+'" data-r="win" data-id="'+it.id+'">Win</button>'+
-        '<button class="wl loss'+(it.result==="loss"?" on":"")+'" data-r="loss" data-id="'+it.id+'">Loss</button>'+
-        '<button class="wl push'+(it.result==="push"?" on":"")+'" data-r="push" data-id="'+it.id+'">Push</button>'+
-        '<button class="wl" data-r="del" data-id="'+it.id+'" style="margin-left:auto">Remove</button>'+
-      '</div>';
-    list.appendChild(box);
+/* ============ PLAY HISTORY (AUTO-LOG) ============ */
+var PLAY_HIST_KEY="propdesk_play_history";
+var _histFilters={sport:"all",result:"all",days:"all"};
+function loadPlayHist(){ try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]"); }catch(e){ return []; } }
+function savePlayHist(h){ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h)); }
+
+function logPlaysToHistory(plays){
+  var h=loadPlayHist();
+  var today=new Date().toISOString().slice(0,10);
+  var changed=false;
+  plays.forEach(function(p){
+    if(MLB_HIDDEN_MARKETS[p._market]) return;
+    var exists=h.some(function(e){ return e.player===p.player&&e.market===p._market&&e.date===today; });
+    if(exists) return;
+    var conf=Math.round((p.pdConfidence||0)*100);
+    var tier=confTierOf(conf).t;
+    var sp=p._sport||ST.sport;
+    var spLabel={baseball_mlb:"MLB",americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL"}[sp]||sp;
+    var mkt=p._market||ST.market;
+    var _isT=!!(mkt&&(THRESHOLD_MARKETS[sp]||{})[mkt]);
+    var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
+    var lineStr=_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL);
+    var bookStr=_isT?threshLabel(p.bestLine,mkt):fmtLine(p.bestLine,p.side||"Over");
+    h.unshift({
+      date:today, player:p.player, market:mkt, marketDisplay:marketName(mkt),
+      sport:spLabel, game:p._game||"", line:lineStr, confidence:conf, tier:tier,
+      bookLine:bookStr, bookOdds:p.bestOdds!=null?fmtOdds(p.bestOdds):"",
+      result:"pending", loggedAt:Date.now()
+    });
+    changed=true;
   });
-  list.querySelectorAll(".wl[data-id]").forEach(function(b){
+  if(changed){
+    savePlayHist(h);
+    if($("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
+  }
+}
+
+function renderPlayHistory(){
+  var mount=$("playHistMount"); if(!mount) return;
+  var all=loadPlayHist();
+  var filtered=all.filter(function(e){
+    if(_histFilters.sport!=="all"&&e.sport!==_histFilters.sport) return false;
+    if(_histFilters.result!=="all"&&e.result!==_histFilters.result) return false;
+    if(_histFilters.days!=="all"){
+      var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-parseInt(_histFilters.days));
+      if(new Date(e.date)<cutoff) return false;
+    }
+    return true;
+  });
+  var resolved=filtered.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
+  var hits=filtered.filter(function(e){ return e.result==="hit"; }).length;
+  var hitRate=resolved.length>0?Math.round(hits/resolved.length*100):null;
+  var rateColor=hitRate===null?"var(--mut)":hitRate>=80?"var(--accent)":hitRate>=65?"#f0c040":"var(--red)";
+  var sportStats={};
+  all.filter(function(e){ return e.result==="hit"||e.result==="miss"; }).forEach(function(e){
+    if(!sportStats[e.sport]) sportStats[e.sport]={hits:0,total:0};
+    sportStats[e.sport].total++;
+    if(e.result==="hit") sportStats[e.sport].hits++;
+  });
+  var sportKeys=Object.keys(sportStats);
+
+  var html='<div style="padding:16px">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
+  html+='<div style="font-size:18px;font-weight:800;color:var(--text)">History of Hits</div>';
+  html+='<button class="btn" id="phExportBtn" style="font-size:11px">Export CSV</button>';
+  html+='</div>';
+  html+='<div class="hist-summary" style="margin-bottom:'+(sportKeys.length>1?'8px':'16px')+'">';
+  html+='<div class="statcard"><div class="sc-l">Plays</div><div class="sc-v">'+filtered.length+'</div></div>';
+  html+='<div class="statcard"><div class="sc-l">Hit Rate</div><div class="sc-v" style="color:'+rateColor+'">'+(hitRate!==null?hitRate+'%':'–')+'</div></div>';
+  html+='<div class="statcard"><div class="sc-l">Hits</div><div class="sc-v" style="color:var(--accent)">'+hits+'</div></div>';
+  html+='<div class="statcard"><div class="sc-l">Misses</div><div class="sc-v" style="color:#ff4444">'+(resolved.length-hits)+'</div></div>';
+  html+='<div class="statcard"><div class="sc-l">Pending</div><div class="sc-v">'+(filtered.length-resolved.length)+'</div></div>';
+  html+='</div>';
+  if(sportKeys.length>1){
+    html+='<div class="hist-summary" style="margin-bottom:16px">';
+    sportKeys.forEach(function(s){
+      var r=sportStats[s]; var rate=Math.round(r.hits/r.total*100);
+      var rc=rate>=80?"var(--accent)":rate>=65?"#f0c040":"#ff4444";
+      html+='<div class="statcard"><div class="sc-l">'+esc(s)+'</div><div class="sc-v" style="color:'+rc+'">'+rate+'% <span style="color:var(--mut);font-size:10px">('+r.total+')</span></div></div>';
+    });
+    html+='</div>';
+  }
+  html+='<div class="filterbar" style="flex-wrap:wrap;gap:6px;margin-bottom:16px">';
+  html+='<span class="fb-lbl">Sport:</span>';
+  [["all","All"],["MLB","MLB"],["NFL","NFL"],["NBA","NBA"],["NHL","NHL"]].forEach(function(p){
+    html+='<button class="btn ph-flt'+(p[0]===_histFilters.sport?" on":"")+'" data-flt="sport" data-v="'+p[0]+'">'+p[1]+'</button>';
+  });
+  html+='<span class="fb-lbl" style="margin-left:8px">Result:</span>';
+  [["all","All"],["hit","Hit"],["miss","Miss"],["pending","Pending"]].forEach(function(p){
+    html+='<button class="btn ph-flt'+(p[0]===_histFilters.result?" on":"")+'" data-flt="result" data-v="'+p[0]+'">'+p[1]+'</button>';
+  });
+  html+='<span class="fb-lbl" style="margin-left:8px">Period:</span>';
+  [["7","7d"],["30","30d"],["all","All Time"]].forEach(function(p){
+    html+='<button class="btn ph-flt'+(p[0]===_histFilters.days?" on":"")+'" data-flt="days" data-v="'+p[0]+'">'+p[1]+'</button>';
+  });
+  html+='</div>';
+  if(!filtered.length){
+    html+='<div class="empty" style="padding:32px 0">No plays logged yet. Open a game and Best Plays will auto-log 80%+ props here.</div>';
+  } else {
+    html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    html+='<thead><tr>';
+    ['Date','Player','Market','Line','Confidence','Game','Result'].forEach(function(c){
+      html+='<th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bord);white-space:nowrap">'+c+'</th>';
+    });
+    html+='</tr></thead><tbody>';
+    filtered.forEach(function(e,i){
+      var tier=confTierOf(e.confidence||0);
+      var resBadge;
+      if(e.result==="hit")
+        resBadge='<span style="background:#00e87a22;color:var(--accent);font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px">HIT</span>';
+      else if(e.result==="miss")
+        resBadge='<span style="background:#ff444422;color:#ff4444;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px">MISS</span>';
+      else
+        resBadge='<span style="color:var(--mut);font-size:10px;margin-right:4px">PENDING</span>'+
+          '<button class="btn ph-hit" data-i="'+i+'" style="font-size:9px;padding:2px 6px;color:var(--accent);border-color:var(--accent)">✓ Hit</button> '+
+          '<button class="btn ph-miss" data-i="'+i+'" style="font-size:9px;padding:2px 6px;color:#ff4444;border-color:#ff4444">✗ Miss</button>';
+      html+='<tr style="border-bottom:1px solid var(--bord)">';
+      html+='<td style="padding:8px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
+      html+='<td style="padding:8px 10px;font-weight:700">'+esc(e.player||'')+'</td>';
+      html+='<td style="padding:8px 10px;color:var(--mut)">'+esc(e.marketDisplay||e.market||'')+'</td>';
+      html+='<td style="padding:8px 10px">'+esc(e.line||'')+'</td>';
+      html+='<td style="padding:8px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||''))+'%</span></td>';
+      html+='<td style="padding:8px 10px;color:var(--mut);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(e.game||'')+'">'+esc(e.game||'')+'</td>';
+      html+='<td style="padding:8px 10px;white-space:nowrap">'+resBadge+'</td>';
+      html+='</tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='<div style="margin-top:28px;text-align:center">';
+  html+='<button class="btn" id="phClearBtn" style="color:#ff4444;border-color:#ff4444;font-size:11px">Clear History ('+all.length+' plays)</button>';
+  html+='</div></div>';
+  mount.innerHTML=html;
+  mount.querySelectorAll('.ph-flt').forEach(function(b){
+    b.onclick=function(){ _histFilters[b.getAttribute('data-flt')]=b.getAttribute('data-v'); renderPlayHistory(); };
+  });
+  mount.querySelectorAll('.ph-hit,.ph-miss').forEach(function(b){
     b.onclick=function(){
-      var id=b.getAttribute("data-id"), r=b.getAttribute("data-r");
-      var h=loadHist();
-      if(r==="del") h=h.filter(function(x){return x.id!==id;});
-      else h.forEach(function(x){ if(x.id===id) x.result=(x.result===r)?"pending":r; });
-      saveHist(h);
+      var idx=parseInt(b.getAttribute('data-i')), entry=filtered[idx]; if(!entry) return;
+      var res=b.classList.contains('ph-hit')?"hit":"miss";
+      var h=loadPlayHist();
+      h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market) e.result=res; });
+      savePlayHist(h); renderPlayHistory();
     };
   });
+  var exp=$('phExportBtn'); if(exp) exp.onclick=function(){ exportPlayHistCSV(filtered); };
+  var clr=$('phClearBtn'); if(clr) clr.onclick=function(){
+    if(confirm('This will permanently delete all '+all.length+' logged plays. This cannot be undone.')){
+      localStorage.removeItem(PLAY_HIST_KEY); _histFilters={sport:"all",result:"all",days:"all"}; renderPlayHistory();
+    }
+  };
+}
+
+function exportPlayHistCSV(rows){
+  var cols=['date','player','marketDisplay','line','confidence','tier','game','sport','bookLine','bookOdds','result'];
+  var hdrs=['Date','Player','Market','Line','Confidence','Tier','Game','Sport','Book Line','Book Odds','Result'];
+  var csv=hdrs.join(',')+'\n';
+  rows.forEach(function(e){
+    csv+=cols.map(function(k){
+      var v=String(e[k]!=null?e[k]:'');
+      if(v.indexOf(',')>=0||v.indexOf('"')>=0||v.indexOf('\n')>=0) v='"'+v.replace(/"/g,'""')+'"';
+      return v;
+    }).join(',')+'\n';
+  });
+  var blob=new Blob([csv],{type:'text/csv'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='propdesk-history-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
 /* ============ NAV / DRAWER ============ */
@@ -4667,8 +4768,7 @@ function init(){
   // expose so cart functions can call it
   window._mpRender=function(expanded){ if(expanded!=null) mpExpanded=expanded; renderParlayBar(mpExpanded); };
 
-  $("saveUnit").onclick=function(){ localStorage.setItem("pe_unit",parseFloat($("unitIn").value)||0); renderHistory(); toast("Unit size saved"); };
-  $("clearHist").onclick=function(){ if(confirm("Clear all saved picks and parlays?")){ localStorage.removeItem("pe_hist"); renderHistory(); } };
+  // saveUnit / clearHist buttons removed — history page now uses auto-log system (renderPlayHistory)
 
   $("onbConnect").onclick=function(){
     var key=($("onbKey").value||"").trim();
@@ -6812,6 +6912,7 @@ async function startGameEnrichment(eventId){
     localStorage.setItem("pe_g5_hist",JSON.stringify(_hist));
   }catch(e){}
   if(ST.eventId===eventId) renderGameTop5(qFinal,false);
+  logPlaysToHistory(qFinal);
 }
 
 // Lightweight: just ensures enrichment is running and shows current cache state.
