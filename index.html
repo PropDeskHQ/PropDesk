@@ -4497,7 +4497,7 @@ function _buildHistEntry(p){
   var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
   return {
     date:new Date().toISOString().slice(0,10), player:p.player, market:mkt, marketDisplay:marketName(mkt),
-    sport:spLabel, game:p._game||"",
+    sport:spLabel, game:p._game||(function(){var _ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];return _ev?(_ev.away_team+" vs "+_ev.home_team):"";})(),
     line:_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL),
     confidence:conf, tier:confTierOf(conf).t,
     bookLine:_isT?threshLabel(p.bestLine,mkt):fmtLine(p.bestLine,p.side||"Over"),
@@ -4506,11 +4506,14 @@ function _buildHistEntry(p){
   };
 }
 
+function _phDedupKey(player,market,date){ return (player||"").toLowerCase().trim()+"|"+market+"|"+date; }
+
 function _logSinglePropHistory(p){
   try{
     var entry=_buildHistEntry(p); if(!entry) return;
     var h=loadPlayHist();
-    if(h.some(function(e){ return e.player===entry.player&&e.market===entry.market&&e.date===entry.date; })) return;
+    var key=_phDedupKey(entry.player,entry.market,entry.date);
+    if(h.some(function(e){ return _phDedupKey(e.player,e.market,e.date)===key; })) return;
     h.unshift(entry); savePlayHist(h);
     if($("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
   }catch(e){}
@@ -4521,10 +4524,14 @@ function logPlaysToHistory(plays){
     if(!plays||!plays.length) return;
     var h=loadPlayHist();
     var today=new Date().toISOString().slice(0,10);
+    var seen={};
+    h.forEach(function(e){ seen[_phDedupKey(e.player,e.market,e.date)]=true; });
     var changed=false;
     plays.forEach(function(p){
       var entry=_buildHistEntry(p); if(!entry) return;
-      if(h.some(function(e){ return e.player===entry.player&&e.market===entry.market&&e.date===today; })) return;
+      var key=_phDedupKey(entry.player,entry.market,today);
+      if(seen[key]) return;
+      seen[key]=true;
       h.unshift(entry); changed=true;
     });
     if(changed){
@@ -4704,7 +4711,7 @@ function renderPlayHistory(){
 
   /* ════ BUILD HTML ════ */
   var allPending=all.filter(function(e){return e.result==="pending";}).length;
-  var showTrendCols=all.length>=10;
+  var showTrendCols=Object.keys(pmMap).some(function(k){ return pmMap[k].length>1; });
   var hasStreak=topMkts.some(function(k){return mktMap[k].bestStreak>0;});
   var html='<div style="padding:16px">';
 
@@ -4863,7 +4870,7 @@ function renderPlayHistory(){
       var arr=_histSort.col===c?(_histSort.dir==="asc"?" ↑":" ↓"):"";
       return '<th style="'+TH+'" data-sort="'+c+'">'+label+arr+'</th>';
     }
-    html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    html+='<div style="overflow:clip"><table style="width:100%;border-collapse:collapse;font-size:12px">';
     html+='<thead><tr>'+sh("date","Date")+sh("player","Player")+'<th style="'+TH_S+'">Market</th><th style="'+TH_S+'">Line</th>'+sh("confidence","Conf");
     if(showTrendCols) html+='<th style="'+TH_S+'">Trend</th><th style="'+TH_S+'">Days Since</th>';
     html+='<th style="'+TH_S+'">Game</th>'+sh("result","Result")+'</tr></thead><tbody>';
