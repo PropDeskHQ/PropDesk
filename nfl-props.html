@@ -4550,7 +4550,7 @@ function _phTbl(hdrs,rows,compact){
   var p=compact?'5px 8px':'7px 10px';
   var th='text-align:left;padding:'+p+';font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bd);white-space:nowrap';
   var td='padding:'+p+';font-size:11px;border-bottom:1px solid var(--bd2)';
-  return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'+
+  return '<div style="overflow:clip"><table style="width:100%;border-collapse:collapse">'+
     '<thead><tr>'+hdrs.map(function(h){ return '<th style="'+th+'">'+h+'</th>'; }).join('')+'</tr></thead>'+
     '<tbody>'+rows.join('')+'</tbody></table></div>';
 }
@@ -4749,10 +4749,10 @@ function renderPlayHistory(){
   /* ─── SECTION 2: BY SPORT ─── */
   var sportKeys=Object.keys(sportMap);
   if(sportKeys.length){
-    html+=_phSectionHdr("By Sport");
     if(allRes.length===0){
-      html+='<div style="font-size:11px;color:var(--mut);margin-bottom:32px">Hit rates will appear once plays are resolved.</div>';
+      html+='<div style="font-size:11px;color:var(--mut);margin-bottom:32px">Sport breakdown available once plays are resolved.</div>';
     } else {
+      html+=_phSectionHdr("By Sport");
       html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate'],
         sportKeys.map(function(s){
           var m=sportMap[s], rate=_phRate(m.hits,m.hits+m.misses);
@@ -4777,7 +4777,7 @@ function renderPlayHistory(){
         var m=mktMap[k], rate=_phRate(m.hits,m.hits+m.misses);
         var rateCell=rate!==null
           ?'<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+rate+'%</td>'
-          :'<td style="padding:5px 8px;font-size:11px;color:var(--mut)">Pending</td>';
+          :'<td style="padding:5px 8px;font-size:11px;color:var(--mut)">–</td>';
         var row='<tr><td style="padding:5px 8px;font-size:11px">'+esc(k)+'</td>'+
           '<td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+rateCell;
         if(hasStreak) row+='<td style="padding:5px 8px;font-size:11px">'+(m.bestStreak||'–')+'</td>';
