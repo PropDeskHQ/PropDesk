@@ -6791,10 +6791,7 @@ async function startGameEnrichment(eventId){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
-      var _pct=p.pdConfidence!=null?Math.round(p.pdConfidence*100):null;
-      var _pass=p.enriched&&!p.pdNoValue&&!p.thinData&&_pct!=null&&_pct>=80;
-      console.log("[BestPlays][enrichment] "+(p.player||"?")+" | "+(mk)+" | conf="+_pct+"% | enriched="+p.enriched+" | noValue="+p.pdNoValue+" | thinData="+p.thinData+" | PASS="+_pass);
-      if(_pass) qFinal.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=80) qFinal.push(p);
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
@@ -6828,8 +6825,6 @@ async function loadGameTop5(){
 
 function renderGameTop5(picks,isScanning){
   var mount=$("gameTop5Mount"); if(!mount) return;
-  console.log("[BestPlays][renderGameTop5] received "+picks.length+" picks, isScanning="+isScanning);
-  picks.forEach(function(p){console.log("[BestPlays][renderGameTop5] pick: "+(p.player||"?")+" | "+(p._market||"?")+" | conf="+Math.round((p.pdConfidence||0)*100)+"%");});
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
     var emptyMsg=isScanning?'Scanning markets for 80%+ plays…':'No plays above 80% confidence for this game.';
