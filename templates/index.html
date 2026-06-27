@@ -2663,7 +2663,8 @@ function renderPropOfDay(p, mkt){
     tierNote+
     '<div class="pname">'+esc(p.player)+'</div>'+
     '<div class="pbet '+sidecls+'">'+esc(betLabel)+'</div>'+
-    '<div class="conf-badge cb-strong" style="width:fit-content;margin:4px 0 8px">'+confPct+'% confidence · '+tierInfo.t+'</div>'+
+    '<div class="conf-badge cb-strong" style="width:fit-content;margin:4px 0 8px">'+confPct+'% confidence · '+tierInfo.t+
+      (p._confTrend==="up"?'<span class="g5-arrow g5-up" title="Confidence trending up this session">↑</span>':p._confTrend==="down"?'<span class="g5-arrow g5-down" title="Confidence trending down this session">↓</span>':'')+'</div>'+
     '<div class="analysis">'+s1+" "+s2+" "+s3+'</div>';
   mount.innerHTML="";
   mount.appendChild(c);
