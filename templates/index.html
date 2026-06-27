@@ -4598,7 +4598,7 @@ function profitOf(item){
   if(item.result==="loss") return -1;
   return 0;
 }
-function renderHistory(){ renderPlayHistory(); }
+function renderHistory(){ renderPlayHistory(); setTimeout(function(){ if(!_arRunning) _phAutoResolveAll(); },150); }
 
 /* ============ PLAY HISTORY (AUTO-LOG) ============ */
 var PLAY_HIST_KEY="propdesk_play_history";
@@ -5048,6 +5048,7 @@ function renderPlayHistory(){
   html+='<button class="btn" id="phExportBtn" style="font-size:11px">Export CSV</button>';
   html+='<button class="btn" id="phStatsExportBtn" style="font-size:11px">Export Stats</button>';
   html+='</div></div>';
+  html+='<div style="font-size:10px;color:var(--mut2);margin-bottom:14px">MLB plays from past games resolve automatically from box score data. Other sports require manual resolution.</div>';
 
   if(storeKB>3800) html+='<div style="background:#ffcc0022;border:1px solid var(--yellow);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--yellow);margin-bottom:12px">Storage nearing limit — consider exporting and clearing old history.</div>';
 
@@ -5273,9 +5274,10 @@ function renderPlayHistory(){
           }
 
           var undoBtn='<button class="btn ph-undo" data-i="'+i+'" style="margin-left:6px;font-size:10px;color:var(--mut);background:none;border:1px solid var(--bd2);border-radius:4px;padding:2px 7px;cursor:pointer">Undo</button>';
+          var autoLbl=e.autoResolved?'<span style="font-size:8px;color:var(--mut2);font-weight:700;letter-spacing:.04em;margin-left:5px;vertical-align:middle">AUTO</span>':'';
           var res;
-          if(e.result==="hit") res='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">HIT</span>'+undoBtn;
-          else if(e.result==="miss") res='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">MISS</span>'+undoBtn;
+          if(e.result==="hit") res='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">HIT</span>'+autoLbl+undoBtn;
+          else if(e.result==="miss") res='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">MISS</span>'+autoLbl+undoBtn;
           else if(e.result==="void") res='<span style="background:rgba(136,136,136,.13);color:var(--mut);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">VOID</span>'+undoBtn;
           else res=
             '<button class="btn ph-hit" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:6px;margin-right:6px">✓ Hit</button>'+
@@ -5334,7 +5336,7 @@ function renderPlayHistory(){
     b.onclick=function(){
       var idx=parseInt(b.getAttribute('data-i')), entry=filtered[idx]; if(!entry) return;
       var h=loadPlayHist();
-      h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market) e.result="pending"; });
+      h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market){ e.result="pending"; if(e.autoResolved) e.autoResolveLocked=true; } });
       savePlayHist(h); renderPlayHistory();
     };
   });
@@ -5362,7 +5364,16 @@ function renderPlayHistory(){
   var sexp=$('phStatsExportBtn'); if(sexp) sexp.onclick=function(){
     exportPlayHistStats(all,allRes,allHits,allRate,rate7,rate30,r7.length,r30.length,sportMap,mktMap,TIER_DEF,tierMap,streaks,hotMkts,coldMkts);
   };
-  var blk=$('phBulkBtn'); if(blk) blk.onclick=function(){ _phBulkResolve(pastPending); };
+  var blk=$('phBulkBtn'); if(blk) blk.onclick=function(){
+    var mlbPend=pastPending.filter(function(e){return e.sport==="MLB"&&!e.autoResolveLocked;});
+    if(!mlbPend.length){ _phBulkResolve(pastPending); return; }
+    Promise.all(mlbPend.map(function(e){return resolvePlayAutomatically(e);})).then(function(){
+      var h=loadPlayHist(), today=new Date().toISOString().slice(0,10);
+      var still=h.filter(function(e){return e.result==="pending"&&e.date<today;});
+      renderPlayHistory();
+      if(still.length) _phBulkResolve(still);
+    }).catch(function(){ _phBulkResolve(pastPending); });
+  };
   mount.querySelectorAll('.ph-a-sport').forEach(function(b){
     b.onclick=function(){
       var v=b.getAttribute('data-pha-sport');
@@ -5424,6 +5435,110 @@ function _phBulkResolve(pastPending){
     modal.querySelector("#phBulkCancel").onclick=function(){ modal.remove(); renderPlayHistory(); };
   }
   showNext();
+}
+
+/* ============ AUTO-RESOLUTION (MLB box score) ============ */
+var _arPlayerIdCache={};
+var _arRunning=false;
+
+function _phParseLineThr(lineStr){
+  // "1+ Hits", "2+ Total Bases" → integer threshold
+  if(!lineStr) return null;
+  var m=lineStr.match(/^(\d+)\+/);
+  if(m) return parseInt(m[1]);
+  // "Over 1.5" → Math.ceil(1.5) = 2
+  var m2=lineStr.match(/^over\s+([\d.]+)/i);
+  if(m2) return Math.ceil(parseFloat(m2[1]));
+  return null;
+}
+
+async function _arGetMlbPlayerId(name){
+  if(_arPlayerIdCache[name]!==undefined) return _arPlayerIdCache[name];
+  try{
+    var r=await fetch("https://statsapi.mlb.com/api/v1/people/search?names="+encodeURIComponent((name||"").trim())+"&sportId=1",{signal:AbortSignal.timeout(6000)});
+    var d=await r.json();
+    var id=(d.people&&d.people.length)?d.people[0].id:null;
+    _arPlayerIdCache[name]=id;
+    return id;
+  }catch(e){ return null; }
+}
+
+async function resolvePlayAutomatically(play){
+  try{
+    if(!play||play.sport!=="MLB"||play.result!=="pending"||play.autoResolveLocked) return false;
+    var today=new Date().toISOString().slice(0,10);
+    if(play.date>=today) return false;
+
+    var playerId=await _arGetMlbPlayerId(play.player);
+    if(!playerId) return false;
+
+    var threshold=_phParseLineThr(play.line);
+    if(threshold===null) return false;
+
+    var market=play.market;
+    var group=mlbGroup(market);
+    var keys=STAT_KEYS[market]||[];
+    var compositeKeys=STAT_COMPOSITE_KEYS[market]||null;
+    if(!keys.length&&!compositeKeys) return false;
+
+    var year=(play.date||"").slice(0,4)||String(new Date().getFullYear());
+    var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+playerId+"/stats?stats=gameLog&season="+year+"&group="+group+"&limit=200",{signal:AbortSignal.timeout(9000)});
+    var d=await r.json();
+    if(!d.stats||!d.stats[0]||!d.stats[0].splits) return false;
+
+    var splits=d.stats[0].splits;
+    var matchSplit=null;
+    for(var i=0;i<splits.length;i++){
+      var sp=splits[i];
+      var dt=sp.date||(sp.game&&sp.game.gameDate)||"";
+      var mDate=dt.match(/(\d{4}-\d{2}-\d{2})/);
+      if(mDate&&mDate[1]===play.date){ matchSplit=sp; break; }
+    }
+    if(!matchSplit) return false;
+
+    var stat=matchSplit.stat||{};
+    var actual=null;
+    if(compositeKeys){
+      var sum=0,ok=true;
+      for(var ci=0;ci<compositeKeys.length;ci++){
+        var f=pickStatDirect(stat,compositeKeys[ci]);
+        if(f==null){ok=false;break;}
+        sum+=Number(f);
+      }
+      if(ok) actual=sum;
+    } else {
+      var v=pickStat(stat,keys);
+      if(v!=null) actual=Number(v);
+    }
+    if(actual===null) return false;
+
+    var result=actual>=threshold?"hit":"miss";
+    var h=loadPlayHist();
+    var updated=false;
+    h.forEach(function(e){
+      if(e.loggedAt===play.loggedAt&&e.player===play.player&&e.market===play.market){
+        e.result=result; e.autoResolved=true; updated=true;
+      }
+    });
+    if(!updated) return false;
+    savePlayHist(h);
+    return result;
+  }catch(e){ return false; }
+}
+
+async function _phAutoResolveAll(){
+  if(_arRunning) return;
+  _arRunning=true;
+  try{
+    var today=new Date().toISOString().slice(0,10);
+    var h=loadPlayHist();
+    var toResolve=h.filter(function(e){ return e.result==="pending"&&e.sport==="MLB"&&e.date<today&&!e.autoResolveLocked; });
+    for(var i=0;i<toResolve.length;i++){
+      var resolved=await resolvePlayAutomatically(toResolve[i]);
+      if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
+    }
+  }catch(e){}
+  _arRunning=false;
 }
 
 function _phDownloadCSV(csv,filename){
