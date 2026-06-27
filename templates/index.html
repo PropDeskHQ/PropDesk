@@ -683,6 +683,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .g5-arrow{font-size:11px;font-weight:900;margin-left:3px;vertical-align:middle}
 .g5-up{color:var(--accent)}
 .g5-down{color:#ff5050}
+.g5-ts{font-size:11px;color:#777;margin:-6px 0 8px;display:flex;align-items:center;gap:5px;min-height:16px}
+.g5-ts-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;animation:livepulse 1.2s ease-in-out infinite}
 /* MONEYLINE REASONING */
 .ml-reason-wrap{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
 .ml-reason{padding:12px 14px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid #1e1e1e}
@@ -1590,6 +1592,7 @@ var _propStore={};
 var _gamePropsCache={};
 // Task-ID tracker — cancels stale enrichment runs when the user switches games.
 var _gameEnrichTaskId={};
+var _gameEnrichCompletedAt={};  // { eventId: {ts:timestamp, mkts:N} }
 
 /* ============ MATH ============ */
 function impliedProb(o){ o=Number(o); if(o>0) return 100/(o+100); return Math.abs(o)/(Math.abs(o)+100); }
@@ -7965,6 +7968,7 @@ async function startGameEnrichment(eventId){
     Object.keys(_newH).forEach(function(k){_hist[k]=_newH[k];});
     localStorage.setItem("pe_g5_hist",JSON.stringify(_hist));
   }catch(e){}
+  _gameEnrichCompletedAt[eventId]={ts:Date.now(),mkts:allMkts.length};
   if(ST.eventId===eventId) renderGameTop5(qFinal,false);
   logPlaysToHistory(qFinal);
 }
@@ -7982,6 +7986,14 @@ async function loadGameTop5(){
   updateBestPlaysDisplay(eventId,Math.max(0,allMkts.length-cachedMkts.length));
 }
 
+function _g5TsHtml(eventId,isScanning){
+  if(isScanning) return '<div class="g5-ts"><span class="g5-ts-dot"></span>Scanning markets…</div>';
+  var info=_gameEnrichCompletedAt[eventId];
+  if(!info) return '<div class="g5-ts"></div>';
+  var d=new Date(info.ts),h=d.getHours(),m=d.getMinutes(),ampm=h>=12?"PM":"AM";
+  var hh=h%12||12,mm=m<10?"0"+m:String(m);
+  return '<div class="g5-ts">Last updated: '+hh+':'+mm+' '+ampm+' \xb7 '+info.mkts+' market'+(info.mkts!==1?'s':'')+(info.mkts?' scanned':'')+'</div>';
+}
 function renderGameTop5(picks,isScanning){
   console.log("[BP] renderGameTop5 called — "+picks.length+" props received, isScanning:"+isScanning);
   picks.forEach(function(p){ console.log("  [render]",p.player,"|",p._market,"| pdConf:",+(( p.pdConfidence||0)*100).toFixed(1)+"%"); });
@@ -7990,10 +8002,10 @@ function renderGameTop5(picks,isScanning){
   if(!picks.length){
     var emptyMsg=isScanning?'Scanning markets for 75%+ plays…':'No plays above 75% confidence for this game.';
     var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 75% confidence for this game.">Share Game</button>':'';
-    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span>'+emptyShareBtn+'</div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
+    mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span>'+emptyShareBtn+'</div>'+_g5TsHtml(ST.eventId,isScanning)+'<div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
     return;
   }
-  var html='<div class="g5-hdr"><span class="g5-title">Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span><button class="g5-share-game-btn" id="g5ShareGameBtn">Share Game</button></div>';
+  var html='<div class="g5-hdr"><span class="g5-title">Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span><button class="g5-share-game-btn" id="g5ShareGameBtn">Share Game</button></div>'+_g5TsHtml(ST.eventId,isScanning);
   picks.forEach(function(p,i){
     var conf=getEffectiveConf(p);
     var tier=confTierOf(conf);
