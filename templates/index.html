@@ -4631,25 +4631,34 @@ function _phChartTimelineSvg(resolved){
   resolved.forEach(function(e){ if(dayMap[e.date]){ dayMap[e.date].total++; if(e.result==="hit") dayMap[e.date].hits++; } });
   var dataDays=days.filter(function(d){ return dayMap[d].total>0; });
   if(dataDays.length<3) return null;
-  var W=300,H=90,CH=70,YT=8,YB=YT+CH,XL=5,XR=W-5;
+  var W=300,H=180,CH=150,YT=12,YB=YT+CH,XL=8,XR=W-8;
   function dX(i){ return XL+(i/29)*(XR-XL); }
   function rY(r){ return YB-r*CH; }
   var MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:'+H+'px;display:block">';
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:180px;display:block">';
+  svg+='<defs><linearGradient id="pha-fill-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00e87a" stop-opacity="0.15"/><stop offset="100%" stop-color="#00e87a" stop-opacity="0"/></linearGradient></defs>';
   var ry=rY(0.8);
-  svg+='<line x1="'+XL+'" y1="'+ry+'" x2="'+XR+'" y2="'+ry+'" stroke="#00e87a" stroke-width="1" stroke-dasharray="2 3" opacity="0.3"/>';
-  svg+='<text x="'+(XL+2)+'" y="'+(ry-2)+'" fill="#00e87a" font-size="6" opacity="0.4">80%</text>';
-  var run=[];
-  function flushRun(){ if(run.length>1) svg+='<polyline points="'+run.join(' ')+'" fill="none" stroke="#555" stroke-width="1.5" opacity="0.7"/>'; run=[]; }
+  svg+='<line x1="'+XL+'" y1="'+ry+'" x2="'+XR+'" y2="'+ry+'" stroke="#00e87a" stroke-width="1" stroke-dasharray="3 4" opacity="0.35"/>';
+  svg+='<text x="'+(XL+2)+'" y="'+(ry-3)+'" fill="#00e87a" font-size="7" opacity="0.45">80%</text>';
+  var run=[], frun=[];
+  function flushRun(){
+    if(run.length>1){
+      var x0=frun[0].x, xN=frun[frun.length-1].x;
+      var pts=frun.map(function(p){ return p.x+','+p.y; }).join(' ');
+      svg+='<polygon points="'+x0+','+YB+' '+pts+' '+xN+','+YB+'" fill="url(#pha-fill-grad)"/>';
+      svg+='<polyline points="'+run.join(' ')+'" fill="none" stroke="#00e87a" stroke-width="2.5" opacity="0.55"/>';
+    }
+    run=[]; frun=[];
+  }
   days.forEach(function(ds,i){
     var dm=dayMap[ds];
     if(!dm.total){ flushRun(); return; }
     var rate=dm.hits/dm.total;
     var x=Math.round(dX(i)), y=Math.round(rY(rate));
-    run.push(x+','+y);
+    run.push(x+','+y); frun.push({x:x,y:y});
     var fill=rate>=0.8?"#00e87a":rate>=0.65?"#ffcc00":"#ff4f4f";
     var dp=ds.split('-'), dlbl=MOS[parseInt(dp[1])-1]+' '+parseInt(dp[2]);
-    svg+='<circle cx="'+x+'" cy="'+y+'" r="3.5" fill="'+fill+'" stroke="#111" stroke-width="1.5"><title>'+dlbl+' \xb7 '+dm.hits+' of '+dm.total+' \xb7 '+Math.round(rate*100)+'%</title></circle>';
+    svg+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="'+fill+'" stroke="#111" stroke-width="2"><title>'+dlbl+' \xb7 '+dm.hits+' of '+dm.total+' \xb7 '+Math.round(rate*100)+'%</title></circle>';
   });
   flushRun();
   svg+='</svg>';
@@ -4658,36 +4667,39 @@ function _phChartTimelineSvg(resolved){
 
 function _phChartCalibrationSvg(resolved){
   if(resolved.length<5) return null;
-  var TIERS=[{min:80,max:84,exp:82,lbl:"80-84"},{min:85,max:89,exp:87,lbl:"85-89"},{min:90,max:94,exp:92,lbl:"90-94"},{min:95,max:100,exp:97,lbl:"95+"}];
+  var TIERS=[
+    {min:80,max:84,exp:82,lbl:"80–84%"},
+    {min:85,max:89,exp:87,lbl:"85–89%"},
+    {min:90,max:94,exp:92,lbl:"90–94%"},
+    {min:95,max:100,exp:97,lbl:"95%+"}
+  ];
   TIERS.forEach(function(t){
     t.hits=0; t.plays=0;
     resolved.forEach(function(e){ var c=e.confidence||0; if(c>=t.min&&c<=t.max){ t.plays++; if(e.result==="hit") t.hits++; } });
     t.rate=t.plays>0?t.hits/t.plays:null;
   });
-  var W=300,CH=72,YB=84,XL=22,SLOT=64,BW=42;
-  var H=YB+26;
+  var W=300,XL=6,SLOT=72,BW=60,CH=106,YT=22,YB=YT+CH,H=YB+32;
   function rY(r){ return YB-Math.round(r*CH); }
   var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:'+H+'px;display:block">';
-  svg+='<line x1="'+XL+'" y1="'+YB+'" x2="'+(XL+4*SLOT)+'" y2="'+YB+'" stroke="#2a2a2a" stroke-width="1"/>';
+  svg+='<line x1="'+XL+'" y1="'+YB+'" x2="'+(XL+4*SLOT)+'" y2="'+YB+'" stroke="#1e1e1e" stroke-width="1"/>';
   TIERS.forEach(function(t,i){
     var bx=XL+i*SLOT+Math.round((SLOT-BW)/2);
     var cx=XL+i*SLOT+SLOT/2;
     if(t.rate===null){
-      svg+='<rect x="'+bx+'" y="'+(YB-8)+'" width="'+BW+'" height="8" fill="#222" rx="2"/>';
-      svg+='<text x="'+cx+'" y="'+(YB-11)+'" text-anchor="middle" fill="#444" font-size="7">—</text>';
+      svg+='<rect x="'+bx+'" y="'+(YB-8)+'" width="'+BW+'" height="8" fill="#1e1e1e" rx="3"/>';
+      svg+='<text x="'+cx+'" y="'+(YT-4)+'" text-anchor="middle" fill="#333" font-size="15" font-weight="700">–</text>';
     } else {
       var bH=Math.max(4,Math.round(t.rate*CH));
       var by=YB-bH;
       var fill=t.rate>=(t.exp/100)?"#00e87a":"#ff4f4f";
-      svg+='<rect x="'+bx+'" y="'+by+'" width="'+BW+'" height="'+bH+'" fill="'+fill+'" rx="2" opacity="0.85"/>';
+      svg+='<rect x="'+bx+'" y="'+by+'" width="'+BW+'" height="'+bH+'" fill="'+fill+'" rx="3" opacity="0.9"/>';
       var eY=rY(t.exp/100);
-      svg+='<line x1="'+bx+'" y1="'+eY+'" x2="'+(bx+BW)+'" y2="'+eY+'" stroke="#fff" stroke-width="1" opacity="0.4" stroke-dasharray="2 2"/>';
+      svg+='<line x1="'+bx+'" y1="'+eY+'" x2="'+(bx+BW)+'" y2="'+eY+'" stroke="#fff" stroke-width="1.5" opacity="0.45" stroke-dasharray="3 2"/>';
       var pct=Math.round(t.rate*100);
-      svg+='<text x="'+cx+'" y="'+(by-9)+'" text-anchor="middle" fill="#ccc" font-size="7.5" font-weight="700">'+pct+'%</text>';
-      svg+='<text x="'+cx+'" y="'+(by-1)+'" text-anchor="middle" fill="#666" font-size="6.5">'+t.plays+' plays</text>';
+      svg+='<text x="'+cx+'" y="'+(by-6)+'" text-anchor="middle" fill="#ddd" font-size="15" font-weight="700">'+pct+'%</text>';
     }
-    svg+='<text x="'+cx+'" y="'+(YB+11)+'" text-anchor="middle" fill="#555" font-size="7">'+t.lbl+'%</text>';
-    svg+='<text x="'+cx+'" y="'+(YB+19)+'" text-anchor="middle" fill="#3a3a3a" font-size="6">exp '+t.exp+'%</text>';
+    svg+='<text x="'+cx+'" y="'+(YB+14)+'" text-anchor="middle" fill="#666" font-size="8.5" font-weight="700">'+t.lbl+'</text>';
+    svg+='<text x="'+cx+'" y="'+(YB+25)+'" text-anchor="middle" fill="#444" font-size="7">'+(t.plays>0?t.plays+' plays':'no data')+'</text>';
   });
   svg+='</svg>';
   return svg;
@@ -4705,25 +4717,26 @@ function _phChartPlayersHtml(allEntries){
   var unqual=Object.keys(pm).filter(function(p){ return pm[p].res<3; })
     .sort(function(a,b){ return pm[b].res-pm[a].res; }).slice(0,5);
   if(qual.length<3) return null;
-  var h='';
-  qual.forEach(function(p){
+  var h='<div style="border-radius:6px;overflow:hidden">';
+  qual.forEach(function(p,idx){
     var r=pm[p].hits/pm[p].res, pct=Math.round(r*100);
     var col=r>=0.8?"#00e87a":r>=0.65?"#ffcc00":"#ff4f4f";
-    h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd2)">';
-    h+='<div style="flex:0 0 110px;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(p)+'">'+esc(p)+'</div>';
-    h+='<div style="flex:1;background:var(--bd);border-radius:3px;height:7px"><div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px"></div></div>';
-    h+='<div style="flex:0 0 72px;font-size:10px;color:var(--mut);text-align:right;white-space:nowrap">'+pm[p].hits+'/'+pm[p].res+' \xb7 '+pct+'%</div>';
+    var bg=idx%2===0?"#1a1a1a":"#141414";
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:'+bg+'">';
+    h+='<div style="width:20px;font-size:10px;font-weight:800;color:#555;text-align:center;flex-shrink:0">'+(idx+1)+'</div>';
+    h+='<div style="flex:1;min-width:0">';
+    h+='<div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">'+esc(p)+'</div>';
+    h+='<div style="height:4px;background:#252525;border-radius:2px"><div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:2px"></div></div>';
+    h+='</div>';
+    h+='<div style="font-size:10px;color:#666;white-space:nowrap;flex-shrink:0">'+pm[p].hits+' of '+pm[p].res+'</div>';
+    h+='<div style="font-size:13px;font-weight:800;color:'+col+';white-space:nowrap;text-align:right;min-width:42px;flex-shrink:0">'+pct+'%</div>';
     h+='</div>';
   });
   if(unqual.length){
-    h+='<div style="font-size:10px;color:var(--mut2);margin:8px 0 4px;font-style:italic">Insufficient data (&lt; 3 resolved)</div>';
-    unqual.forEach(function(p){
-      h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;opacity:0.4">';
-      h+='<div style="flex:0 0 110px;font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p)+'</div>';
-      h+='<div style="flex:1;font-size:10px;color:var(--mut2)">'+pm[p].res+' resolved</div>';
-      h+='</div>';
-    });
+    h+='<div style="padding:8px 12px;font-size:10px;color:#555;font-style:italic;background:#111;border-top:1px solid #1e1e1e">';
+    h+='Insufficient data (&lt; 3 resolved): '+unqual.map(function(p){ return esc(p)+' ('+pm[p].res+')'; }).join(', ')+'</div>';
   }
+  h+='</div>';
   return h;
 }
 
@@ -4752,32 +4765,37 @@ function _phAnalyticsSection(all,sport,mkt){
   });
   html+='</div></div>';
 
-  if(mkt==="all") return html; /* charts only when a specific market is selected */
+  return html; /* charts rendered separately via _phAnalyticsCharts after Overall Record */
+}
 
-  /* ── compute data for selected sport+market ── */
+function _phAnalyticsCharts(all,sport,mkt){
+  if(mkt==="all") return "";
+  var MKT_NAMES={};
+  Object.keys(MARKETS).forEach(function(sp){ MARKETS[sp].forEach(function(m){ MKT_NAMES[m.k]=m.n; }); });
+  var sportEntries=sport==="all"?all:all.filter(function(e){ return e.sport===sport; });
   var aAll=sportEntries.filter(function(e){ return e.market===mkt; });
   var aRes=aAll.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
   var mktName=MKT_NAMES[mkt]||marketName(mkt);
-
-  function chartCard(title,sub,body){
-    return '<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:16px">'+
-      '<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">'+title+'</div>'+
-      '<div style="font-size:10px;color:var(--mut2);margin-bottom:10px">'+sub+'</div>'+body+'</div>';
+  function chartCard(title,desc,body){
+    return '<div style="background:#111;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:16px">'+
+      '<div style="font-size:10px;font-weight:800;color:rgba(0,232,122,.7);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px">'+title+'</div>'+
+      body+
+      '<div style="font-size:12px;color:#888;font-style:italic;margin-top:8px;line-height:1.5">'+desc+'</div></div>';
   }
-  function ph(msg){ return '<div style="font-size:11px;color:var(--mut2);text-align:center;padding:16px 0;font-style:italic">'+msg+'</div>'; }
-
+  function ph(msg){ return '<div style="font-size:11px;color:#555;text-align:center;padding:16px 0;font-style:italic">'+msg+'</div>'; }
+  var html='';
   var s1=_phChartTimelineSvg(aRes);
-  html+=chartCard("Hit Rate Over Time","Daily hit rate for resolved "+esc(mktName)+" plays \xb7 80% reference line",
+  html+=chartCard("Hit Rate Over Time",
+    "Tracks your daily hit rate on resolved plays for this market. The dashed line marks the 80% model target — consistent performance above it means the model is calibrated for this prop.",
     s1||ph("Not enough resolved data yet — resolve plays to see trend"));
-
   var s2=_phChartCalibrationSvg(aRes);
-  html+=chartCard("Model Calibration","Are confidence levels accurate for "+esc(mktName)+"? Dashed line = expected rate",
+  html+=chartCard("Model Calibration",
+    "Compares PropDesk’s predicted confidence to actual results. Green bars mean the model is accurate or conservative for that confidence range — red means it’s overconfident. Ideal: all bars at or above the dashed expected line.",
     s2||ph("Resolve at least 5 plays to see calibration"));
-
   var s3=_phChartPlayersHtml(aAll);
-  html+=chartCard("Player Performance — "+esc(mktName),"Hit rate by player \xb7 minimum 3 resolved plays to qualify",
+  html+=chartCard("Player Performance — "+esc(mktName),
+    "Shows which players the model performs best on for this prop. Players need at least 3 resolved plays to qualify. Use this to spot where PropDesk has a consistent edge — or where it’s consistently off.",
     s3||ph("Log more plays for more players to see rankings"));
-
   return html;
 }
 
@@ -4927,6 +4945,9 @@ function renderPlayHistory(){
     html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate30)+'">'+_phRateStr(rate30)+'</div><div style="font-size:9px;color:var(--mut)">'+r30.length+' resolved</div></div>';
     html+='</div></div>';
   }
+
+  /* ─── ANALYTICS CHARTS (after Overall Record) ─── */
+  html+=_phAnalyticsCharts(all,_phAnalyticsSport,_phAnalyticsMkt);
 
   /* ─── SECTION 2: BY SPORT ─── */
   var sportKeys=Object.keys(sportMap);
