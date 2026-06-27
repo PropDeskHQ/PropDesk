@@ -276,6 +276,22 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .btn-best{background:var(--surf2);border:1px solid var(--bd2);border-radius:8px;padding:6px 13px;font-size:12px;font-weight:700;color:var(--mut);transition:.15s;white-space:nowrap}
 .btn-best:hover{border-color:#3a3a3a;color:var(--text)}
 .btn-best.on{background:rgba(0,255,135,.12);border-color:rgba(0,255,135,.4);color:var(--accent)}
+/* Tier filter chip row */
+.tier-filter-row{display:flex;gap:6px;padding:4px 0 10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tier-filter-row::-webkit-scrollbar{display:none}
+.tf-chip{display:inline-flex;flex-direction:column;align-items:center;gap:1px;padding:5px 11px;border-radius:8px;border:1px solid var(--bd2);background:var(--surf2);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;transition:.12s;flex-shrink:0;line-height:1}
+.tf-chip .tf-lbl{font-size:11px;font-weight:800}
+.tf-chip .tf-range{font-size:8px;opacity:.6;margin-top:1px}
+.tf-chip .tf-cnt{font-size:8px;opacity:.55;margin-top:1px}
+.tf-chip:hover:not(.tf-empty){border-color:#3a3a3a;color:var(--text)}
+.tf-chip.tf-empty{opacity:.35;cursor:default;pointer-events:none}
+.tf-chip.active{background:var(--accent);border-color:var(--accent);color:#000!important}
+.tf-chip.tf-all{color:var(--text)}
+.tf-chip.tf-elite-chip{color:#ffd700}
+.tf-chip.tf-great-chip{color:var(--accent)}
+.tf-chip.tf-good-chip{color:#7fe6a8}
+.tf-chip.tf-value-chip{color:var(--yellow)}
+.tf-chip.tf-poor-chip{color:var(--mut)}
 .btn-toggle{background:var(--surf2);border:1px solid var(--bd2);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:700;color:var(--mut);transition:.15s;white-space:nowrap}
 .btn-toggle:hover{border-color:#3a3a3a;color:var(--text)}
 .btn-toggle.on{border-color:rgba(255,204,0,.4);color:var(--yellow)}
@@ -749,6 +765,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
             <button class="btn-best" id="bestBetsBtn">Best Bets Only</button>
           </div>
         </div>
+        <div id="tierFilterRow" style="display:none"></div>
         <div id="tableMount"></div>
         <div id="trendsMount" style="display:none">
           <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game to see trends.</p></div>
@@ -1562,6 +1579,7 @@ var ST = {
 };
 var ST_showNoValue=false; // show pdNoValue / hidden rows
 var ST_bestOnly=false;    // show only GREAT+ (≥75%)
+var ST_tierFilter="all";  // tier chip filter: "all"|"ELITE"|"GREAT"|"GOOD"|"VALUE"|"POOR"
 // Cross-sport props accumulator — keyed by "sport|market", values are ST.props arrays (live refs)
 var _propStore={};
 // Per-game enriched prop cache — keyed by eventId, then market key. Lets Best Plays read
@@ -2366,7 +2384,7 @@ function renderPropTabs(){
   c.appendChild(tp);
   (MARKETS[ST.sport]||[]).filter(function(m){return m.k!=="_h2h"&&!MLB_HIDDEN_MARKETS[m.k];}).forEach(function(m){
     var b=el("button","pill"+(m.k===ST.market?" active":""),m.n);
-    b.onclick=function(){ ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); showGameContent(); if(ST.eventId) loadBoard(); updateBotnavActive("games"); };
+    b.onclick=function(){ ST_tierFilter="all"; ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); showGameContent(); if(ST.eventId) loadBoard(); updateBotnavActive("games"); };
     c.appendChild(b);
   });
 }
@@ -2787,6 +2805,10 @@ function filteredProps(){
       if(p.thinData||p.pdNoValue||p.pdConfidence==null) return false;
       if(Math.round(p.pdConfidence*100)<75) return false;
     }
+    // Tier chip filter — only applies to enriched props with a valid confidence score
+    if(ST_tierFilter!=="all"&&p.enriched&&!p.pdNoValue&&p.pdConfidence!=null){
+      if(confTierOf(Math.round(p.pdConfidence*100)).t!==ST_tierFilter) return false;
+    }
     return true;
   });
   // Sort highest confidence first; unenriched / thin-data / no-value sink to the bottom
@@ -2838,13 +2860,46 @@ function renderSummaryBar(){
       if(rT<thB+2) window.scrollBy({top:rT-thB-2,behavior:"instant"});
     });
   }
-  if(!total) return;
+  var tfrEl=$("tierFilterRow");
+  if(!total){ if(tfrEl) tfrEl.style.display="none"; return; }
   $("sb-total").textContent=total+" prop"+(total!==1?"s":"")+" analyzed";
   $("sb-lock").textContent="ELITE: "+locks;
   $("sb-elite").textContent="GREAT: "+elites;
   $("sb-good").textContent="GOOD: "+goods;
   var bb=$("bestBetsBtn");
   if(bb){ bb.className="btn-best"+(ST_bestOnly?" on":""); bb.textContent=ST_bestOnly?"Best Bets ✓":"Best Bets Only"; }
+  /* ── Tier filter chips ── */
+  if(tfrEl){
+    var tierCounts={ELITE:0,GREAT:0,GOOD:0,VALUE:0,POOR:0};
+    ST.props.filter(function(p){ return p.enriched&&!p.pdNoValue&&p.pdConfidence!=null; })
+      .forEach(function(p){ var t=confTierOf(Math.round(p.pdConfidence*100)).t; if(tierCounts[t]!==undefined) tierCounts[t]++; });
+    var CHIP_DEF=[
+      {k:"all",   lbl:"All",   range:"",       cls:"tf-all"},
+      {k:"ELITE", lbl:"ELITE", range:"90%+",   cls:"tf-elite-chip"},
+      {k:"GREAT", lbl:"GREAT", range:"75–89%", cls:"tf-great-chip"},
+      {k:"GOOD",  lbl:"GOOD",  range:"60–74%", cls:"tf-good-chip"},
+      {k:"VALUE", lbl:"VALUE", range:"45–59%", cls:"tf-value-chip"},
+      {k:"POOR",  lbl:"POOR",  range:"<45%",   cls:"tf-poor-chip"}
+    ];
+    var ch='<div class="tier-filter-row">';
+    CHIP_DEF.forEach(function(cd){
+      var cnt=cd.k==="all"?null:(tierCounts[cd.k]||0);
+      var empty=cd.k!=="all"&&cnt===0;
+      var active=ST_tierFilter===cd.k;
+      var cls="tf-chip "+cd.cls+(active?" active":"")+(empty?" tf-empty":"");
+      ch+='<button class="'+cls+'" data-tier="'+cd.k+'">';
+      ch+='<span class="tf-lbl">'+cd.lbl+'</span>';
+      if(cd.range) ch+='<span class="tf-range">'+cd.range+'</span>';
+      if(cnt!==null) ch+='<span class="tf-cnt">'+cnt+'</span>';
+      ch+='</button>';
+    });
+    ch+='</div>';
+    tfrEl.style.display="block";
+    tfrEl.innerHTML=ch;
+    tfrEl.querySelectorAll('[data-tier]').forEach(function(btn){
+      btn.onclick=function(){ ST_tierFilter=btn.getAttribute('data-tier'); renderTable(true); renderSummaryBar(); };
+    });
+  }
 }
 
 function renderTable(silent){
