@@ -4669,10 +4669,10 @@ function _ph30DayChartSvg(all){
   var slotW=W/30, barW=Math.max(3,Math.floor(slotW)-2);
   var MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:'+H+'px;display:block">';
-  /* 80% reference dashed line — keep at same visual position */
-  var refY=H-Math.round(0.8*chartH)-2;
+  /* 75% reference dashed line */
+  var refY=H-Math.round(0.75*chartH)-2;
   svg+='<line x1="0" y1="'+refY+'" x2="'+W+'" y2="'+refY+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 2" opacity="0.4"/>';
-  svg+='<text x="'+(W-2)+'" y="'+(refY-2)+'" fill="var(--accent)" font-size="7" text-anchor="end" opacity="0.5">80%</text>';
+  svg+='<text x="'+(W-2)+'" y="'+(refY-2)+'" fill="var(--accent)" font-size="7" text-anchor="end" opacity="0.5">75%</text>';
   /* bars — one per day with resolved plays only */
   days.forEach(function(ds,i){
     var dm=dayMap[ds];
@@ -4708,9 +4708,9 @@ function _phChartTimelineSvg(resolved){
   var MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:180px;display:block">';
   svg+='<defs><linearGradient id="pha-fill-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00e87a" stop-opacity="0.15"/><stop offset="100%" stop-color="#00e87a" stop-opacity="0"/></linearGradient></defs>';
-  var ry=rY(0.8);
+  var ry=rY(0.75);
   svg+='<line x1="'+XL+'" y1="'+ry+'" x2="'+XR+'" y2="'+ry+'" stroke="#00e87a" stroke-width="1" stroke-dasharray="3 4" opacity="0.35"/>';
-  svg+='<text x="'+(XL+2)+'" y="'+(ry-3)+'" fill="#00e87a" font-size="7" opacity="0.45">80%</text>';
+  svg+='<text x="'+(XL+2)+'" y="'+(ry-3)+'" fill="#00e87a" font-size="7" opacity="0.45">75%</text>';
   var run=[], frun=[];
   function flushRun(){
     if(run.length>1){
@@ -4739,10 +4739,10 @@ function _phChartTimelineSvg(resolved){
 function _phChartCalibrationSvg(resolved){
   if(resolved.length<5) return null;
   var TIERS=[
+    {min:75,max:79,exp:77,lbl:"75–79%"},
     {min:80,max:84,exp:82,lbl:"80–84%"},
     {min:85,max:89,exp:87,lbl:"85–89%"},
-    {min:90,max:94,exp:92,lbl:"90–94%"},
-    {min:95,max:100,exp:97,lbl:"95%+"}
+    {min:90,max:100,exp:95,lbl:"90%+"}
   ];
   TIERS.forEach(function(t){
     t.hits=0; t.plays=0;
@@ -4857,7 +4857,7 @@ function _phAnalyticsCharts(all,sport,mkt){
   var html='';
   var s1=_phChartTimelineSvg(aRes);
   html+=chartCard("Hit Rate Over Time",
-    "Tracks your daily hit rate on resolved plays for this market. The dashed line marks the 80% model target — consistent performance above it means the model is calibrated for this prop.",
+    "Tracks your daily hit rate on resolved plays for this market. The dashed line marks the 75% model target — consistent performance above it means the model is calibrated for this prop.",
     s1||ph("Not enough resolved data yet — resolve plays to see trend"));
   var s2=_phChartCalibrationSvg(aRes);
   html+=chartCard("Model Calibration",
@@ -4937,7 +4937,7 @@ function renderPlayHistory(){
   var topMkts=Object.keys(mktMap).sort(function(a,b){ return mktMap[b].plays-mktMap[a].plays; }).slice(0,10);
 
   /* ── confidence tiers ── */
-  var TIER_DEF=[{label:"LOCK",min:80,max:84,exp:82},{label:"LOCK+",min:85,max:89,exp:87},{label:"ELITE LOCK",min:90,max:94,exp:92},{label:"MAX LOCK",min:95,max:100,exp:97}];
+  var TIER_DEF=[{label:"LOCK",min:75,max:79,exp:77},{label:"LOCK+",min:80,max:84,exp:82},{label:"ELITE LOCK",min:85,max:89,exp:87},{label:"MAX LOCK",min:90,max:100,exp:95}];
   var tierMap={};
   TIER_DEF.forEach(function(t){ tierMap[t.label]={plays:0,hits:0}; });
   allRes.forEach(function(e){
@@ -5136,7 +5136,7 @@ function renderPlayHistory(){
 
   /* ─── PLAY TABLE ─── */
   if(!filtered.length){
-    html+='<div class="empty" style="padding:24px 0">'+(all.length?'No plays match the current filters.':'Open a game — 80%+ props will auto-log here.')+'</div>';
+    html+='<div class="empty" style="padding:24px 0">'+(all.length?'No plays match the current filters.':'Open a game — 75%+ props will auto-log here.')+'</div>';
   } else {
     var TH='text-align:left;padding:8px 10px;font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bd);white-space:nowrap;cursor:pointer;user-select:none';
     var TH_S='text-align:left;padding:8px 10px;font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bd);white-space:nowrap';
@@ -7709,7 +7709,7 @@ function renderGameTop5(picks,isScanning){
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
-    var emptyMsg=isScanning?'Scanning markets for 80%+ plays…':'No plays above 80% confidence for this game.';
+    var emptyMsg=isScanning?'Scanning markets for 75%+ plays…':'No plays above 75% confidence for this game.';
     mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
     return;
   }
