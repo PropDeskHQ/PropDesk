@@ -4481,6 +4481,7 @@ var PLAY_HIST_KEY="propdesk_play_history";
 var _histFilters={sport:"all",result:"all",days:"all"};
 var _histSort={col:"date",dir:"desc"};
 var _histSearch="";
+var _phCollapsedDates={};
 
 function loadPlayHist(){ try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]"); }catch(e){ return []; } }
 function savePlayHist(h){ try{ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h)); }catch(e){ console.warn("[History] storage full",e); } }
@@ -4636,8 +4637,11 @@ function renderPlayHistory(){
     return sd==="asc"?cmp:-cmp;
   });
 
+  /* ── sport-filtered stats dataset ── */
+  var statData=_histFilters.sport==="all"?all:all.filter(function(e){ return e.sport===_histFilters.sport; });
+
   /* ── aggregate stats ── */
-  var allRes=all.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
+  var allRes=statData.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
   var allHits=allRes.filter(function(e){ return e.result==="hit"; }).length;
   var allRate=_phRate(allHits,allRes.length);
 
@@ -4651,15 +4655,15 @@ function renderPlayHistory(){
 
   /* ── by sport ── */
   var sportMap={};
-  all.forEach(function(e){
+  statData.forEach(function(e){
     if(!sportMap[e.sport]) sportMap[e.sport]={plays:0,hits:0,misses:0,pending:0};
     var m=sportMap[e.sport]; m.plays++;
-    if(e.result==="hit") m.hits++; else if(e.result==="miss") m.misses++; else m.pending++;
+    if(e.result==="hit") m.hits++; else if(e.result==="miss") m.misses++; else if(e.result!=="void") m.pending++;
   });
 
   /* ── by market ── */
   var mktMap={};
-  all.forEach(function(e){
+  statData.forEach(function(e){
     var k=e.marketDisplay||e.market||"";
     if(!mktMap[k]) mktMap[k]={plays:0,hits:0,misses:0,confSum:0,curStreak:0,bestStreak:0};
     var m=mktMap[k]; m.plays++; m.confSum+=(e.confidence||0);
@@ -4691,7 +4695,7 @@ function renderPlayHistory(){
 
   /* ── best/worst sport this month ── */
   var monthSp={};
-  all.filter(function(e){ return (e.result==="hit"||e.result==="miss")&&new Date(e.date)>=d1; }).forEach(function(e){
+  statData.filter(function(e){ return (e.result==="hit"||e.result==="miss")&&new Date(e.date)>=d1; }).forEach(function(e){
     if(!monthSp[e.sport]) monthSp[e.sport]={hits:0,total:0};
     monthSp[e.sport].total++; if(e.result==="hit") monthSp[e.sport].hits++;
   });
@@ -4838,7 +4842,7 @@ function renderPlayHistory(){
   /* ─── SECTION 6: 30-DAY CHART ─── */
   if(allRes.length){
     html+=_phSectionHdr("Rolling 30-Day Hit Rate");
-    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px 10px 8px;margin-bottom:4px">'+_ph30DayChartSvg(all)+'</div>';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px 10px 8px;margin-bottom:4px">'+_ph30DayChartSvg(statData)+'</div>';
     html+='<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mut);margin-bottom:32px"><span>30 days ago</span><span>Today</span></div>';
   }
 
@@ -4851,7 +4855,7 @@ function renderPlayHistory(){
     html+='<button class="btn ph-flt'+(p[0]===_histFilters.sport?" on":"")+'" data-flt="sport" data-v="'+p[0]+'">'+p[1]+'</button>';
   });
   html+='<span class="fb-lbl" style="margin-left:8px">Result:</span>';
-  [["all","All"],["hit","Hit"],["miss","Miss"],["pending","Pending"]].forEach(function(p){
+  [["all","All"],["hit","Hit"],["miss","Miss"],["void","Void"],["pending","Pending"]].forEach(function(p){
     html+='<button class="btn ph-flt'+(p[0]===_histFilters.result?" on":"")+'" data-flt="result" data-v="'+p[0]+'">'+p[1]+'</button>';
   });
   html+='<span class="fb-lbl" style="margin-left:8px">Period:</span>';
@@ -4870,53 +4874,103 @@ function renderPlayHistory(){
       var arr=_histSort.col===c?(_histSort.dir==="asc"?" ↑":" ↓"):"";
       return '<th style="'+TH+'" data-sort="'+c+'">'+label+arr+'</th>';
     }
+
+    /* ── build date groups; sort each group by confidence desc ── */
+    var dateOrder=[], dateGroups={};
+    filtered.forEach(function(e,i){
+      if(!dateGroups[e.date]){ dateGroups[e.date]=[]; dateOrder.push(e.date); }
+      dateGroups[e.date].push({i:i,e:e});
+    });
+    dateOrder.sort(function(a,b){ return a<b?1:a>b?-1:0; });
+    dateOrder.forEach(function(d){ dateGroups[d].sort(function(a,b){ return (b.e.confidence||0)-(a.e.confidence||0); }); });
+
+    var colSpan=showTrendCols?9:7;
+    var _months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmtDHdr(d){ var p=d.split('-'); return _months[parseInt(p[1])-1]+' '+parseInt(p[2]); }
+
+    html+='<div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px">';
+    html+='<button class="btn" id="phExpandAll" style="font-size:10px;padding:4px 10px">Expand All</button>';
+    html+='<button class="btn" id="phCollapseAll" style="font-size:10px;padding:4px 10px">Collapse All</button>';
+    html+='</div>';
+
     html+='<div style="overflow:clip"><table style="width:100%;border-collapse:collapse;font-size:12px">';
     html+='<thead><tr>'+sh("date","Date")+sh("player","Player")+'<th style="'+TH_S+'">Market</th><th style="'+TH_S+'">Line</th>'+sh("confidence","Conf");
     if(showTrendCols) html+='<th style="'+TH_S+'">Trend</th><th style="'+TH_S+'">Days Since</th>';
     html+='<th style="'+TH_S+'">Game</th>'+sh("result","Result")+'</tr></thead><tbody>';
-    filtered.forEach(function(e,i){
-      var tier=confTierOf(e.confidence||0);
-      var isPP=e.result==="pending"&&e.date<today;
-      var rowStyle='border-bottom:1px solid var(--bd);'+(isPP?"border-left:3px solid var(--yellow);":"");
 
-      var trendHtml="", dsSince="";
-      if(showTrendCols){
-        var pmArr=pmMap[e.player+"|"+e.market]||[];
-        var pmIdx=pmArr.findIndex(function(x){ return x.loggedAt===e.loggedAt; });
-        var prev=pmIdx>=0&&pmIdx<pmArr.length-1?pmArr[pmIdx+1]:null;
-        trendHtml="<span style='color:var(--mut)'>—</span>";
-        if(prev&&prev.confidence!=null){
-          var diff=(e.confidence||0)-(prev.confidence||0);
-          trendHtml=diff>0?'<span style="color:var(--accent)">↑</span>':diff<0?'<span style="color:var(--red)">↓</span>':"<span style='color:var(--mut)'>—</span>";
-        }
-        dsSince="—";
-        if(prev&&prev.date){
-          var diff2=Math.round((new Date(e.date)-new Date(prev.date))/86400000);
-          dsSince=diff2===0?"today":diff2+"d";
-        }
+    dateOrder.forEach(function(d){
+      var grp=dateGroups[d];
+      var dHits=0,dMiss=0,dPend=0,dVoid=0;
+      grp.forEach(function(g){
+        if(g.e.result==="hit") dHits++;
+        else if(g.e.result==="miss") dMiss++;
+        else if(g.e.result==="void") dVoid++;
+        else dPend++;
+      });
+      var collapsed=d in _phCollapsedDates?_phCollapsedDates[d]:(d!==today);
+      var chevron=collapsed?'▶':'▼';
+      var parts=[];
+      if(dHits) parts.push(dHits+' hit');
+      if(dMiss) parts.push(dMiss+' miss');
+      if(dPend) parts.push(dPend+' pending');
+      if(dVoid) parts.push(dVoid+' void');
+      var summary=grp.length+' play'+(grp.length!==1?'s':'')+(parts.length?' · '+parts.join(' / '):'');
+      html+='<tr class="ph-date-hdr" data-date="'+esc(d)+'" style="cursor:pointer;background:var(--surf2);border-bottom:1px solid var(--bd)">';
+      html+='<td colspan="'+colSpan+'" style="padding:7px 10px">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center">';
+      html+='<span style="font-size:11px;font-weight:800">'+esc(fmtDHdr(d))+(d===today?' <span style="font-size:9px;color:var(--mut);font-weight:400">today</span>':'')+'</span>';
+      html+='<span style="font-size:10px;color:var(--mut)">'+esc(summary)+' '+chevron+'</span>';
+      html+='</div></td></tr>';
+
+      if(!collapsed){
+        grp.forEach(function(g){
+          var e=g.e, i=g.i;
+          var tier=confTierOf(e.confidence||0);
+          var isPP=e.result==="pending"&&e.date<today;
+          var rowStyle='border-bottom:1px solid var(--bd);'+(isPP?"border-left:3px solid var(--yellow);":"");
+
+          var trendHtml="", dsSince="";
+          if(showTrendCols){
+            var pmArr=pmMap[e.player+"|"+e.market]||[];
+            var pmIdx=pmArr.findIndex(function(x){ return x.loggedAt===e.loggedAt; });
+            var prev=pmIdx>=0&&pmIdx<pmArr.length-1?pmArr[pmIdx+1]:null;
+            trendHtml="<span style='color:var(--mut)'>—</span>";
+            if(prev&&prev.confidence!=null){
+              var diff=(e.confidence||0)-(prev.confidence||0);
+              trendHtml=diff>0?'<span style="color:var(--accent)">↑</span>':diff<0?'<span style="color:var(--red)">↓</span>':"<span style='color:var(--mut)'>—</span>";
+            }
+            dsSince="—";
+            if(prev&&prev.date){
+              var diff2=Math.round((new Date(e.date)-new Date(prev.date))/86400000);
+              dsSince=diff2===0?"today":diff2+"d";
+            }
+          }
+
+          var undoBtn='<button class="btn ph-undo" data-i="'+i+'" style="margin-left:6px;font-size:10px;color:var(--mut);background:none;border:1px solid var(--bd2);border-radius:4px;padding:2px 7px;cursor:pointer">Undo</button>';
+          var res;
+          if(e.result==="hit") res='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">HIT</span>'+undoBtn;
+          else if(e.result==="miss") res='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">MISS</span>'+undoBtn;
+          else if(e.result==="void") res='<span style="background:rgba(136,136,136,.13);color:var(--mut);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">VOID</span>'+undoBtn;
+          else res=
+            '<button class="btn ph-hit" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:6px;margin-right:6px">✓ Hit</button>'+
+            '<button class="btn ph-miss" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>'+
+            '<button class="btn ph-void" data-i="'+i+'" style="min-width:48px;min-height:32px;padding:6px 10px;font-size:11px;font-weight:700;background:none;color:var(--mut);border:1px solid var(--bd2);border-radius:6px;margin-left:6px">∅ Void</button>';
+
+          html+='<tr style="'+rowStyle+'">';
+          html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
+          html+='<td style="padding:9px 10px;font-weight:700">'+esc(e.player||"")+'</td>';
+          html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.marketDisplay||e.market||"")+'</td>';
+          html+='<td style="padding:9px 10px">'+esc(e.line||"")+'</td>';
+          html+='<td style="padding:9px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span></td>';
+          if(showTrendCols){
+            html+='<td style="padding:9px 10px;text-align:center">'+trendHtml+'</td>';
+            html+='<td style="padding:9px 10px;text-align:center;color:var(--mut)">'+dsSince+'</td>';
+          }
+          html+='<td style="padding:9px 10px;color:var(--mut);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(e.game||"")+'">'+esc(e.game||"")+'</td>';
+          html+='<td style="padding:9px 10px;white-space:nowrap">'+res+'</td>';
+          html+='</tr>';
+        });
       }
-
-      var undoBtn='<button class="btn ph-undo" data-i="'+i+'" style="margin-left:6px;font-size:10px;color:var(--mut);background:none;border:1px solid var(--bd2);border-radius:4px;padding:2px 7px;cursor:pointer">Undo</button>';
-      var res;
-      if(e.result==="hit") res='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">HIT</span>'+undoBtn;
-      else if(e.result==="miss") res='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">MISS</span>'+undoBtn;
-      else res=
-        '<button class="btn ph-hit" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:6px;margin-right:6px">✓ Hit</button>'+
-        '<button class="btn ph-miss" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>';
-
-      html+='<tr style="'+rowStyle+'">';
-      html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
-      html+='<td style="padding:9px 10px;font-weight:700">'+esc(e.player||"")+'</td>';
-      html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.marketDisplay||e.market||"")+'</td>';
-      html+='<td style="padding:9px 10px">'+esc(e.line||"")+'</td>';
-      html+='<td style="padding:9px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span></td>';
-      if(showTrendCols){
-        html+='<td style="padding:9px 10px;text-align:center">'+trendHtml+'</td>';
-        html+='<td style="padding:9px 10px;text-align:center;color:var(--mut)">'+dsSince+'</td>';
-      }
-      html+='<td style="padding:9px 10px;color:var(--mut);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(e.game||"")+'">'+esc(e.game||"")+'</td>';
-      html+='<td style="padding:9px 10px;white-space:nowrap">'+res+'</td>';
-      html+='</tr>';
     });
     html+='</tbody></table></div>';
   }
@@ -4958,6 +5012,26 @@ function renderPlayHistory(){
       savePlayHist(h); renderPlayHistory();
     };
   });
+  mount.querySelectorAll('.ph-void').forEach(function(b){
+    b.onclick=function(){
+      var idx=parseInt(b.getAttribute('data-i')), entry=filtered[idx]; if(!entry) return;
+      var h=loadPlayHist();
+      h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market) e.result="void"; });
+      savePlayHist(h); renderPlayHistory();
+    };
+  });
+  mount.querySelectorAll('.ph-date-hdr').forEach(function(row){
+    row.onclick=function(){
+      var d=row.getAttribute('data-date');
+      var cur=d in _phCollapsedDates?_phCollapsedDates[d]:(d!==today);
+      _phCollapsedDates[d]=!cur;
+      renderPlayHistory();
+    };
+  });
+  var exAll=$('phExpandAll');
+  if(exAll) exAll.onclick=function(){ dateOrder.forEach(function(d){ _phCollapsedDates[d]=false; }); renderPlayHistory(); };
+  var colAll=$('phCollapseAll');
+  if(colAll) colAll.onclick=function(){ dateOrder.forEach(function(d){ _phCollapsedDates[d]=true; }); renderPlayHistory(); };
   var exp=$('phExportBtn'); if(exp) exp.onclick=function(){ exportPlayHistCSV(filtered); };
   var sexp=$('phStatsExportBtn'); if(sexp) sexp.onclick=function(){
     exportPlayHistStats(all,allRes,allHits,allRate,rate7,rate30,r7.length,r30.length,sportMap,mktMap,TIER_DEF,tierMap,streaks,hotMkts,coldMkts);
