@@ -1564,7 +1564,7 @@ function tierOf(s){
 }
 // Confidence-based tier (used after phase-2 enrichment to display X%)
 function confTierOf(pct){ // pct is 0-100
-  if(pct>=80) return {c:"t-lock",   t:"LOCK"};
+  if(pct>=75) return {c:"t-lock",   t:"LOCK"};
   if(pct>=72) return {c:"t-elite",  t:"ELITE"};
   if(pct>=65) return {c:"t-strong", t:"STRONG"};
   if(pct>=58) return {c:"t-good",   t:"GOOD"};
@@ -4198,7 +4198,7 @@ function ensureChart(cb){
   if(window.Chart){ cb(); return; }
   var tries=0; var iv=setInterval(function(){ tries++; if(window.Chart){ clearInterval(iv); cb(); } else if(tries>50){ clearInterval(iv); } },120);
 }
-function tierColor(s){ if(s>=80)return "#00ff87"; if(s>=65)return "#7fe6a8"; if(s>=48)return "#ffcc00"; if(s>=32)return "#ff9d4f"; return "#ff4f4f"; }
+function tierColor(s){ if(s>=75)return "#00ff87"; if(s>=65)return "#7fe6a8"; if(s>=48)return "#ffcc00"; if(s>=32)return "#ff9d4f"; return "#ff4f4f"; }
 // pdLine = PropDesk reference line, isOver = direction, confPct = 0-100 confidence, bookLine = original book line
 function drawAnalyzeCharts(p,pdLine,vals,seasonAvg,hitRate,dates,isOver,confPct,bookLine){
   ensureChart(function(){
@@ -4561,7 +4561,7 @@ function savePlayHist(h){ try{ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify
 
 function _buildHistEntry(p){
   if(!p||!p._market||!p.player||!p.enriched||p.thinData||p.pdNoValue||p.pdConfidence==null) return null;
-  if(Math.round((p.pdConfidence||0)*100)<80) return null;
+  if(Math.round((p.pdConfidence||0)*100)<75) return null;
   if(MLB_HIDDEN_MARKETS[p._market]) return null;
   var conf=Math.round((p.pdConfidence||0)*100);
   var sp=p._sport||ST.sport;
@@ -4617,7 +4617,7 @@ function logPlaysToHistory(plays){
 
 /* ── stats helpers ── */
 function _phRate(hits,total){ return total>0?Math.round(hits/total*100):null; }
-function _phRateColor(r){ return r===null?"var(--mut)":r>=80?"var(--accent)":r>=65?"var(--yellow)":"var(--red)"; }
+function _phRateColor(r){ return r===null?"var(--mut)":r>=75?"var(--accent)":r>=65?"var(--yellow)":"var(--red)"; }
 function _phRateStr(r){ return r===null?"–":r+"%"; }
 function _phSectionHdr(t){ return '<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:.08em;text-transform:uppercase;margin:20px 0 10px">'+t+'</div>'; }
 function _phTbl(hdrs,rows,compact){
@@ -6976,7 +6976,7 @@ function buildInsight(t){
       if(h&&streak>0)streak++; else if(!h&&streak<0)streak--; else break;
     }
     var s="";
-    if(pct>=80) s=t.player+" has hit the "+dir+" "+line+" in "+pct+"% of tracked games — one of the stronger trends in today's slate.";
+    if(pct>=75) s=t.player+" has hit the "+dir+" "+line+" in "+pct+"% of tracked games — one of the stronger trends in today's slate.";
     else if(pct>=65) s=t.player+" is hitting the "+dir+" "+line+" at a "+pct+"% clip across "+n+" games, above the threshold for a statistically meaningful edge.";
     else s=t.player+" is hitting the "+dir+" "+line+" at "+pct+"% — borderline but worth monitoring alongside other signals.";
     if(streak>=3) s+=" Currently on a "+streak+"-game hit streak.";
@@ -7609,7 +7609,7 @@ function updateBestPlaysDisplay(eventId,remaining){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=80) q.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) q.push(p);
     });
   });
   q.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
@@ -7667,11 +7667,11 @@ async function startGameEnrichment(eventId){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=80) qFinal.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) qFinal.push(p);
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
-  console.log("[BP] startGameEnrichment final pass — "+qFinal.length+" props at 80%+:");
+  console.log("[BP] startGameEnrichment final pass — "+qFinal.length+" props at 75%+:");
   qFinal.forEach(function(p){ console.log("  [BP]",p.player,"|",p._market,"| pdConf:",+(( p.pdConfidence||0)*100).toFixed(1)+"%","| enriched:",p.enriched,"| thinData:",!!p.thinData,"| pdNoValue:",!!p.pdNoValue); });
   if(!qFinal.length) console.log("  [BP] none qualified — full cache dump:"); Object.keys(_gamePropsCache[eventId]||{}).forEach(function(mk){ (_gamePropsCache[eventId][mk]||[]).forEach(function(p){ console.log("    [cache]",p.player,mk,"pdConf:",p.pdConfidence,"enriched:",p.enriched,"thinData:",!!p.thinData); }); });
   try{
