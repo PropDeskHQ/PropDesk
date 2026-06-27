@@ -167,7 +167,8 @@ input:focus,select:focus{border-color:var(--accent)}
 .leg-conf{font-size:12px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;align-self:flex-start}
 .leg-conf.t-lock{color:#ffd700;background:rgba(255,215,0,.1)}
 .leg-conf.t-elite{color:var(--accent);background:rgba(0,255,135,.1)}
-.leg-conf.t-good{color:#7fe6a8;background:rgba(127,230,168,.08)}
+.leg-conf.t-strong{color:#7fe6a8;background:rgba(127,230,168,.08)}
+.leg-conf.t-good{color:var(--yellow);background:rgba(255,204,0,.08)}
 .parlay-empty{background:#141414;border-radius:12px;padding:24px 20px;text-align:center;color:var(--mut);font-size:14px;line-height:1.7}
 .parlay-empty strong{color:var(--text);display:block;margin-bottom:6px;font-size:15px}
 .parlay-leg-note{font-size:12px;color:var(--yellow);margin-top:8px;text-align:center}
@@ -211,7 +212,7 @@ thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4){text-align:cen
 .vs{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
 .vs b{font-size:36px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap}
 .vs .vt{font-size:10px;font-weight:700;letter-spacing:.5px;line-height:1;text-transform:uppercase}
-.t-lock{color:#ffd700} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:#b8f5d4} .t-fair{color:var(--mut2)} .t-pass{color:var(--mut2)}
+.t-lock{color:#ffd700} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:var(--yellow)} .t-poor{color:var(--mut)} .t-pass{color:var(--mut2)}
 /* PropDesk Line display */
 .pd-cell{display:flex;flex-direction:column;gap:3px;align-items:center}
 .pd-book-strike{font-size:11px;color:var(--mut2);text-decoration:line-through;line-height:1}
@@ -381,14 +382,16 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .hiw-tier{padding:13px 15px;border-radius:10px;border:1px solid var(--bd2)}
 .hiw-tier-name{font-size:11px;font-weight:800;letter-spacing:.8px;margin-bottom:6px}
 .hiw-tier-desc{font-size:12px;color:var(--mut);line-height:1.6}
-.hiw-tier-lock{border-color:rgba(0,255,135,.25);background:rgba(0,255,135,.04)}
-.hiw-tier-lock .hiw-tier-name{color:var(--accent)}
-.hiw-tier-elite{border-color:rgba(167,139,250,.25);background:rgba(167,139,250,.04)}
-.hiw-tier-elite .hiw-tier-name{color:var(--purple)}
-.hiw-tier-strong{border-color:rgba(79,159,255,.25);background:rgba(79,159,255,.04)}
-.hiw-tier-strong .hiw-tier-name{color:var(--blue)}
+.hiw-tier-lock{border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.04)}
+.hiw-tier-lock .hiw-tier-name{color:#ffd700}
+.hiw-tier-elite{border-color:rgba(0,255,135,.25);background:rgba(0,255,135,.04)}
+.hiw-tier-elite .hiw-tier-name{color:var(--accent)}
+.hiw-tier-strong{border-color:rgba(127,230,168,.2);background:rgba(127,230,168,.03)}
+.hiw-tier-strong .hiw-tier-name{color:#7fe6a8}
 .hiw-tier-good{border-color:rgba(255,204,0,.2);background:rgba(255,204,0,.03)}
 .hiw-tier-good .hiw-tier-name{color:var(--yellow)}
+.hiw-tier-poor{border-color:rgba(136,136,136,.15);background:rgba(136,136,136,.03)}
+.hiw-tier-poor .hiw-tier-name{color:var(--mut)}
 .hiw-dont-list{display:flex;flex-direction:column;gap:14px;margin-top:16px}
 .hiw-dont{display:flex;gap:13px;align-items:flex-start}
 .hiw-dont-x{font-size:12px;font-weight:800;color:#ff5050;flex-shrink:0;margin-top:3px;letter-spacing:.5px}
@@ -431,7 +434,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tc-footer{display:flex;align-items:center;gap:6px;margin-top:14px;padding-top:10px;border-top:1px solid #1e1e1e}
 .tc-source{font-size:10px;color:var(--mut2);letter-spacing:.2px}
 .tc-conf-sm{font-size:10px;font-weight:700;color:var(--mut);margin-left:auto;white-space:nowrap}
-.tc-conf-sm.t-lock{color:#ffd700}.tc-conf-sm.t-elite{color:var(--accent)}.tc-conf-sm.t-good{color:#7fe6a8}
+.tc-conf-sm.t-lock{color:#ffd700}.tc-conf-sm.t-elite{color:var(--accent)}.tc-conf-sm.t-strong{color:#7fe6a8}.tc-conf-sm.t-good{color:var(--yellow)}
 .tc-share-sm{font-size:10px;font-weight:700;color:var(--accent);background:none;border:1px solid rgba(0,255,135,.25);border-radius:5px;padding:3px 8px;cursor:pointer;transition:.15s}
 .tc-share-sm:hover{background:rgba(0,255,135,.12)}
 .tc-no-data{text-align:center;padding:60px 20px;color:var(--mut)}
@@ -495,6 +498,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .t10-sp-lock{color:#ffd700;border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.07)}
 .t10-sp-elite{color:var(--accent);border-color:rgba(0,232,122,.3);background:rgba(0,232,122,.06)}
 .t10-sp-good{color:#7fe6a8;border-color:rgba(127,230,168,.3);background:rgba(127,230,168,.05)}
+.t10-sp-value{color:var(--yellow);border-color:rgba(255,204,0,.3);background:rgba(255,204,0,.06)}
 .t10-hdr-right{display:flex;gap:7px;align-items:flex-start;flex-shrink:0}
 .t10-copy-btn{font-size:11px;font-weight:700;color:var(--accent);background:transparent;border:1px solid rgba(0,232,122,.4);border-radius:8px;padding:7px 13px;cursor:pointer;white-space:nowrap;transition:.15s}
 .t10-copy-btn:hover{background:rgba(0,232,122,.08)}
@@ -516,7 +520,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .t10-card:hover{border-color:#252525;border-left-color:#3a3a3a}
 .t10-card.tc-lock{border-left-color:#ffd700}
 .t10-card.tc-elite{border-left-color:var(--accent)}
-.t10-card.tc-good{border-left-color:#7fe6a8}
+.t10-card.tc-strong{border-left-color:#7fe6a8}
+.t10-card.tc-good{border-left-color:var(--yellow)}
 .t10-row-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px}
 .t10-col-info{flex:1;min-width:0}
 .t10-col-conf{text-align:right;flex-shrink:0}
@@ -526,7 +531,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .t10-tier{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:4px;display:inline-block;margin-top:3px}
 .t10-tier.t-lock{background:rgba(255,215,0,.1);color:#ffd700;border:1px solid rgba(255,215,0,.22)}
 .t10-tier.t-elite{background:rgba(0,232,122,.08);color:var(--accent);border:1px solid rgba(0,232,122,.18)}
-.t10-tier.t-good{background:rgba(127,230,168,.06);color:#7fe6a8;border:1px solid rgba(127,230,168,.18)}
+.t10-tier.t-strong{background:rgba(127,230,168,.06);color:#7fe6a8;border:1px solid rgba(127,230,168,.18)}
+.t10-tier.t-good{background:rgba(255,204,0,.08);color:var(--yellow);border:1px solid rgba(255,204,0,.2)}
 .t10-snap-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0;padding:7px 0;border-top:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a}
 .t10-snap-text{font-size:11px;color:var(--mut);flex:1;min-width:0}
 .t10-line-badge{font-size:12px;font-weight:700;padding:2px 8px;border-radius:5px;background:#1a1a1a;border:1px solid #252525;color:#aaa;flex-shrink:0}
@@ -721,8 +727,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
         <div id="summaryBar" style="display:none">
           <div class="summary-bar">
             <span class="sb-label" id="sb-total">0 props</span>
-            <span class="sb-chip sb-lock" id="sb-lock">LOCK: 0</span>
-            <span class="sb-chip sb-elite" id="sb-elite">ELITE: 0</span>
+            <span class="sb-chip sb-lock" id="sb-lock">ELITE: 0</span>
+            <span class="sb-chip sb-elite" id="sb-elite">GREAT: 0</span>
             <span class="sb-chip sb-good" id="sb-good">GOOD: 0</span>
             <span class="sb-spacer"></span>
             <button class="btn-best" id="bestBetsBtn">Best Bets Only</button>
@@ -813,20 +819,24 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
           <div class="hiw-tiers-label">Confidence Tiers</div>
           <div class="hiw-tier-grid">
             <div class="hiw-tier hiw-tier-lock">
-              <div class="hiw-tier-name">🔒 LOCK</div>
-              <div class="hiw-tier-desc">Strongest signal. The player must have actually hit this mark in most of their recent games — not just a good season average. Requires multiple data points to align.</div>
+              <div class="hiw-tier-name">🏆 ELITE</div>
+              <div class="hiw-tier-desc">90%+ confidence. Strongest signal — the player has hit this mark in the overwhelming majority of recent games. Multiple data points align across L5, L10, and season. Top-tier bet.</div>
             </div>
             <div class="hiw-tier hiw-tier-elite">
-              <div class="hiw-tier-name">⚡ ELITE</div>
-              <div class="hiw-tier-desc">High confidence across recent form, mid-term trend, and season data — with meaningful line value or a market signal layered on top.</div>
+              <div class="hiw-tier-name">⭐ GREAT</div>
+              <div class="hiw-tier-desc">75–89% confidence. High confidence across recent form, mid-term trend, and season data. The primary target for most plays — solid edge with real data behind it.</div>
             </div>
             <div class="hiw-tier hiw-tier-strong">
-              <div class="hiw-tier-name">💪 STRONG</div>
-              <div class="hiw-tier-desc">Solid historical edge at the posted line. Worth a close look, especially when the matchup or situation supports it.</div>
+              <div class="hiw-tier-name">👍 GOOD</div>
+              <div class="hiw-tier-desc">60–74% confidence. A clear positive lean at the posted line. Worth including in a parlay or as a supporting leg — the edge is real, just not overwhelming.</div>
             </div>
             <div class="hiw-tier hiw-tier-good">
-              <div class="hiw-tier-name">✅ GOOD</div>
-              <div class="hiw-tier-desc">A positive lean with real data behind it. Better used as a supporting play than a headliner — but the number is honest.</div>
+              <div class="hiw-tier-name">📊 VALUE</div>
+              <div class="hiw-tier-desc">45–59% confidence. Slight lean with limited historical data or a tight spread. Use as context — not as a primary bet. Still better than a coin flip.</div>
+            </div>
+            <div class="hiw-tier hiw-tier-poor">
+              <div class="hiw-tier-name">⬜ POOR</div>
+              <div class="hiw-tier-desc">Below 45% confidence. The model sees little to no edge here. Hidden by default in the prop table — shown only when filtering is removed.</div>
             </div>
           </div>
         </div>
@@ -841,7 +851,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Home advantage is factored in per sport.</strong> The edge of playing at home is real, measurable, and different for baseball, basketball, hockey, and football. We treat each sport separately.</div></div>
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>In MLB, the starting pitcher is the single biggest variable.</strong> A great starter against a weak lineup can swing a game significantly. We pull confirmed starter data daily and weight it accordingly — it's never an afterthought.</div></div>
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>In NBA, back-to-back fatigue is a real, measurable edge.</strong> Teams playing the second night of a back-to-back underperform at a rate the market doesn't always fully price in. We flag it every time.</div></div>
-          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We never show a strong edge on one factor alone.</strong> LOCK and ELITE ratings on a moneyline require multiple independent signals pointing the same direction. One decent stat isn't enough to call the market wrong.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We never show a strong edge on one factor alone.</strong> ELITE and GREAT ratings on a moneyline require multiple independent signals pointing the same direction. One decent stat isn't enough to call the market wrong.</div></div>
         </div>
       </div>
 
@@ -1526,7 +1536,7 @@ var ST = {
   parlayCart:[]
 };
 var ST_showNoValue=false; // show pdNoValue / hidden rows
-var ST_bestOnly=false;    // show only LOCK + ELITE (≥67%)
+var ST_bestOnly=false;    // show only GREAT+ (≥75%)
 // Cross-sport props accumulator — keyed by "sport|market", values are ST.props arrays (live refs)
 var _propStore={};
 // Per-game enriched prop cache — keyed by eventId, then market key. Lets Best Plays read
@@ -1556,19 +1566,19 @@ function avg(arr){ if(!arr.length) return 0; var s=0; for(var i=0;i<arr.length;i
 function fmtStat(v){ v=Number(v); if(isNaN(v)) return "-"; if(Number.isInteger(v)) return ""+v; return v.toFixed(1); }
 
 function tierOf(s){
-  if(s>=90) return {c:"t-lock", t:"LOCK"};
-  if(s>=80) return {c:"t-elite",t:"ELITE"};
-  if(s>=70) return {c:"t-strong",t:"STRONG"};
-  if(s>=60) return {c:"t-good", t:"GOOD"};
-  return {c:"t-pass",t:"···"}; // Phase 1 preview — enrichment pending
+  if(s>=90) return {c:"t-lock",  t:"ELITE"};
+  if(s>=75) return {c:"t-elite", t:"GREAT"};
+  if(s>=60) return {c:"t-strong",t:"GOOD"};
+  if(s>=45) return {c:"t-good",  t:"VALUE"};
+  return {c:"t-poor",t:"POOR"};
 }
 // Confidence-based tier (used after phase-2 enrichment to display X%)
 function confTierOf(pct){ // pct is 0-100
-  if(pct>=75) return {c:"t-lock",   t:"LOCK"};
-  if(pct>=72) return {c:"t-elite",  t:"ELITE"};
-  if(pct>=65) return {c:"t-strong", t:"STRONG"};
-  if(pct>=58) return {c:"t-good",   t:"GOOD"};
-  return       {c:"t-pass",   t:"···"};
+  if(pct>=90) return {c:"t-lock",   t:"ELITE"};
+  if(pct>=75) return {c:"t-elite",  t:"GREAT"};
+  if(pct>=60) return {c:"t-strong", t:"GOOD"};
+  if(pct>=45) return {c:"t-good",   t:"VALUE"};
+  return       {c:"t-poor",   t:"POOR"};
 }
 function sportLabel(k){ for(var i=0;i<SPORTS.length;i++) if(SPORTS[i].key===k) return SPORTS[i].label; return k; }
 function marketName(k){
@@ -2535,8 +2545,8 @@ async function loadPropOfDay(){
     }
   });
 
-  // Show anything ≥ 62% (GOOD tier); tier label in renderPropOfDay handles LOCK/ELITE/GOOD distinction
-  if(bestEnriched && bestEnrichedConf>=0.62){
+  // Show anything ≥ 60% (GOOD tier); tier label in renderPropOfDay handles ELITE/GREAT/GOOD distinction
+  if(bestEnriched && bestEnrichedConf>=0.60){
     _potgCache[eid]={prop:bestEnriched.prop, mkt:bestEnriched.mkt};
     renderPropOfDay(bestEnriched.prop, bestEnriched.mkt);
   } else {
@@ -2567,7 +2577,7 @@ function renderPropOfDay(p, mkt){
   var mount=$("potgMount");
   if(!mount||!p) return;
   var confPct=p.pdConfidence!=null?Math.round(p.pdConfidence*100):p.value;
-  if(confPct<62){ renderNoPropOfDay(); return; }
+  if(confPct<60){ renderNoPropOfDay(); return; }
 
   var mktLabel=marketName(mkt);
   var isThresh=isThreshProp(p);
@@ -2579,9 +2589,9 @@ function renderPropOfDay(p, mkt){
 
   // Tier label — drives the card header badge and analysis tone
   var tierInfo=confTierOf(confPct);
-  var isGoodOnly=(confPct>=62&&confPct<67);
+  var isGoodOnly=(confPct>=60&&confPct<75);
   var cardTitle=isGoodOnly?"Best Available Today":"Prop of the Day";
-  var tierNote=isGoodOnly?'<div class="warn" style="margin:6px 0 4px;font-size:11px">No LOCK or ELITE pick today — showing best available (GOOD tier)</div>':"";
+  var tierNote=isGoodOnly?'<div class="warn" style="margin:6px 0 4px;font-size:11px">No ELITE or GREAT pick today — showing best available (GOOD tier)</div>':"";
 
   // Line shift note
   var shiftedUp=pdLine!=null&&p.bestLine!=null&&pdLine>p.bestLine;
@@ -2633,8 +2643,8 @@ async function loadLOTD(){
     (LOTD_MARKETS[ST.sport]||[getMarket()]).forEach(function(mk){
       parseProps(data,mk).forEach(function(p){ p._lotdMk=mk; pool.push(p); });
     });
-    // LOCK + ELITE only (≥67) — never show GOOD or below in Lay of the Day
-    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null && p.value>=67; });
+    // GREAT + ELITE only (≥75) — never show GOOD or below in Lay of the Day
+    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null && p.value>=75; });
     // De-duplicate by player — one player can't appear in multiple legs
     var lotdSeen={}, poolDedup=[];
     pool.sort(function(a,b){ return b.value-a.value; }).forEach(function(p){
@@ -2720,7 +2730,7 @@ function lotdText(legs){
   var diverse=(ST.sport!=="americanfootball_nfl")?" across different stat categories so the legs stay independent":"";
   var avgConf=Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length);
   return "Today's Lay of the Day combines "+esc(names)+diverse+
-    ". Every leg is rated LOCK or ELITE (67%+) — PropDesk's avg confidence is "+avgConf+"%."+
+    ". Every leg is rated GREAT or ELITE (75%+) — PropDesk's avg confidence is "+avgConf+"%."+
     " Size this as a swing bet: keep stakes modest and consider playing legs individually if your book restricts correlated props.";
 }
 
@@ -2730,11 +2740,11 @@ function filteredProps(){
   var results=ST.props.filter(function(p){
     // Search filter
     if(q&&p.player.toLowerCase().indexOf(q)<0) return false;
-    // "Best Bets Only" toggle — restrict to LOCK+ELITE (≥67%); thin-data and no-value excluded
+    // "Best Bets Only" toggle — restrict to GREAT+ (≥75%); thin-data and no-value excluded
     if(ST_bestOnly){
       if(!p.enriched) return false;
       if(p.thinData||p.pdNoValue||p.pdConfidence==null) return false;
-      if(Math.round(p.pdConfidence*100)<67) return false;
+      if(Math.round(p.pdConfidence*100)<75) return false;
     }
     return true;
   });
@@ -2762,7 +2772,7 @@ function renderSummaryBar(){
   var locks=0,elites=0,goods=0;
   allEnriched.forEach(function(p){
     var pct=Math.round(p.pdConfidence*100);
-    if(pct>=72) locks++; else if(pct>=67) elites++; else if(pct>=62) goods++;
+    if(pct>=90) locks++; else if(pct>=75) elites++; else if(pct>=60) goods++;
   });
   var total=allEnriched.length;
   bar.style.display=total?"block":"none";
@@ -2789,8 +2799,8 @@ function renderSummaryBar(){
   }
   if(!total) return;
   $("sb-total").textContent=total+" prop"+(total!==1?"s":"")+" analyzed";
-  $("sb-lock").textContent="LOCK: "+locks;
-  $("sb-elite").textContent="ELITE: "+elites;
+  $("sb-lock").textContent="ELITE: "+locks;
+  $("sb-elite").textContent="GREAT: "+elites;
   $("sb-good").textContent="GOOD: "+goods;
   var bb=$("bestBetsBtn");
   if(bb){ bb.className="btn-best"+(ST_bestOnly?" on":""); bb.textContent=ST_bestOnly?"Best Bets ✓":"Best Bets Only"; }
@@ -4198,7 +4208,7 @@ function ensureChart(cb){
   if(window.Chart){ cb(); return; }
   var tries=0; var iv=setInterval(function(){ tries++; if(window.Chart){ clearInterval(iv); cb(); } else if(tries>50){ clearInterval(iv); } },120);
 }
-function tierColor(s){ if(s>=75)return "#00ff87"; if(s>=65)return "#7fe6a8"; if(s>=48)return "#ffcc00"; if(s>=32)return "#ff9d4f"; return "#ff4f4f"; }
+function tierColor(s){ if(s>=90)return "#ffd700"; if(s>=75)return "#00ff87"; if(s>=60)return "#7fe6a8"; if(s>=45)return "#ffcc00"; return "#888"; }
 // pdLine = PropDesk reference line, isOver = direction, confPct = 0-100 confidence, bookLine = original book line
 function drawAnalyzeCharts(p,pdLine,vals,seasonAvg,hitRate,dates,isOver,confPct,bookLine){
   ensureChart(function(){
@@ -4399,8 +4409,8 @@ async function silentRefresh(){
 }
 
 /* ============ PARLAY MODAL ============ */
-var PARLAY_LEG_MIN_CONF=62; // each leg must hit the GOOD tier floor (≥62%) to qualify
-var PARLAY_OVERALL_MIN=70;  // average confidence across all legs must be ≥70 (ELITE-level parlay)
+var PARLAY_LEG_MIN_CONF=60; // each leg must hit the GOOD tier floor (≥60%) to qualify
+var PARLAY_OVERALL_MIN=75;  // average confidence across all legs must be ≥75 (GREAT-level parlay)
 
 function getEffectiveConf(p){
   if(p.enriched&&p.pdConfidence!=null&&!p.pdNoValue)
@@ -4937,7 +4947,7 @@ function renderPlayHistory(){
   var topMkts=Object.keys(mktMap).sort(function(a,b){ return mktMap[b].plays-mktMap[a].plays; }).slice(0,10);
 
   /* ── confidence tiers ── */
-  var TIER_DEF=[{label:"LOCK",min:75,max:79,exp:77},{label:"LOCK+",min:80,max:84,exp:82},{label:"ELITE LOCK",min:85,max:89,exp:87},{label:"MAX LOCK",min:90,max:100,exp:95}];
+  var TIER_DEF=[{label:"ELITE",min:90,max:100,exp:92},{label:"GREAT",min:75,max:89,exp:82},{label:"GOOD",min:60,max:74,exp:67},{label:"VALUE",min:45,max:59,exp:52},{label:"POOR",min:0,max:44,exp:35}];
   var tierMap={};
   TIER_DEF.forEach(function(t){ tierMap[t.label]={plays:0,hits:0}; });
   allRes.forEach(function(e){
@@ -6511,7 +6521,7 @@ function buildTop10Analysis(p,mktName){
 function buildTop10ShareItem(rank,p,mktName,sportKey){
   var conf=getEffectiveConf(p);
   var tier=confTierOf(conf).t;
-  var emoji=tier==="LOCK"?"🔒":tier==="ELITE"?"⭐":"✅";
+  var emoji=tier==="ELITE"?"🏆":tier==="GREAT"?"⭐":"✅";
   var sp={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"}[sportKey]||"";
   var side=p.pdSide||"Over";
   var line=p.pdLine!=null?p.pdLine:p.bestLine;
@@ -6596,19 +6606,19 @@ function renderTop10(picks){
   var sumEl=$("t10Summary");
   var copyBtn=$("t10CopyAll");
   if(!picks.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🏆</div><p>Not enough qualifying props found today (55%+ confidence required).</p></div>';
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🏆</div><p>Not enough qualifying props found today (45%+ confidence required).</p></div>';
     if(sumEl) sumEl.innerHTML="";
     if(copyBtn) copyBtn.style.display="none";
     return;
   }
-  var lockCt=picks.filter(function(p){return getEffectiveConf(p)>=72;}).length;
-  var eliteCt=picks.filter(function(p){var c=getEffectiveConf(p);return c>=67&&c<72;}).length;
+  var lockCt=picks.filter(function(p){return getEffectiveConf(p)>=90;}).length;
+  var eliteCt=picks.filter(function(p){var c=getEffectiveConf(p);return c>=75&&c<90;}).length;
   var goodCt=picks.length-lockCt-eliteCt;
   if(sumEl){
     var pills="";
-    if(lockCt) pills+='<span class="t10-stat-pill t10-sp-lock">'+lockCt+' LOCK</span>';
-    if(eliteCt) pills+='<span class="t10-stat-pill t10-sp-elite">'+eliteCt+' ELITE</span>';
-    if(goodCt) pills+='<span class="t10-stat-pill t10-sp-good">'+goodCt+' STRONG</span>';
+    if(lockCt) pills+='<span class="t10-stat-pill t10-sp-lock">'+lockCt+' ELITE</span>';
+    if(eliteCt) pills+='<span class="t10-stat-pill t10-sp-elite">'+eliteCt+' GREAT</span>';
+    if(goodCt) pills+='<span class="t10-stat-pill t10-sp-good">'+goodCt+' GOOD</span>';
     sumEl.innerHTML=pills;
   }
   if(copyBtn){
@@ -6633,8 +6643,8 @@ function renderTop10(picks){
     var sportKey=p._sport||"";
     var sportLabel=spLbls[sportKey]||sportKey.toUpperCase();
     var sportCls="t10-sport-"+sportLabel.toLowerCase();
-    var tierCls="t-"+tier.t.toLowerCase();
-    var cardCls="tc-"+tier.t.toLowerCase();
+    var tierCls=tier.c;
+    var cardCls="tc-"+tier.c.replace("t-","");
     var mktArr=MARKETS[sportKey]||[];
     var mktDef=null;
     for(var mi=0;mi<mktArr.length;mi++){if(mktArr[mi].k===(p._market||"")){mktDef=mktArr[mi];break;}}
@@ -6817,8 +6827,8 @@ async function t10LoadGame(){
     }));
     var qualified=toEnrich.filter(function(p){
       if(p.enriched&&p.pdNoValue) return false;
-      if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=55;
-      return p.value>=55;
+      if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=45;
+      return p.value>=45;
     });
     qualified.sort(function(a,b){ return getEffectiveConf(b)-getEffectiveConf(a); });
     _t10Data=qualified.slice(0,10);
@@ -7301,9 +7311,9 @@ function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
   var awayImplied=hasOdds?odds.awayImplied:0.5;
   var edge=hasOdds?pdHomeProb-homeImplied:0;
   var absEdge=Math.abs(edge);
-  // LOCK/ELITE require 2+ independent signals; STRONG requires at least 1
-  var rawTier=hasOdds&&absEdge>=0.15?"LOCK":hasOdds&&absEdge>=0.10?"ELITE":hasOdds&&absEdge>=0.05?"STRONG":null;
-  var tier=!rawTier||numSig===0?null:(rawTier==="LOCK"||rawTier==="ELITE")&&numSig<2?"STRONG":rawTier;
+  // ELITE/GREAT require 2+ independent signals; GOOD requires at least 1
+  var rawTier=hasOdds&&absEdge>=0.15?"ELITE":hasOdds&&absEdge>=0.10?"GREAT":hasOdds&&absEdge>=0.05?"GOOD":null;
+  var tier=!rawTier||numSig===0?null:(rawTier==="ELITE"||rawTier==="GREAT")&&numSig<2?"GOOD":rawTier;
 
   // Console breakdown so you can verify what's driving the edge
   console.group("[ML] "+mlSportCode(sport).toUpperCase()+" "+mlNick(away)+"@"+mlNick(home));
@@ -7342,8 +7352,8 @@ function renderMoneylineCard(c){
   var tierHtml="";
   if(c.tier){
     var favNick=mlNick(favHome?c.home:c.away);
-    var tierEmoji=c.tier==="LOCK"?"🔒":c.tier==="ELITE"?"⚡":"💪";
-    var tierCl="ml-c3-tier"+(c.tier==="LOCK"?" ml-c3-tier-lock":"");
+    var tierEmoji=c.tier==="ELITE"?"🏆":c.tier==="GREAT"?"⭐":"💪";
+    var tierCl="ml-c3-tier"+(c.tier==="ELITE"?" ml-c3-tier-lock":"");
     tierHtml='<div class="ml-c3-tier-wrap"><span class="'+tierCl+'">'+tierEmoji+' '+esc(c.tier)+' — '+esc(favNick)+' +'+edgePct+'%</span></div>';
   }
 
@@ -7721,8 +7731,8 @@ function renderGameTop5(picks,isScanning){
     var conf=getEffectiveConf(p);
     var tier=confTierOf(conf);
     var sportKey=p._sport||ST.sport;
-    var tierCls="t-"+tier.t.toLowerCase();
-    var cardCls="tc-"+tier.t.toLowerCase();
+    var tierCls=tier.c;
+    var cardCls="tc-"+tier.c.replace("t-","");
     var mktArr=MARKETS[sportKey]||[];
     var mktDef=null;
     for(var mi=0;mi<mktArr.length;mi++){if(mktArr[mi].k===(p._market||"")){mktDef=mktArr[mi];break;}}
