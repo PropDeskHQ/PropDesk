@@ -4848,19 +4848,21 @@ function _phChartTimelineSvg(resolved){
 }
 
 function _phChartCalibrationSvg(resolved){
-  if(resolved.length<5) return null;
+  if(!resolved||resolved.length<3) return null;
   var TIERS=[
-    {min:75,max:79,exp:77,lbl:"75–79%"},
-    {min:80,max:84,exp:82,lbl:"80–84%"},
-    {min:85,max:89,exp:87,lbl:"85–89%"},
-    {min:90,max:100,exp:95,lbl:"90%+"}
+    {min:45,max:59,exp:52,lbl:"VALUE",range:"45–59%"},
+    {min:60,max:74,exp:67,lbl:"GOOD", range:"60–74%"},
+    {min:75,max:89,exp:82,lbl:"GREAT",range:"75–89%"},
+    {min:90,max:100,exp:95,lbl:"ELITE",range:"90%+"}
   ];
   TIERS.forEach(function(t){
     t.hits=0; t.plays=0;
     resolved.forEach(function(e){ var c=e.confidence||0; if(c>=t.min&&c<=t.max){ t.plays++; if(e.result==="hit") t.hits++; } });
-    t.rate=t.plays>0?t.hits/t.plays:null;
+    t.rate=t.plays>=3?t.hits/t.plays:null;
   });
-  var W=300,XL=6,SLOT=72,BW=60,CH=106,YT=22,YB=YT+CH,H=YB+32;
+  if(!TIERS.some(function(t){return t.plays>0;})) return null;
+  var W=300,XL=6,SLOT=72,BW=60,CH=106,YT=22,YB=YT+CH,H=YB+44;
+  var MID=Math.round((YT+YB)/2);
   function rY(r){ return YB-Math.round(r*CH); }
   var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:'+H+'px;display:block">';
   svg+='<line x1="'+XL+'" y1="'+YB+'" x2="'+(XL+4*SLOT)+'" y2="'+YB+'" stroke="#1e1e1e" stroke-width="1"/>';
@@ -4868,8 +4870,9 @@ function _phChartCalibrationSvg(resolved){
     var bx=XL+i*SLOT+Math.round((SLOT-BW)/2);
     var cx=XL+i*SLOT+SLOT/2;
     if(t.rate===null){
-      svg+='<rect x="'+bx+'" y="'+(YB-8)+'" width="'+BW+'" height="8" fill="#1e1e1e" rx="3"/>';
-      svg+='<text x="'+cx+'" y="'+(YT-4)+'" text-anchor="middle" fill="#333" font-size="15" font-weight="700">–</text>';
+      svg+='<rect x="'+bx+'" y="'+(YB-4)+'" width="'+BW+'" height="4" fill="#222" rx="2"/>';
+      svg+='<text x="'+cx+'" y="'+(MID-4)+'" text-anchor="middle" fill="#444" font-size="7.5" font-style="italic">Need</text>';
+      svg+='<text x="'+cx+'" y="'+(MID+7)+'" text-anchor="middle" fill="#444" font-size="7.5" font-style="italic">3+ plays</text>';
     } else {
       var bH=Math.max(4,Math.round(t.rate*CH));
       var by=YB-bH;
@@ -4878,10 +4881,11 @@ function _phChartCalibrationSvg(resolved){
       var eY=rY(t.exp/100);
       svg+='<line x1="'+bx+'" y1="'+eY+'" x2="'+(bx+BW)+'" y2="'+eY+'" stroke="#fff" stroke-width="1.5" opacity="0.45" stroke-dasharray="3 2"/>';
       var pct=Math.round(t.rate*100);
-      svg+='<text x="'+cx+'" y="'+(by-6)+'" text-anchor="middle" fill="#ddd" font-size="15" font-weight="700">'+pct+'%</text>';
+      svg+='<text x="'+cx+'" y="'+(by-5)+'" text-anchor="middle" fill="#ddd" font-size="15" font-weight="700">'+pct+'%</text>';
     }
-    svg+='<text x="'+cx+'" y="'+(YB+14)+'" text-anchor="middle" fill="#666" font-size="8.5" font-weight="700">'+t.lbl+'</text>';
-    svg+='<text x="'+cx+'" y="'+(YB+25)+'" text-anchor="middle" fill="#444" font-size="7">'+(t.plays>0?t.plays+' plays':'no data')+'</text>';
+    svg+='<text x="'+cx+'" y="'+(YB+14)+'" text-anchor="middle" fill="#888" font-size="8.5" font-weight="800">'+t.lbl+'</text>';
+    svg+='<text x="'+cx+'" y="'+(YB+25)+'" text-anchor="middle" fill="#555" font-size="7.5">'+t.range+'</text>';
+    svg+='<text x="'+cx+'" y="'+(YB+37)+'" text-anchor="middle" fill="#444" font-size="7">'+(t.plays>0?t.plays+' play'+(t.plays===1?'':'s'):'—')+'</text>';
   });
   svg+='</svg>';
   return svg;
@@ -4972,8 +4976,8 @@ function _phAnalyticsCharts(all,sport,mkt){
     s1||ph("Not enough resolved data yet — resolve plays to see trend"));
   var s2=_phChartCalibrationSvg(aRes);
   html+=chartCard("Model Calibration",
-    "Compares PropDesk’s predicted confidence to actual results. Green bars mean the model is accurate or conservative for that confidence range — red means it’s overconfident. Ideal: all bars at or above the dashed expected line.",
-    s2||ph("Resolve at least 5 plays to see calibration"));
+    "Compares PropDesk’s predicted confidence tier to actual results. Green bars mean the model is accurate or conservative for that tier — red means it’s overconfident. Ideal: all bars at or above the dashed expected line.",
+    s2||ph("Resolve at least 3 plays to see calibration"));
   var s3=_phChartPlayersHtml(aAll);
   html+=chartCard("Player Performance — "+esc(mktName),
     "Shows which players the model performs best on for this prop. Players need at least 3 resolved plays to qualify. Use this to spot where PropDesk has a consistent edge — or where it’s consistently off.",
