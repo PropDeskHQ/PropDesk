@@ -913,7 +913,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   <div class="modal-box">
     <button class="modal-close drawer-close" id="parlayClose">&times;</button>
     <h2>Build a Parlay</h2>
-    <p class="sub">Only legs rated 68%+ confidence qualify. We'll build the best 2 or 3-leg parlay automatically.</p>
+    <p class="sub">Only legs rated 60%+ confidence (GOOD tier or better) qualify. We'll build the best 2 or 3-leg parlay automatically.</p>
     <button class="btn btn-accent" id="genParlay" style="width:100%;padding:11px">Generate Parlay</button>
     <div id="parlayResult" style="margin-top:16px"></div>
   </div>
@@ -930,7 +930,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     </div>
     <div class="onb-step2" id="onbStep2">
       <div class="obig">You're connected.</div>
-      <p>Select a sport and a game above to load live prop lines. Pick a prop market, then explore the value board, Play of the Game, and Lay of the Day.</p>
+      <p>Select a sport and a game above to load live prop lines. Pick a prop market, then explore the Prop of the Day, Best Plays, and Trends for every game.</p>
       <button class="btn btn-accent" id="onbDone" style="width:100%;padding:11px">Start Analyzing</button>
     </div>
   </div>
@@ -2643,15 +2643,29 @@ async function loadLOTD(){
     (LOTD_MARKETS[ST.sport]||[getMarket()]).forEach(function(mk){
       parseProps(data,mk).forEach(function(p){ p._lotdMk=mk; pool.push(p); });
     });
-    // GREAT + ELITE only (≥75) — never show GOOD or below in Lay of the Day
-    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null && p.value>=75; });
-    // De-duplicate by player — one player can't appear in multiple legs
+    // Pre-filter: must have odds, not yes/no, and have a line
+    pool=pool.filter(function(p){ return p.bestOdds!=null && !p.yesNo && p.bestLine!=null; });
+    // De-duplicate by player — keep the highest phase-1 value per player
     var lotdSeen={}, poolDedup=[];
     pool.sort(function(a,b){ return b.value-a.value; }).forEach(function(p){
       var k=p.player.toLowerCase();
       if(!lotdSeen[k]){ lotdSeen[k]=1; poolDedup.push(p); }
     });
     pool=poolDedup;
+    if(!pool.length) return;
+    // Enrich top 20 candidates with real confidence scores (same pattern as Best Plays)
+    var _lotdSavedEid=ST.eventId;
+    var _lotdToEnrich=pool.slice(0, Math.min(pool.length, 20));
+    for(var _li=0; _li<_lotdToEnrich.length; _li++){
+      if(ST.eventId!==_lotdSavedEid) return;
+      var _lp=_lotdToEnrich[_li];
+      var _lotdSm=ST.market; ST.market=_lp._lotdMk;
+      try{ await enrichWithConfidence(_lp); }catch(e){}
+      ST.market=_lotdSm;
+    }
+    // GREAT + ELITE only (≥75% real confidence) — never show GOOD or below in Lay of the Day
+    pool=pool.filter(function(p){ return p.pdConfidence!=null && p.pdConfidence>=0.75 && !p.pdNoValue && !p.thinData; });
+    pool.sort(function(a,b){ return b.pdConfidence-a.pdConfidence; });
     if(pool.length<2){ return; }
 
     var LOTD_MAX_DEC=5.0; // +400 hard cap for LOTD card
@@ -2740,6 +2754,8 @@ function filteredProps(){
   var results=ST.props.filter(function(p){
     // Search filter
     if(q&&p.player.toLowerCase().indexOf(q)<0) return false;
+    // "Show Hidden" toggle — POOR tier (<45% confidence) hidden by default
+    if(!ST_showNoValue && p.enriched && !p.pdNoValue && p.pdConfidence!=null && Math.round(p.pdConfidence*100)<45) return false;
     // "Best Bets Only" toggle — restrict to GREAT+ (≥75%); thin-data and no-value excluded
     if(ST_bestOnly){
       if(!p.enriched) return false;
@@ -2980,10 +2996,12 @@ function handleAdj(e,dir,pid){
 function sharePick(p){
   var pdSide=p.pdSide||p.side;
   var pdLine=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:"");
-  var confPct=p.pdConfidence!=null?Math.round(p.pdConfidence*100)+"% conf":"";
   var gap=p.pdGap>0?" (Book: "+p.bestLine+" → PD: "+pdLine+")":"";
   var bet=pdSide+(pdLine!=null?" "+pdLine:"")+(p.bestOdds!=null?" "+fmtOdds(p.bestOdds):"");
-  copyText("PropDesk Pick: "+p.player+" "+bet+gap+(confPct?" | "+confPct:"")+" | Value: "+p.value+"/100 | propdeskhq.netlify.app");
+  var conf=p.pdConfidence!=null?Math.round(p.pdConfidence*100):null;
+  var tier=conf!=null?confTierOf(conf).t:null;
+  var confStr=conf!=null?" — "+conf+"% confidence ("+tier+") via @PropDeskHQ":"  via @PropDeskHQ";
+  copyText("PropDesk Pick: "+p.player+" "+bet+gap+confStr);
   toast("Copied!");
 }
 function copyText(txt){
@@ -4440,7 +4458,7 @@ function generateParlay(){
   var NO_PARLAY='<div class="parlay-empty"><strong>No parlay today.</strong>Our data couldn\'t find enough high-confidence legs. Check back tomorrow or play the individual props instead.</div>';
   if(!ST.props.length){ $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Load a game and prop market first.</div>'; return; }
 
-  // Pool: ≥68% confidence, has odds, one player per leg
+  // Pool: ≥60% confidence (PARLAY_LEG_MIN_CONF), has odds, one player per leg
   var seenPl={}, pool=[];
   ST.props
     .filter(function(p){ return p.bestOdds!=null && getEffectiveConf(p)>=PARLAY_LEG_MIN_CONF; })
@@ -5786,13 +5804,6 @@ function trendConf(hitRate, n){
   var sq=Math.min(1,Math.max(0,(n-5)/10)); // 0 at n=5, 1 at n=15
   return Math.round(Math.min(95,Math.max(55, h*0.65+30*sq)));
 }
-function trendTierCls(conf){
-  if(conf>=72) return "t-lock";
-  if(conf>=67) return "t-elite";
-  if(conf>=62) return "t-good";
-  return "t-pass";
-}
-
 /* --- TYPE 1: Player Streak Trends --------------------------------- */
 function calcPlayerStreakTrends(){
   var trends=[];
