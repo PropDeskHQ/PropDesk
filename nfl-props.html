@@ -4672,16 +4672,16 @@ function _ph30DayChartSvg(all){
   /* 75% reference dashed line */
   var refY=H-Math.round(0.75*chartH)-2;
   svg+='<line x1="0" y1="'+refY+'" x2="'+W+'" y2="'+refY+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 2" opacity="0.4"/>';
-  svg+='<text x="'+(W-2)+'" y="'+(refY-2)+'" fill="var(--accent)" font-size="7" text-anchor="end" opacity="0.5">75%</text>';
+  svg+='<text x="'+(W-2)+'" y="'+Math.max(7,refY-2)+'" fill="var(--accent)" font-size="7" text-anchor="end" opacity="0.5">75%</text>';
   /* bars — one per day with resolved plays only */
   days.forEach(function(ds,i){
     var dm=dayMap[ds];
     if(!dm.total) return; /* no bar for days with no resolved plays */
     var rate=dm.hits/dm.total;
-    var barH=Math.max(6,Math.round(rate*chartH)); /* min 6px so 0% still looks like a bar not a square */
+    var barH=Math.min(chartH,Math.max(4,Math.round(rate*chartH)));
     var x=Math.round(i*slotW)+1;
     var y=H-barH-2;
-    var fill=rate>=0.8?"#00e87a":rate>=0.65?"#ffcc00":"#ff4f4f";
+    var fill=rate>=0.75?"#00e87a":rate>=0.60?"#ffcc00":"#ff4f4f";
     var pct=Math.round(rate*100);
     var dp=ds.split('-');
     var dlbl=MOS[parseInt(dp[1])-1]+' '+parseInt(dp[2]);
@@ -4949,13 +4949,17 @@ function renderPlayHistory(){
   /* ── streaks ── */
   var resolvedAsc=allRes.slice().sort(function(a,b){ return (a.loggedAt||0)-(b.loggedAt||0); });
   var streaks=_phCalcStreaks(resolvedAsc);
+  var _resolvedDates={};resolvedAsc.forEach(function(e){_resolvedDates[e.date]=1;});
+  var _allSingleDay=Object.keys(_resolvedDates).length<=1;
 
   /* ── hot/cold markets (≥5 resolved) ── */
   var mktRanks=Object.keys(mktMap)
     .filter(function(k){ var m=mktMap[k]; return (m.hits+m.misses)>=5; })
     .map(function(k){ var m=mktMap[k]; return {k:k,rate:_phRate(m.hits,m.hits+m.misses)}; })
     .sort(function(a,b){ return b.rate-a.rate; });
-  var hotMkts=mktRanks.slice(0,3), coldMkts=mktRanks.slice(-3).reverse();
+  var hotMkts=mktRanks.slice(0,3);
+  var _hotKeys={};hotMkts.forEach(function(m){_hotKeys[m.k]=1;});
+  var coldMkts=mktRanks.filter(function(m){return !_hotKeys[m.k];}).slice(-3).reverse();
 
   /* ── best/worst sport this month ── */
   var monthSp={};
@@ -5088,22 +5092,21 @@ function renderPlayHistory(){
     var curStr=curS.len?(curS.len+" "+(curS.dir?"hit":"miss")+" streak"):"—";
     html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px">';
     html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">CURRENT STREAK</div><div style="font-size:15px;font-weight:800;color:'+(curS.len?(curS.dir?"var(--accent)":"var(--red)"):"var(--mut)")+'">'+curStr+'</div></div>';
-    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST HIT STREAK</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(bH.len?bH.len+" hits":"–")+'</div>'+(bH.len?'<div style="font-size:9px;color:var(--mut)">'+bH.start+(bH.start!==bH.end?" → "+bH.end:"")+'</div>':"")+'</div>';
-    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">WORST MISS STREAK</div><div style="font-size:15px;font-weight:800;color:var(--red)">'+(bM.len?bM.len+" misses":"–")+'</div>'+(bM.len?'<div style="font-size:9px;color:var(--mut)">'+bM.start+(bM.start!==bM.end?" → "+bM.end:"")+'</div>':"")+'</div>';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST HIT STREAK</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(bH.len?bH.len+" hits":"–")+'</div>'+(bH.len?'<div style="font-size:9px;color:var(--mut)">'+bH.start+(bH.start!==bH.end?" → "+bH.end:"")+'</div>'+(bH.start===bH.end?'<div style="font-size:9px;color:var(--mut);font-style:italic">All from one day</div>':""):"")+'</div>';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">WORST MISS STREAK</div><div style="font-size:15px;font-weight:800;color:var(--red)">'+(bM.len?bM.len+" misses":"–")+'</div>'+(bM.len?'<div style="font-size:9px;color:var(--mut)">'+bM.start+(bM.start!==bM.end?" → "+bM.end:"")+'</div>'+(bM.start===bM.end?'<div style="font-size:9px;color:var(--mut);font-style:italic">All from one day</div>':""):"")+'</div>';
     html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST SPORT (MONTH)</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(monthRanked.length?monthRanked[0].s+" "+monthRanked[0].rate+"%":"–")+'</div></div>';
     html+='</div>';
-    if(hotMkts.length||coldMkts.length){
+    var _hotShow=hotMkts.length>=2,_coldShow=coldMkts.length>=2;
+    if(_hotShow||_coldShow){
       html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">';
-      if(hotMkts.length){
-        html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">HOT MARKETS</div>';
-        hotMkts.forEach(function(m){ html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--accent);font-weight:700">'+m.rate+'%</span></div>'; });
-        html+='</div>';
-      }
-      if(coldMkts.length){
-        html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">COLD MARKETS</div>';
-        coldMkts.forEach(function(m){ html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--red);font-weight:700">'+m.rate+'%</span></div>'; });
-        html+='</div>';
-      }
+      html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">HOT MARKETS</div>';
+      if(_hotShow){hotMkts.forEach(function(m){html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--accent);font-weight:700">'+m.rate+'%</span></div>';});}
+      else{html+='<div style="font-size:10px;color:var(--mut);font-style:italic">Not enough market data yet</div>';}
+      html+='</div>';
+      html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">COLD MARKETS</div>';
+      if(_coldShow){coldMkts.forEach(function(m){html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--red);font-weight:700">'+m.rate+'%</span></div>';});}
+      else{html+='<div style="font-size:10px;color:var(--mut);font-style:italic">Not enough market data yet</div>';}
+      html+='</div>';
       html+='</div>';
     }
     html+='<div style="margin-bottom:16px"></div>';
