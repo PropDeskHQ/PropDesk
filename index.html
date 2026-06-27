@@ -1783,7 +1783,9 @@ function computeBestBet(p,marketKey){
 // Weighted composite confidence player hits the prop at a given line
 // L5=60% (recent form dominates), L10=25% (medium trend), season=15% (baseline)
 // isOver=true → "hit" means val > line; isOver=false → val < line
-function compositeConf(vals, line, isOver){
+// seasonBA: optional full-season batting average — used as the season weight when provided,
+//           replacing the noisy 15-game hit-rate proxy (rAll)
+function compositeConf(vals, line, isOver, seasonBA){
   if(!vals||vals.length<3) return null;
   function sliceHR(n){
     var sl=vals.slice(0,Math.min(n,vals.length));
@@ -1792,22 +1794,23 @@ function compositeConf(vals, line, isOver){
   }
   var r5=vals.length>=3?sliceHR(5):null;   // L5 recent form  (60%)
   var r10=vals.length>=7?sliceHR(10):null; // L10 trend       (25%)
-  var rAll=sliceHR(vals.length);           // season baseline (15%)
+  var rAll=sliceHR(vals.length);           // 15-game hit rate (variance check + season fallback)
+  var rSzn=(seasonBA!=null&&seasonBA>0)?seasonBA:rAll; // true season signal when available
   var w5=r5!=null?0.60:0, w10=r10!=null?0.25:0, wA=0.15;
   var tot=w5+w10+wA;
   if(!tot) return null;
-  var composite=((r5||0)*w5+(r10||0)*w10+(rAll||0)*wA)/tot;
-  // High-variance penalty: L5 and season diverging by >20% signals instability
-  if(r5!=null&&rAll!=null&&Math.abs(r5-rAll)>0.20) composite=composite*0.93;
+  var composite=((r5||0)*w5+(r10||0)*w10+(rSzn||0)*wA)/tot;
+  // High-variance penalty: recent form diverging >20% from season signal
+  if(r5!=null&&rSzn!=null&&Math.abs(r5-rSzn)>0.20) composite=composite*0.93;
   return composite;
 }
 
 // Recompute threshold confidence at a user-chosen line using game log data already in memory.
-// Applies the same post-enrichment adjustments as enrichWithConfidence (matchup, streak, thin-data, LOCK gate).
+// Applies the same post-enrichment adjustments as enrichWithConfidence (streak, thin-data).
 function recomputeAdjConf(p,newLine){
   var vals=p._vals;
   if(!vals||vals.length<3) return null;
-  var raw=compositeConf(vals,newLine,true);
+  var raw=compositeConf(vals,newLine,true,p.seasonBA||null);
   if(raw===null) return null;
   var streak=0;
   for(var i=0;i<vals.length;i++){
@@ -1817,12 +1820,7 @@ function recomputeAdjConf(p,newLine){
   }
   var sa=streak>=4?0.04:streak>=3?0.025:streak>=2?0.01:streak<=-4?-0.04:streak<=-3?-0.025:streak<=-2?-0.01:0;
   var tp=vals.length<5?-0.07:(vals.length<10?-0.04:0);
-  var adj=Math.max(0.01,Math.min(0.97,raw+sa+tp));
-  if(Math.round(adj*100)>=80){
-    var l5h=vals.slice(0,Math.min(5,vals.length)).filter(function(v){return v>newLine;}).length;
-    if(l5h<4) adj=Math.min(adj,0.799);
-  }
-  return adj;
+  return Math.max(0.01,Math.min(0.97,raw+sa+tp));
 }
 
 // Find PropDesk Line: always seek a line different from the book line.
@@ -1919,6 +1917,7 @@ async function enrichWithConfidence(p){
     p.l5Avg=avg(vals.slice(0,Math.min(5,vals.length)));
     p.l14Avg=avg(vals.slice(0,Math.min(14,vals.length)));
     p.seasonAvgEnrich=gl.seasonAvg!=null?gl.seasonAvg:avg(vals);
+    p.seasonBA=gl.seasonBA||null;
     p._vals=vals;
     p._dates=gl.dates||[];
     if(gl.avgMins!=null) p.avgMins=gl.avgMins;
@@ -2036,7 +2035,7 @@ async function enrichWithConfidence(p){
         p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return;
       }
       // Confidence = hit rate at the book's actual posted line.
-      var confRaw=compositeConf(vals,bookLine,true);
+      var confRaw=compositeConf(vals,bookLine,true,p.seasonBA);
       if(confRaw===null){ p.enriched=true; updatePropValueDisplay(p); updatePropPDDisplay(p); return; }
       p.pdSide="Over";
       p.pdLine=bookLine;
@@ -2097,8 +2096,42 @@ async function enrichWithConfidence(p){
     // LINE_ADJ flag if PropDesk line differs from book line
     if(p.pdGap>0&&p.valueFlags.indexOf("LINE_ADJ")<0) p.valueFlags.push("LINE_ADJ");
 
+    // ── MLB batter game context: ERA + lineup (one new fetch per game, all cached) ──
+    var _eraAdj=0, _lineupAdj=0;
+    if(ST.sport==='baseball_mlb' && thresh){
+      try{
+        var _pid=gl.playerId;
+        if(_pid){
+          var _tid=await mlbPlayerTeamId(_pid);
+          if(_tid){
+            var _gpk=await mlbTodayGamePk(_tid);
+            if(_gpk){
+              var _bctx=await mlbBoxscoreContext(_gpk);
+              if(_bctx){
+                var _inHome=_bctx.home&&_bctx.home.orderMap&&_bctx.home.orderMap[_pid]!=null;
+                var _inAway=!_inHome&&_bctx.away&&_bctx.away.orderMap&&_bctx.away.orderMap[_pid]!=null;
+                var _myKey=_inHome?'home':_inAway?'away':null;
+                if(_myKey){
+                  var _slot=_bctx[_myKey].orderMap[_pid];
+                  p.todayOrderSlot=_slot;
+                  _lineupAdj=_slot<=3?0.02:_slot<=6?0:-0.02;
+                  var _oppKey=_myKey==='home'?'away':'home';
+                  var _oppStarter=_bctx[_oppKey]&&_bctx[_oppKey].starterId;
+                  if(_oppStarter){
+                    var _era=await mlbPitcherERA(_oppStarter,new Date().getFullYear());
+                    p.opposingPitcherERA=_era;
+                    if(_era!=null) _eraAdj=_era>=5.00?0.05:_era>=4.00?0.025:_era>=3.50?0:_era>=2.75?-0.03:-0.05;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }catch(e){}
+    }
+
     // ── Post-enrichment confidence adjustments ────────────────────────────
-    // Streak/trend (10%): consecutive hits or misses at current line
+    // Streak/trend: consecutive hits or misses at current line
     var streakAdj=0;
     var s=p.streak||0;
     if(s>=4) streakAdj=0.04; else if(s>=3) streakAdj=0.025;
@@ -2107,24 +2140,17 @@ async function enrichWithConfidence(p){
     else if(s<=-2) streakAdj=-0.01;
     // Thin data penalty (sample size <10)
     var thinPenalty=vals.length<5?-0.07:(vals.length<10?-0.04:0);
+    // Batting average talent adjustment (MLB batter markets, min 5 games)
+    var _baAdj=0;
+    if(p.seasonBA!=null&&vals.length>=5){
+      _baAdj=p.seasonBA>=0.300?0.04:p.seasonBA>=0.280?0.02:p.seasonBA>=0.260?0:p.seasonBA>=0.240?-0.01:-0.02;
+    }
     // Apply all adjustments to pdConfidence (clamp 0.01–0.97)
     if(p.pdConfidence!=null){
-      p.pdConfidence=Math.max(0.01,Math.min(0.97,p.pdConfidence+streakAdj+thinPenalty));
+      p.pdConfidence=Math.max(0.01,Math.min(0.97,p.pdConfidence+streakAdj+thinPenalty+_baAdj+_eraAdj+_lineupAdj));
       p.pdResult.confidence=p.pdConfidence;
       p.hitRate14=+(p.pdConfidence*100).toFixed(1);
       p.value=Math.round(p.pdConfidence*100);
-    }
-    // LOCK gate: requires 4 of last 5 games hitting at the PropDesk line
-    if(p.pdConfidence!=null&&vals&&Math.round(p.pdConfidence*100)>=80){
-      var _l5s=vals.slice(0,Math.min(5,vals.length));
-      var _l5hits=_l5s.filter(function(v){return p.pdSide==="Over"?v>p.pdLine:v<p.pdLine;}).length;
-      if(_l5hits<4){
-        p.pdConfidence=Math.min(p.pdConfidence,0.799);
-        if(p.pdResult) p.pdResult.confidence=p.pdConfidence;
-        p.hitRate14=+(p.pdConfidence*100).toFixed(1);
-        p.value=Math.round(p.pdConfidence*100);
-        if(p.guardrailFlags.indexOf("L5_LOCK_FAIL")<0) p.guardrailFlags.push("L5_LOCK_FAIL");
-      }
     }
 
     try{ _logSinglePropHistory(p); }catch(e){}
@@ -3485,8 +3511,10 @@ async function mlbGameLog(id,market){
           }
         });
         if(vals.length){
-          var savg=await mlbSeasonAvg(id,group,keys,years[y],mkt);
-          return {values:vals, seasonAvg:savg!=null?savg:avg(vals), dates:dates,
+          var savgObj=await mlbSeasonAvg(id,group,keys,years[y],mkt);
+          var savg=savgObj!=null?savgObj.value:null;
+          var seasonBA=(savgObj&&group==='hitting')?savgObj.ba:null;
+          return {values:vals, seasonAvg:savg!=null?savg:avg(vals), seasonBA:seasonBA, dates:dates,
             gamePks:gamePks, isHomeArr:isHomeArr, opponents:opponents, playerId:id};
         }
       }
@@ -3503,6 +3531,8 @@ async function mlbSeasonAvg(id,group,keys,year,market){
     if(d.stats && d.stats[0] && d.stats[0].splits && d.stats[0].splits[0]){
       var st=d.stats[0].splits[0].stat||{};
       var games=st.gamesPlayed||st.games||null;
+      var ba=(group==='hitting'&&st.avg)?parseFloat(st.avg)||null:null;
+      var value=null;
       if(compositeKeys){
         var sum=0,ok=true;
         for(var ci=0;ci<compositeKeys.length;ci++){
@@ -3510,13 +3540,14 @@ async function mlbSeasonAvg(id,group,keys,year,market){
           if(f==null){ok=false;break;}
           sum+=Number(f);
         }
-        if(ok&&games) return sum/Number(games);
-        if(ok) return sum;
+        if(ok&&games) value=sum/Number(games);
+        else if(ok) value=sum;
       } else {
         var total=pickStat(st,keys);
-        if(total!=null&&games) return Number(total)/Number(games);
-        if(total!=null) return Number(total);
+        if(total!=null&&games) value=Number(total)/Number(games);
+        else if(total!=null) value=Number(total);
       }
+      if(value!=null) return {value:value,ba:ba};
     }
   }catch(e){}
   return null;
@@ -3560,6 +3591,46 @@ async function mlbBoxscoreContext(gamePk){
   }catch(e){}
   _boxCache[gamePk]=result;
   return result;
+}
+
+/* ===== MLB game-context helpers for ERA + lineup enrichment ===== */
+var _playerTeamCache={};
+async function mlbPlayerTeamId(playerId){
+  if(_playerTeamCache[playerId]!==undefined) return _playerTeamCache[playerId];
+  try{
+    var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+playerId+"?hydrate=currentTeam",{signal:AbortSignal.timeout(5000)});
+    var d=await r.json();
+    var tid=d.people&&d.people[0]&&d.people[0].currentTeam&&d.people[0].currentTeam.id;
+    _playerTeamCache[playerId]=tid||null;
+  }catch(e){ _playerTeamCache[playerId]=null; }
+  return _playerTeamCache[playerId];
+}
+
+var _todaySchedCache={};
+async function mlbTodayGamePk(teamId){
+  if(_todaySchedCache[teamId]!==undefined) return _todaySchedCache[teamId];
+  try{
+    var today=new Date().toISOString().slice(0,10);
+    var r=await fetch("https://statsapi.mlb.com/api/v1/schedule?sportId=1&date="+today+"&teamId="+teamId,{signal:AbortSignal.timeout(5000)});
+    var d=await r.json();
+    var gpk=d.dates&&d.dates[0]&&d.dates[0].games&&d.dates[0].games[0]&&d.dates[0].games[0].gamePk;
+    _todaySchedCache[teamId]=gpk||null;
+  }catch(e){ _todaySchedCache[teamId]=null; }
+  return _todaySchedCache[teamId];
+}
+
+var _pitcherERACache={};
+async function mlbPitcherERA(pitcherId,year){
+  var ckey=pitcherId+"|"+year;
+  if(_pitcherERACache[ckey]!==undefined) return _pitcherERACache[ckey];
+  try{
+    var r=await fetch("https://statsapi.mlb.com/api/v1/people/"+pitcherId+"/stats?stats=season&season="+year+"&group=pitching",{signal:AbortSignal.timeout(5000)});
+    var d=await r.json();
+    var st=d.stats&&d.stats[0]&&d.stats[0].splits&&d.stats[0].splits[0]&&d.stats[0].splits[0].stat;
+    var era=st&&st.era!=null?parseFloat(st.era):null;
+    _pitcherERACache[ckey]=era;
+  }catch(e){ _pitcherERACache[ckey]=null; }
+  return _pitcherERACache[ckey];
 }
 
 // Batch-fetch throwing hand for opposing starters — one call covers every unique pitcher
