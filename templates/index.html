@@ -4478,10 +4478,12 @@ function renderHistory(){ renderPlayHistory(); }
 
 /* ============ PLAY HISTORY (AUTO-LOG) ============ */
 var PLAY_HIST_KEY="propdesk_play_history";
-var _histFilters={sport:"all",result:"all",days:"all"};
+var _histFilters={sport:"all",result:"all",days:"all",market:"all"};
 var _histSort={col:"date",dir:"desc"};
 var _histSearch="";
 var _phCollapsedDates={};
+var _phAnalyticsSport="all";
+var _phAnalyticsMkt="all";
 
 function loadPlayHist(){ try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]"); }catch(e){ return []; } }
 function savePlayHist(h){ try{ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h)); }catch(e){ console.warn("[History] storage full",e); } }
@@ -4618,6 +4620,167 @@ function _ph30DayChartSvg(all){
   return svg;
 }
 
+/* ── Analytics chart helpers ── */
+
+function _phChartTimelineSvg(resolved){
+  var today=new Date(), days=[], dayMap={};
+  for(var i=29;i>=0;i--){
+    var d=new Date(today); d.setDate(d.getDate()-i);
+    var ds=d.toISOString().slice(0,10); days.push(ds); dayMap[ds]={hits:0,total:0};
+  }
+  resolved.forEach(function(e){ if(dayMap[e.date]){ dayMap[e.date].total++; if(e.result==="hit") dayMap[e.date].hits++; } });
+  var dataDays=days.filter(function(d){ return dayMap[d].total>0; });
+  if(dataDays.length<3) return null;
+  var W=300,H=90,CH=70,YT=8,YB=YT+CH,XL=5,XR=W-5;
+  function dX(i){ return XL+(i/29)*(XR-XL); }
+  function rY(r){ return YB-r*CH; }
+  var MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:'+H+'px;display:block">';
+  var ry=rY(0.8);
+  svg+='<line x1="'+XL+'" y1="'+ry+'" x2="'+XR+'" y2="'+ry+'" stroke="#00e87a" stroke-width="1" stroke-dasharray="2 3" opacity="0.3"/>';
+  svg+='<text x="'+(XL+2)+'" y="'+(ry-2)+'" fill="#00e87a" font-size="6" opacity="0.4">80%</text>';
+  var run=[];
+  function flushRun(){ if(run.length>1) svg+='<polyline points="'+run.join(' ')+'" fill="none" stroke="#555" stroke-width="1.5" opacity="0.7"/>'; run=[]; }
+  days.forEach(function(ds,i){
+    var dm=dayMap[ds];
+    if(!dm.total){ flushRun(); return; }
+    var rate=dm.hits/dm.total;
+    var x=Math.round(dX(i)), y=Math.round(rY(rate));
+    run.push(x+','+y);
+    var fill=rate>=0.8?"#00e87a":rate>=0.65?"#ffcc00":"#ff4f4f";
+    var dp=ds.split('-'), dlbl=MOS[parseInt(dp[1])-1]+' '+parseInt(dp[2]);
+    svg+='<circle cx="'+x+'" cy="'+y+'" r="3.5" fill="'+fill+'" stroke="#111" stroke-width="1.5"><title>'+dlbl+' \xb7 '+dm.hits+' of '+dm.total+' \xb7 '+Math.round(rate*100)+'%</title></circle>';
+  });
+  flushRun();
+  svg+='</svg>';
+  return svg;
+}
+
+function _phChartCalibrationSvg(resolved){
+  if(resolved.length<5) return null;
+  var TIERS=[{min:80,max:84,exp:82,lbl:"80-84"},{min:85,max:89,exp:87,lbl:"85-89"},{min:90,max:94,exp:92,lbl:"90-94"},{min:95,max:100,exp:97,lbl:"95+"}];
+  TIERS.forEach(function(t){
+    t.hits=0; t.plays=0;
+    resolved.forEach(function(e){ var c=e.confidence||0; if(c>=t.min&&c<=t.max){ t.plays++; if(e.result==="hit") t.hits++; } });
+    t.rate=t.plays>0?t.hits/t.plays:null;
+  });
+  var W=300,CH=72,YB=84,XL=22,SLOT=64,BW=42;
+  var H=YB+26;
+  function rY(r){ return YB-Math.round(r*CH); }
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:'+H+'px;display:block">';
+  svg+='<line x1="'+XL+'" y1="'+YB+'" x2="'+(XL+4*SLOT)+'" y2="'+YB+'" stroke="#2a2a2a" stroke-width="1"/>';
+  TIERS.forEach(function(t,i){
+    var bx=XL+i*SLOT+Math.round((SLOT-BW)/2);
+    var cx=XL+i*SLOT+SLOT/2;
+    if(t.rate===null){
+      svg+='<rect x="'+bx+'" y="'+(YB-8)+'" width="'+BW+'" height="8" fill="#222" rx="2"/>';
+      svg+='<text x="'+cx+'" y="'+(YB-11)+'" text-anchor="middle" fill="#444" font-size="7">—</text>';
+    } else {
+      var bH=Math.max(4,Math.round(t.rate*CH));
+      var by=YB-bH;
+      var fill=t.rate>=(t.exp/100)?"#00e87a":"#ff4f4f";
+      svg+='<rect x="'+bx+'" y="'+by+'" width="'+BW+'" height="'+bH+'" fill="'+fill+'" rx="2" opacity="0.85"/>';
+      var eY=rY(t.exp/100);
+      svg+='<line x1="'+bx+'" y1="'+eY+'" x2="'+(bx+BW)+'" y2="'+eY+'" stroke="#fff" stroke-width="1" opacity="0.4" stroke-dasharray="2 2"/>';
+      var pct=Math.round(t.rate*100);
+      svg+='<text x="'+cx+'" y="'+(by-9)+'" text-anchor="middle" fill="#ccc" font-size="7.5" font-weight="700">'+pct+'%</text>';
+      svg+='<text x="'+cx+'" y="'+(by-1)+'" text-anchor="middle" fill="#666" font-size="6.5">'+t.plays+' plays</text>';
+    }
+    svg+='<text x="'+cx+'" y="'+(YB+11)+'" text-anchor="middle" fill="#555" font-size="7">'+t.lbl+'%</text>';
+    svg+='<text x="'+cx+'" y="'+(YB+19)+'" text-anchor="middle" fill="#3a3a3a" font-size="6">exp '+t.exp+'%</text>';
+  });
+  svg+='</svg>';
+  return svg;
+}
+
+function _phChartPlayersHtml(allEntries){
+  var pm={};
+  allEntries.forEach(function(e){
+    if(!e.player) return;
+    if(!pm[e.player]) pm[e.player]={hits:0,res:0};
+    if(e.result==="hit"||e.result==="miss"){ pm[e.player].res++; if(e.result==="hit") pm[e.player].hits++; }
+  });
+  var qual=Object.keys(pm).filter(function(p){ return pm[p].res>=3; })
+    .sort(function(a,b){ return (pm[b].hits/pm[b].res)-(pm[a].hits/pm[a].res); }).slice(0,10);
+  var unqual=Object.keys(pm).filter(function(p){ return pm[p].res<3; })
+    .sort(function(a,b){ return pm[b].res-pm[a].res; }).slice(0,5);
+  if(qual.length<3) return null;
+  var h='';
+  qual.forEach(function(p){
+    var r=pm[p].hits/pm[p].res, pct=Math.round(r*100);
+    var col=r>=0.8?"#00e87a":r>=0.65?"#ffcc00":"#ff4f4f";
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bd2)">';
+    h+='<div style="flex:0 0 110px;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+esc(p)+'">'+esc(p)+'</div>';
+    h+='<div style="flex:1;background:var(--bd);border-radius:3px;height:7px"><div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px"></div></div>';
+    h+='<div style="flex:0 0 72px;font-size:10px;color:var(--mut);text-align:right;white-space:nowrap">'+pm[p].hits+'/'+pm[p].res+' \xb7 '+pct+'%</div>';
+    h+='</div>';
+  });
+  if(unqual.length){
+    h+='<div style="font-size:10px;color:var(--mut2);margin:8px 0 4px;font-style:italic">Insufficient data (&lt; 3 resolved)</div>';
+    unqual.forEach(function(p){
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;opacity:0.4">';
+      h+='<div style="flex:0 0 110px;font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p)+'</div>';
+      h+='<div style="flex:1;font-size:10px;color:var(--mut2)">'+pm[p].res+' resolved</div>';
+      h+='</div>';
+    });
+  }
+  return h;
+}
+
+function _phAnalyticsSection(all,sport,mkt){
+  var MKT_NAMES={};
+  Object.keys(MARKETS).forEach(function(sp){ MARKETS[sp].forEach(function(m){ MKT_NAMES[m.k]=m.n; }); });
+
+  /* ── sport pills ── */
+  var html='<div style="margin-bottom:10px"><div class="tabrow" style="gap:6px">';
+  [["all","All"],["MLB","MLB"],["NFL","NFL"],["NBA","NBA"],["NHL","NHL"]].forEach(function(p){
+    html+='<button class="pill ph-a-sport'+(p[0]===sport?" active":"")+'" data-pha-sport="'+p[0]+'" style="padding:7px 16px;font-size:12px">'+p[1]+'</button>';
+  });
+  html+='</div></div>';
+
+  /* ── market pills: only markets with >=1 play for selected sport ── */
+  var sportEntries=sport==="all"?all:all.filter(function(e){ return e.sport===sport; });
+  var mktCounts={};
+  sportEntries.forEach(function(e){ if(e.market) mktCounts[e.market]=(mktCounts[e.market]||0)+1; });
+  var activeMkts=Object.keys(mktCounts).sort(function(a,b){ return mktCounts[b]-mktCounts[a]; });
+
+  html+='<div style="margin-bottom:20px"><div class="tabrow" style="gap:6px;flex-wrap:wrap">';
+  html+='<button class="pill ph-a-mkt'+(mkt==="all"?" active":"")+'" data-pha-mkt="all" style="padding:7px 16px;font-size:12px">All Markets</button>';
+  activeMkts.forEach(function(k){
+    var n=MKT_NAMES[k]||marketName(k);
+    html+='<button class="pill ph-a-mkt'+(k===mkt?" active":"")+'" data-pha-mkt="'+esc(k)+'" style="padding:7px 16px;font-size:12px">'+esc(n)+'</button>';
+  });
+  html+='</div></div>';
+
+  if(mkt==="all") return html; /* charts only when a specific market is selected */
+
+  /* ── compute data for selected sport+market ── */
+  var aAll=sportEntries.filter(function(e){ return e.market===mkt; });
+  var aRes=aAll.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
+  var mktName=MKT_NAMES[mkt]||marketName(mkt);
+
+  function chartCard(title,sub,body){
+    return '<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:16px">'+
+      '<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">'+title+'</div>'+
+      '<div style="font-size:10px;color:var(--mut2);margin-bottom:10px">'+sub+'</div>'+body+'</div>';
+  }
+  function ph(msg){ return '<div style="font-size:11px;color:var(--mut2);text-align:center;padding:16px 0;font-style:italic">'+msg+'</div>'; }
+
+  var s1=_phChartTimelineSvg(aRes);
+  html+=chartCard("Hit Rate Over Time","Daily hit rate for resolved "+esc(mktName)+" plays \xb7 80% reference line",
+    s1||ph("Not enough resolved data yet — resolve plays to see trend"));
+
+  var s2=_phChartCalibrationSvg(aRes);
+  html+=chartCard("Model Calibration","Are confidence levels accurate for "+esc(mktName)+"? Dashed line = expected rate",
+    s2||ph("Resolve at least 5 plays to see calibration"));
+
+  var s3=_phChartPlayersHtml(aAll);
+  html+=chartCard("Player Performance — "+esc(mktName),"Hit rate by player \xb7 minimum 3 resolved plays to qualify",
+    s3||ph("Log more plays for more players to see rankings"));
+
+  return html;
+}
+
 function renderPlayHistory(){
   var mount=$("playHistMount"); if(!mount) return;
   var all=loadPlayHist();
@@ -4627,6 +4790,7 @@ function renderPlayHistory(){
   var searchLow=(_histSearch||"").toLowerCase();
   var filtered=all.filter(function(e){
     if(_histFilters.sport!=="all"&&e.sport!==_histFilters.sport) return false;
+    if(_histFilters.market!=="all"&&e.market!==_histFilters.market) return false;
     if(_histFilters.result!=="all"&&e.result!==_histFilters.result) return false;
     if(_histFilters.days!=="all"){
       var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-parseInt(_histFilters.days));
@@ -4644,8 +4808,12 @@ function renderPlayHistory(){
     return sd==="asc"?cmp:-cmp;
   });
 
-  /* ── sport-filtered stats dataset ── */
-  var statData=_histFilters.sport==="all"?all:all.filter(function(e){ return e.sport===_histFilters.sport; });
+  /* ── sport+market-filtered stats dataset ── */
+  var statData=all.filter(function(e){
+    if(_histFilters.sport!=="all"&&e.sport!==_histFilters.sport) return false;
+    if(_histFilters.market!=="all"&&e.market!==_histFilters.market) return false;
+    return true;
+  });
 
   /* ── aggregate stats ── */
   var allRes=statData.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
@@ -4736,6 +4904,9 @@ function renderPlayHistory(){
   html+='</div></div>';
 
   if(storeKB>3800) html+='<div style="background:#ffcc0022;border:1px solid var(--yellow);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--yellow);margin-bottom:12px">Storage nearing limit — consider exporting and clearing old history.</div>';
+
+  /* ─── ANALYTICS PILLS + CHARTS ─── */
+  html+=_phAnalyticsSection(all,_phAnalyticsSport,_phAnalyticsMkt);
 
   /* ─── SECTION 1: OVERALL RECORD ─── */
   html+=_phSectionHdr("Overall Record");
@@ -5044,6 +5215,20 @@ function renderPlayHistory(){
     exportPlayHistStats(all,allRes,allHits,allRate,rate7,rate30,r7.length,r30.length,sportMap,mktMap,TIER_DEF,tierMap,streaks,hotMkts,coldMkts);
   };
   var blk=$('phBulkBtn'); if(blk) blk.onclick=function(){ _phBulkResolve(pastPending); };
+  mount.querySelectorAll('.ph-a-sport').forEach(function(b){
+    b.onclick=function(){
+      var v=b.getAttribute('data-pha-sport');
+      _phAnalyticsSport=v; _histFilters.sport=v; _phAnalyticsMkt="all"; _histFilters.market="all";
+      renderPlayHistory();
+    };
+  });
+  mount.querySelectorAll('.ph-a-mkt').forEach(function(b){
+    b.onclick=function(){
+      var v=b.getAttribute('data-pha-mkt');
+      _phAnalyticsMkt=v; _histFilters.market=v;
+      renderPlayHistory();
+    };
+  });
 }
 
 function _phBulkResolve(pastPending){
