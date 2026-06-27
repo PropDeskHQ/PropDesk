@@ -556,7 +556,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .t10-hidden{display:none}
 
 /* MOBILE BOTTOM NAV */
-.botnav{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:70;display:none;align-items:stretch}
+.botnav{position:fixed;bottom:0;left:0;right:0;width:100%;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:1000;display:none;align-items:stretch}
 .botnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--mut)}
 .botnav button .bn-ic{font-size:18px;font-weight:800;line-height:1}
 .botnav button .bn-lbl{font-size:9px;font-weight:600;line-height:1}
@@ -569,7 +569,10 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   .wrap{padding-bottom:70px}
   .toast{bottom:74px}
   .hdr-date{display:none}
-  .keyin{width:110px}
+  .keyin{display:none}
+  #connectBtn{display:none}
+  #disconnectBtn{display:none!important}
+  #statusDot{display:none}
   .quota{display:none}
   .topval{flex-wrap:wrap}
   .more-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:78;opacity:0;pointer-events:none;transition:opacity .2s}
