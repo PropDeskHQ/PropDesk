@@ -557,9 +557,12 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 
 /* MOBILE BOTTOM NAV */
 .botnav{position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:70;display:none;align-items:stretch}
-.botnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:600;color:var(--mut)}
-.botnav button .bn-ic{font-size:16px;font-weight:800}
+.botnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--mut)}
+.botnav button .bn-ic{font-size:18px;font-weight:800;line-height:1}
+.botnav button .bn-lbl{font-size:9px;font-weight:600;line-height:1}
 .botnav button.active{color:var(--accent)}
+/* MORE SLIDE-UP DRAWER (mobile only) */
+.more-overlay,.more-drawer{display:none}
 @media(max-width:639px){
   .botnav{display:flex}
   body{padding-bottom:56px}
@@ -569,6 +572,15 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   .keyin{width:110px}
   .quota{display:none}
   .topval{flex-wrap:wrap}
+  .more-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:78;opacity:0;pointer-events:none;transition:opacity .2s}
+  .more-overlay.open{opacity:1;pointer-events:auto}
+  .more-drawer{display:block;position:fixed;left:0;right:0;bottom:56px;background:var(--surf);border:1px solid var(--bd2);border-bottom:none;border-radius:16px 16px 0 0;z-index:79;transform:translateY(110%);transition:transform .25s cubic-bezier(.4,0,.2,1)}
+  .more-drawer.open{transform:translateY(0)}
+  .more-drawer-handle{width:36px;height:4px;background:#333;border-radius:2px;margin:10px auto 4px}
+  .more-drawer-item{display:flex;align-items:center;gap:14px;width:100%;padding:15px 22px;font-size:15px;font-weight:600;color:var(--text);border-bottom:1px solid var(--bd);text-align:left;border-radius:0;transition:background .12s}
+  .more-drawer-item:last-child{border-bottom:none}
+  .more-drawer-item:active{background:var(--surf2)}
+  .more-drawer-ic{font-size:18px;width:24px;text-align:center;flex-shrink:0}
 }
 @media(max-width:480px){
   .filterbar input.search{width:100%}
@@ -938,10 +950,20 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 
 <!-- MOBILE BOTTOM NAV -->
 <nav class="botnav" id="botnav">
-  <button data-nav="games" class="active"><span class="bn-ic">#</span>Games</button>
-  <button data-nav="history"><span class="bn-ic">★</span>History</button>
-  <button data-nav="parlay"><span class="bn-ic">+</span>Parlay</button>
+  <button data-nav="games" class="active"><span class="bn-ic">#</span><span class="bn-lbl">Games</span></button>
+  <button data-nav="trends"><span class="bn-ic">📈</span><span class="bn-lbl">Trends</span></button>
+  <button data-nav="history"><span class="bn-ic">★</span><span class="bn-lbl">History</span></button>
+  <button data-nav="more"><span class="bn-ic">⋯</span><span class="bn-lbl">More</span></button>
 </nav>
+
+<!-- MOBILE MORE SLIDE-UP DRAWER -->
+<div class="more-overlay" id="moreOverlay"></div>
+<div class="more-drawer" id="moreDrawer">
+  <div class="more-drawer-handle"></div>
+  <button class="more-drawer-item" data-more-action="parlay"><span class="more-drawer-ic">+</span>Parlay Builder</button>
+  <button class="more-drawer-item" data-more-action="how"><span class="more-drawer-ic">?</span>How It Works</button>
+  <button class="more-drawer-item" data-more-action="disclaimer"><span class="more-drawer-ic">!</span>Disclaimer</button>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -2334,14 +2356,14 @@ function showGameContent(){
 function renderPropTabs(){
   var c=$("propTabs"); if(!c) return; c.innerHTML="";
   var gi=el("button","pill"+(ST.market==="__gameinfo__"?" active":""),"Game Information");
-  gi.onclick=function(){ ST.market="__gameinfo__"; renderPropTabs(); showGameInfoSection(); };
+  gi.onclick=function(){ ST.market="__gameinfo__"; renderPropTabs(); showGameInfoSection(); updateBotnavActive("games"); };
   c.appendChild(gi);
   var tp=el("button","pill"+(ST.market==="__trends__"?" active":""),"Trends");
-  tp.onclick=function(){ ST.market="__trends__"; renderPropTabs(); showGameContent(); loadGameTrends(); };
+  tp.onclick=function(){ ST.market="__trends__"; renderPropTabs(); showGameContent(); loadGameTrends(); updateBotnavActive("trends"); };
   c.appendChild(tp);
   (MARKETS[ST.sport]||[]).filter(function(m){return m.k!=="_h2h"&&!MLB_HIDDEN_MARKETS[m.k];}).forEach(function(m){
     var b=el("button","pill"+(m.k===ST.market?" active":""),m.n);
-    b.onclick=function(){ ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); showGameContent(); if(ST.eventId) loadBoard(); };
+    b.onclick=function(){ ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); showGameContent(); if(ST.eventId) loadBoard(); updateBotnavActive("games"); };
     c.appendChild(b);
   });
 }
@@ -5453,11 +5475,20 @@ function exportPlayHistStats(all,allRes,allHits,allRate,rate7,rate30,r7len,r30le
 /* ============ NAV / DRAWER ============ */
 function openDrawer(){ $("drawer").classList.add("open"); $("overlay").classList.add("open"); }
 function closeDrawer(){ $("drawer").classList.remove("open"); $("overlay").classList.remove("open"); }
+function openMoreDrawer(){ $("moreOverlay").classList.add("open"); $("moreDrawer").classList.add("open"); }
+function closeMoreDrawer(){ $("moreOverlay").classList.remove("open"); $("moreDrawer").classList.remove("open"); }
+function updateBotnavActive(name){
+  // how/disclaimer pages → highlight "more" in bottom nav
+  var eff=(name==="how"||name==="disclaimer")?"more":name;
+  $("botnav").querySelectorAll("[data-nav]").forEach(function(b){
+    b.classList.toggle("active",b.getAttribute("data-nav")===eff);
+  });
+}
 function showPage(name){
   document.querySelectorAll(".page").forEach(function(p){ p.classList.remove("active"); });
   var pg=$("page-"+name); if(pg) pg.classList.add("active");
   $("drawerNav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-page")===name); });
-  $("botnav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-nav")===name); });
+  updateBotnavActive(name);
   if(name==="history") renderHistory();
   window.scrollTo(0,0);
 }
@@ -5537,8 +5568,27 @@ function init(){
     b.onclick=function(){ showPage(b.getAttribute("data-page")); closeDrawer(); };
   });
 
-  $("botnav").querySelectorAll("button").forEach(function(b){
-    b.onclick=function(){ var nav=b.getAttribute("data-nav"); if(nav==="parlay") openParlay(); else showPage(nav); };
+  $("botnav").querySelectorAll("[data-nav]").forEach(function(b){
+    b.onclick=function(){
+      var nav=b.getAttribute("data-nav");
+      if(nav==="more"){ openMoreDrawer(); return; }
+      if(nav==="trends"){
+        if(!$("page-games").classList.contains("active")) showPage("games");
+        updateBotnavActive("trends");
+        ST.market="__trends__"; renderPropTabs(); showGameContent(); loadGameTrends();
+        return;
+      }
+      closeMoreDrawer();
+      showPage(nav);
+    };
+  });
+  $("moreOverlay").onclick=closeMoreDrawer;
+  $("moreDrawer").querySelectorAll("[data-more-action]").forEach(function(b){
+    b.onclick=function(){
+      var action=b.getAttribute("data-more-action");
+      closeMoreDrawer();
+      if(action==="parlay") openParlay(); else showPage(action);
+    };
   });
 
   $("searchIn").addEventListener("input",function(){ renderTable(false); });
