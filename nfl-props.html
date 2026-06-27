@@ -4592,20 +4592,27 @@ function _ph30DayChartSvg(all){
     dayMap[e.date].total++;
     if(e.result==="hit") dayMap[e.date].hits++;
   });
-  var W=296,H=60,BW=6,BG=4;
-  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:60px;display:block">';
-  var refY=Math.round(H-(H-6)*0.8);
+  var W=300,H=64,chartH=58;
+  var slotW=W/30, barW=Math.max(3,Math.floor(slotW)-2);
+  var MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:'+H+'px;display:block">';
+  /* 80% reference dashed line — keep at same visual position */
+  var refY=H-Math.round(0.8*chartH)-2;
   svg+='<line x1="0" y1="'+refY+'" x2="'+W+'" y2="'+refY+'" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 2" opacity="0.4"/>';
   svg+='<text x="'+(W-2)+'" y="'+(refY-2)+'" fill="var(--accent)" font-size="7" text-anchor="end" opacity="0.5">80%</text>';
+  /* bars — one per day with resolved plays only */
   days.forEach(function(ds,i){
-    var dm=dayMap[ds], x=i*(BW+BG);
-    if(!dm.total){
-      svg+='<rect x="'+x+'" y="'+(H-3)+'" width="'+BW+'" height="3" fill="#ffffff0d" rx="1"/>';
-    } else {
-      var rate=dm.hits/dm.total;
-      var barH=Math.max(3,Math.round(rate*(H-6)));
-      svg+='<rect x="'+x+'" y="'+(H-barH-2)+'" width="'+BW+'" height="'+barH+'" fill="'+(rate>=0.8?"var(--accent)":rate>=0.65?"var(--yellow)":"var(--red)")+'" rx="1" opacity="0.85"/>';
-    }
+    var dm=dayMap[ds];
+    if(!dm.total) return; /* no bar for days with no resolved plays */
+    var rate=dm.hits/dm.total;
+    var barH=Math.max(6,Math.round(rate*chartH)); /* min 6px so 0% still looks like a bar not a square */
+    var x=Math.round(i*slotW)+1;
+    var y=H-barH-2;
+    var fill=rate>=0.8?"#00e87a":rate>=0.65?"#ffcc00":"#ff4f4f";
+    var pct=Math.round(rate*100);
+    var dp=ds.split('-');
+    var dlbl=MOS[parseInt(dp[1])-1]+' '+parseInt(dp[2]);
+    svg+='<rect x="'+x+'" y="'+y+'" width="'+barW+'" height="'+barH+'" fill="'+fill+'" rx="1" opacity="0.9"><title>'+dlbl+' \xb7 '+dm.hits+'/'+dm.total+' \xb7 '+pct+'%</title></rect>';
   });
   svg+='</svg>';
   return svg;
