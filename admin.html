@@ -3,140 +3,353 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PropDesk — Record</title>
+<title>PropDesk Admin</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#111;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;padding:24px 16px 48px}
-h1{font-size:20px;font-weight:700;letter-spacing:.5px;color:#fff;margin-bottom:4px}
-.sub{font-size:13px;color:#555;margin-bottom:24px}
-.record-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px}
-.stat-card{background:#1a1a1a;border:1px solid #252525;border-radius:12px;padding:16px 20px;min-width:110px;flex:1}
-.stat-label{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
-.stat-val{font-size:28px;font-weight:700;line-height:1}
-.stat-val.green{color:#22c55e}
-.stat-val.red{color:#ef4444}
-.stat-val.amber{color:#f59e0b}
-.stat-val.dim{color:#888}
-.win-rate{font-size:13px;color:#555;margin-top:4px}
-
-.tier-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
-.tier-chip{background:#1a1a1a;border:1px solid #252525;border-radius:8px;padding:8px 14px;font-size:12px;text-align:center;flex:1;min-width:80px}
-.tier-chip .t-name{font-weight:600;margin-bottom:4px}
-.tier-chip .t-rec{color:#888;font-size:12px}
-.tier-chip.elite .t-name{color:#a78bfa}
-.tier-chip.great .t-name{color:#22c55e}
-.tier-chip.good .t-name{color:#3b82f6}
-.tier-chip.value .t-name{color:#f59e0b}
-
-table{width:100%;border-collapse:collapse;font-size:13px}
-thead th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#444;border-bottom:1px solid #222;font-weight:600}
-tbody tr{border-bottom:1px solid #1c1c1c}
-tbody tr:last-child{border-bottom:none}
-tbody td{padding:10px 10px;vertical-align:middle}
-.date-cell{color:#555;white-space:nowrap;font-size:12px}
-.player-cell{font-weight:600;color:#e8e8e8}
-.mkt-cell{color:#888;font-size:12px}
-.line-cell{font-family:monospace;font-size:12px;color:#aaa}
-.conf-cell{font-size:12px;font-weight:600}
-.tier-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.4px}
-.tier-badge.ELITE{background:#2d1f5e;color:#a78bfa}
-.tier-badge.GREAT{background:#1a3326;color:#22c55e}
-.tier-badge.GOOD{background:#1a2a3e;color:#3b82f6}
-.tier-badge.VALUE{background:#3b2a0a;color:#f59e0b}
-.result-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700}
-.result-badge.hit{background:#1a3326;color:#22c55e}
-.result-badge.miss{background:#2d1515;color:#ef4444}
-.result-badge.void{background:#252525;color:#666}
-.result-badge.pending{background:#1e2a1e;color:#888}
-.section-title{font-size:13px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px}
-.loading{color:#444;font-size:14px;padding:40px 0;text-align:center}
+body{background:#111;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
+input,select,button{font-family:inherit}
+button{cursor:pointer}
+.pill-btn{border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;border:1px solid #2a2a2a;background:transparent;color:#555}
+.pill-btn.active{background:#252525;color:#e8e8e8;border-color:#444}
+.badge{display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.badge.ELITE{background:#2d1f5e;color:#a78bfa}
+.badge.GREAT{background:#1a3326;color:#22c55e}
+.badge.GOOD{background:#1a2a3e;color:#3b82f6}
+.badge.VALUE{background:#3b2a0a;color:#f59e0b}
+.res-btn{border-radius:5px;padding:3px 8px;font-size:11px;font-weight:700;border:1px solid #252525;background:transparent;color:#333}
+.res-btn.active-hit{background:#22c55e22;color:#22c55e;border-color:#22c55e44}
+.res-btn.active-miss{background:#ef444422;color:#ef4444;border-color:#ef444444}
+.res-btn.active-void{background:#55555522;color:#555;border-color:#55555544}
+.res-btn.active-pending{background:#88888822;color:#888;border-color:#88888844}
+.day-wrap{margin-bottom:6px;border:1px solid #252525;border-radius:10px;overflow:hidden}
+.day-hdr{width:100%;background:#1a1a1a;border:none;padding:11px 14px;text-align:left;display:flex;align-items:center;gap:8px;min-height:44px}
+.day-hdr:hover{background:#1e1e1e}
+.day-body{background:#161616;padding:12px 16px}
+.play-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #1c1c1c;flex-wrap:wrap}
+.play-row:last-child{border-bottom:none}
+.ctx-bar{background:#1a1a1a;border:1px solid #252525;border-radius:8px;padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bulk-row{display:flex;gap:8px;margin-bottom:10px}
+.infield{background:#111;border:1px solid #333;border-radius:6px;padding:7px 10px;color:#e8e8e8;font-size:13px;width:100%;outline:none}
+.infield:focus{border-color:#444}
+label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
 </style>
 </head>
 <body>
-<h1>PropDesk Record</h1>
-<div class="sub" id="subtitle">Loading…</div>
 
-<div class="record-row" id="statsRow"></div>
-<div class="tier-row" id="tierRow"></div>
+<!-- Password gate -->
+<div id="gate" style="position:fixed;inset:0;background:#111;display:flex;align-items:center;justify-content:center;z-index:999">
+  <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:16px;padding:32px 28px;width:300px;text-align:center">
+    <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:6px">PropDesk Admin</div>
+    <div style="font-size:13px;color:#555;margin-bottom:22px">Enter password to continue</div>
+    <input id="pwInput" type="password" placeholder="Password" class="infield" style="margin-bottom:10px">
+    <button onclick="checkPw()" style="width:100%;background:#22c55e;color:#000;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:700">Enter</button>
+    <div id="pwErr" style="font-size:12px;color:#ef4444;margin-top:8px;display:none">Incorrect password</div>
+  </div>
+</div>
 
-<div class="section-title">All Plays</div>
-<table id="playsTable">
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Player</th>
-      <th>Market</th>
-      <th>Line</th>
-      <th>Conf</th>
-      <th>Tier</th>
-      <th>Result</th>
-    </tr>
-  </thead>
-  <tbody id="tbody"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
-</table>
+<!-- Main -->
+<div id="main" style="display:none;max-width:920px;margin:0 auto;padding:24px 16px 60px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px">
+    <div>
+      <h1 style="font-size:19px;font-weight:700;color:#fff">PropDesk Admin</h1>
+      <div id="subtitle" style="font-size:12px;color:#555;margin-top:3px"></div>
+    </div>
+    <button onclick="exportJSON()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;white-space:nowrap">↓ Export Updated JSON</button>
+  </div>
+
+  <!-- Summary cards -->
+  <div id="summaryRow" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
+
+  <!-- Tier row -->
+  <div id="tierRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px"></div>
+
+  <!-- Export reminder -->
+  <div id="exportReminder" style="display:none;background:#1c2a1c;border:1px solid #22c55e33;border-radius:8px;padding:9px 14px;font-size:12px;color:#22c55e;margin-bottom:14px">
+    Unsaved changes. <strong>Export JSON</strong> and upload to GitHub to update the live site.
+  </div>
+
+  <!-- Add play panel -->
+  <div style="background:#1a1a1a;border:1px solid #252525;border-radius:10px;margin-bottom:18px;overflow:hidden">
+    <button onclick="toggleAdd()" style="width:100%;background:none;border:none;color:#555;font-size:13px;font-weight:600;padding:11px 16px;text-align:left;display:flex;align-items:center;gap:6px">
+      <span id="addArrow" style="font-size:10px">▶</span> Add New Play
+    </button>
+    <div id="addPanel" style="display:none;padding:0 16px 16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div><label class="fl">Date</label><input id="f_date" type="date" class="infield"></div>
+        <div><label class="fl">Player</label><input id="f_player" type="text" placeholder="Player name" class="infield"></div>
+        <div>
+          <label class="fl">Market</label>
+          <select id="f_market" class="infield">
+            <option value="batter_hits">Hits</option>
+            <option value="batter_total_bases">Total Bases</option>
+            <option value="pitcher_strikeouts">Strikeouts</option>
+            <option value="batter_home_runs">Home Runs</option>
+            <option value="batter_rbis">RBIs</option>
+            <option value="batter_runs_scored">Runs</option>
+            <option value="pitcher_walks">Pitcher Walks</option>
+          </select>
+        </div>
+        <div><label class="fl">Line (e.g. Over 1.5)</label><input id="f_line" type="text" placeholder="Over 1.5" class="infield"></div>
+        <div><label class="fl">Confidence %</label><input id="f_conf" type="number" min="45" max="100" placeholder="75" class="infield"></div>
+        <div>
+          <label class="fl">Result</label>
+          <select id="f_result" class="infield">
+            <option value="pending">Pending</option>
+            <option value="hit">Hit</option>
+            <option value="miss">Miss</option>
+            <option value="void">Void</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="addPlay()" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600">Add Play</button>
+    </div>
+  </div>
+
+  <!-- Search + filter -->
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <input id="searchBox" type="text" placeholder="Search player…" oninput="onSearch(this.value)"
+      style="background:#1a1a1a;border:1px solid #252525;border-radius:8px;padding:8px 12px;color:#e8e8e8;font-size:13px;flex:1;min-width:160px;outline:none">
+    <div id="filterPills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  </div>
+
+  <!-- Days -->
+  <div id="days"></div>
+</div>
 
 <script>
-function fmtDate(s){
-  var d=new Date(s+'T12:00:00');
-  return d.toLocaleDateString([],{month:'short',day:'numeric'});
+var plays=[], rawData={}, filter='pending', searchQ='', expandedDays={}, dirty=false;
+var MKT_DISPLAY={batter_hits:'Hits',batter_total_bases:'Total Bases',pitcher_strikeouts:'Strikeouts',
+  batter_home_runs:'Home Runs',batter_rbis:'RBIs',batter_runs_scored:'Runs',pitcher_walks:'Walks'};
+
+/* password */
+document.getElementById('pwInput').addEventListener('keydown',function(e){if(e.key==='Enter')checkPw();});
+function checkPw(){
+  if(document.getElementById('pwInput').value==='propdesk2026'){
+    document.getElementById('gate').style.display='none';
+    document.getElementById('main').style.display='block';
+    loadData();
+  } else {
+    document.getElementById('pwErr').style.display='block';
+    document.getElementById('pwInput').value='';
+  }
 }
 
-fetch('propdesk-stats.json')
-  .then(function(r){return r.json();})
-  .then(function(data){
-    var plays=data.plays||[];
-    var settled=plays.filter(function(p){return p.result==='hit'||p.result==='miss';});
-    var hits=settled.filter(function(p){return p.result==='hit';}).length;
-    var misses=settled.filter(function(p){return p.result==='miss';}).length;
-    var winRate=settled.length?Math.round(hits/settled.length*100):0;
-    var voids=plays.filter(function(p){return p.result==='void';}).length;
-    var pending=plays.filter(function(p){return p.result==='pending';}).length;
+/* load */
+function loadData(){
+  fetch('propdesk-stats.json?_t='+Date.now())
+    .then(function(r){return r.json();})
+    .then(function(d){
+      rawData=d;
+      plays=(d.plays||[]).map(function(p,i){return Object.assign({},p,{_idx:i});});
+      var pDays=uniq(plays.filter(function(p){return p.result==='pending';}).map(function(p){return p.date;})).sort();
+      if(pDays.length) expandedDays[pDays[0]]=true;
+      render();
+    })
+    .catch(function(){document.getElementById('days').innerHTML='<div style="color:#555;padding:40px;text-align:center">Failed to load propdesk-stats.json</div>';});
+}
 
-    document.getElementById('subtitle').textContent=
-      'Since '+data.recordStart+' · Updated '+data.lastUpdated;
-
-    var statsRow=document.getElementById('statsRow');
-    statsRow.innerHTML=
-      '<div class="stat-card"><div class="stat-label">Record</div><div class="stat-val">'
-        +'<span class="stat-val green">'+hits+'</span>–<span class="stat-val red">'+misses+'</span>'
-      +'</div><div class="win-rate">'+winRate+'% win rate</div></div>'
-      +'<div class="stat-card"><div class="stat-label">Total Plays</div><div class="stat-val dim">'+plays.length+'</div></div>'
-      +'<div class="stat-card"><div class="stat-label">Voids</div><div class="stat-val amber">'+voids+'</div></div>'
-      +'<div class="stat-card"><div class="stat-label">Pending</div><div class="stat-val dim">'+pending+'</div></div>';
-
-    var tiers=['ELITE','GREAT','GOOD','VALUE'];
-    var tierCls={ELITE:'elite',GREAT:'great',GOOD:'good',VALUE:'value'};
-    var tierRow=document.getElementById('tierRow');
-    tierRow.innerHTML=tiers.map(function(t){
-      var tp=settled.filter(function(p){return p.tier===t;});
-      var th=tp.filter(function(p){return p.result==='hit';}).length;
-      return '<div class="tier-chip '+tierCls[t]+'">'
-        +'<div class="t-name">'+t+'</div>'
-        +'<div class="t-rec">'+th+'-'+(tp.length-th)+(tp.length?' ('+Math.round(th/tp.length*100)+'%)':'')+'</div>'
-        +'</div>';
-    }).join('');
-
-    var sorted=plays.slice().sort(function(a,b){return b.date.localeCompare(a.date);});
-    var tbody=document.getElementById('tbody');
-    tbody.innerHTML=sorted.map(function(p){
-      return '<tr>'
-        +'<td class="date-cell">'+fmtDate(p.date)+'</td>'
-        +'<td class="player-cell">'+esc(p.player)+'</td>'
-        +'<td class="mkt-cell">'+esc(p.marketDisplay||p.market)+'</td>'
-        +'<td class="line-cell">'+esc(p.line||'—')+'</td>'
-        +'<td class="conf-cell" style="color:'+confColor(p.confidence)+'">'+p.confidence+'%</td>'
-        +'<td><span class="tier-badge '+esc(p.tier)+'">'+esc(p.tier)+'</span></td>'
-        +'<td><span class="result-badge '+esc(p.result)+'">'+p.result+'</span></td>'
-        +'</tr>';
-    }).join('');
-  })
-  .catch(function(){
-    document.getElementById('tbody').innerHTML=
-      '<tr><td colspan="7" class="loading">Failed to load stats.</td></tr>';
-  });
-
+/* helpers */
 function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);});}
-function confColor(c){if(c>=82)return'#22c55e';if(c>=68)return'#3b82f6';return'#888';}
+function confColor(c){return c>=82?'#22c55e':c>=68?'#3b82f6':'#888';}
+function fmtDate(s){return new Date(s+'T12:00:00').toLocaleDateString([],{month:'short',day:'numeric'});}
+function uniq(arr){var s={};arr.forEach(function(x){s[x]=1;});return Object.keys(s);}
+function tierOf(c){c=Number(c);return c>=90?'ELITE':c>=75?'GREAT':c>=60?'GOOD':'VALUE';}
+function fmtLine(line,mktDisplay){
+  var m=String(line||'').match(/^[Oo]ver\s+(\d+)\.5$/);
+  if(m) return (parseInt(m[1])+1)+'+ '+(mktDisplay||'');
+  return line||'—';
+}
+function nextWeek(s){var d=new Date(s+'T12:00:00');d.setDate(d.getDate()+7);return d.toLocaleDateString([],{month:'short',day:'numeric'});}
+
+/* render */
+function render(){renderSummary();renderTiers();renderFilterPills();renderDays();}
+
+function renderSummary(){
+  var settled=plays.filter(function(p){return p.result==='hit'||p.result==='miss';});
+  var hits=settled.filter(function(p){return p.result==='hit';}).length;
+  var misses=settled.filter(function(p){return p.result==='miss';}).length;
+  var pending=plays.filter(function(p){return p.result==='pending';}).length;
+  var voids=plays.filter(function(p){return p.result==='void';}).length;
+  var wr=settled.length?Math.round(hits/settled.length*100):0;
+  document.getElementById('subtitle').innerHTML=
+    'Since '+(rawData.recordStart||'—')
+    +' &nbsp;·&nbsp; Updated '+(rawData.lastUpdated||'—')
+    +' &nbsp;·&nbsp; <span style="color:#f59e0b">Next update: '+nextWeek(rawData.lastUpdated||new Date().toISOString().slice(0,10))+'</span>';
+  function sc(label,body,sub){
+    return '<div style="background:#1a1a1a;border:1px solid #252525;border-radius:12px;padding:13px 16px;flex:1;min-width:100px">'
+      +'<div style="font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px">'+label+'</div>'
+      +body+(sub?'<div style="font-size:11px;color:#555;margin-top:3px">'+sub+'</div>':'')+'</div>';
+  }
+  document.getElementById('summaryRow').innerHTML=
+    sc('Record','<span style="font-size:26px;font-weight:700;color:#22c55e">'+hits+'</span>'
+      +'<span style="font-size:20px;color:#333"> – </span>'
+      +'<span style="font-size:26px;font-weight:700;color:#ef4444">'+misses+'</span>',wr+'% hit rate')
+    +sc('Total','<span style="font-size:26px;font-weight:700;color:#888">'+plays.length+'</span>',settled.length+' resolved')
+    +sc('Pending','<span style="font-size:26px;font-weight:700;color:#f59e0b">'+pending+'</span>')
+    +sc('Voids','<span style="font-size:26px;font-weight:700;color:#444">'+voids+'</span>');
+}
+
+function renderTiers(){
+  var colors={ELITE:'#a78bfa',GREAT:'#22c55e',GOOD:'#3b82f6',VALUE:'#f59e0b'};
+  var settled=plays.filter(function(p){return p.result==='hit'||p.result==='miss';});
+  document.getElementById('tierRow').innerHTML=['ELITE','GREAT','GOOD','VALUE'].map(function(t){
+    var tp=settled.filter(function(p){return p.tier===t;});
+    var th=tp.filter(function(p){return p.result==='hit';}).length;
+    var pend=plays.filter(function(p){return p.tier===t&&p.result==='pending';}).length;
+    return '<div style="background:#1a1a1a;border:1px solid #252525;border-radius:8px;padding:7px 12px;flex:1;min-width:76px;text-align:center">'
+      +'<div style="color:'+colors[t]+';font-size:11px;font-weight:700;margin-bottom:2px">'+t+'</div>'
+      +'<div style="font-size:12px;color:#666">'+th+'–'+(tp.length-th)+(tp.length?' ('+Math.round(th/tp.length*100)+'%)':' —')+'</div>'
+      +(pend?'<div style="font-size:10px;color:#555">+'+pend+' pending</div>':'')
+      +'</div>';
+  }).join('');
+}
+
+function renderFilterPills(){
+  var cnts={all:plays.length};
+  ['pending','hit','miss','void'].forEach(function(r){cnts[r]=plays.filter(function(p){return p.result===r;}).length;});
+  document.getElementById('filterPills').innerHTML=[
+    {k:'all',l:'All'},{k:'pending',l:'Pending'},{k:'hit',l:'Hit'},{k:'miss',l:'Miss'},{k:'void',l:'Void'}
+  ].map(function(it){
+    return '<button class="pill-btn'+(filter===it.k?' active':'')+'" onclick="setFilter(\''+it.k+'\')">'
+      +it.l+' <span style="opacity:.5">'+cnts[it.k]+'</span></button>';
+  }).join('');
+}
+
+function visiblePlays(){
+  var q=searchQ.toLowerCase();
+  return plays.filter(function(p){
+    if(filter!=='all'&&p.result!==filter) return false;
+    if(q&&p.player.toLowerCase().indexOf(q)===-1) return false;
+    return true;
+  });
+}
+
+function renderDays(){
+  var vp=visiblePlays();
+  if(!vp.length){
+    document.getElementById('days').innerHTML='<div style="color:#444;font-size:14px;padding:40px;text-align:center">No plays match this filter.</div>';
+    return;
+  }
+  var asc=filter==='pending';
+  var dates=uniq(vp.map(function(p){return p.date;})).sort(function(a,b){return asc?a.localeCompare(b):b.localeCompare(a);});
+  document.getElementById('days').innerHTML=dates.map(function(date){
+    var dayVisible=vp.filter(function(p){return p.date===date;});
+    var allDay=plays.filter(function(p){return p.date===date;});
+    var hits=allDay.filter(function(p){return p.result==='hit';}).length;
+    var miss=allDay.filter(function(p){return p.result==='miss';}).length;
+    var pend=allDay.filter(function(p){return p.result==='pending';}).length;
+    var settled=hits+miss;
+    var wr=settled?Math.round(hits/settled*100):0;
+    var expanded=!!expandedDays[date];
+
+    var hdSum=allDay.length+' play'+(allDay.length!==1?'s':'')+' · '+hits+' hit / '+miss+' miss'+(pend?' · <span style="color:#f59e0b">'+pend+' pending</span>':'');
+
+    var html='<div class="day-wrap">'
+      +'<button class="day-hdr" onclick="toggleDay(\''+date+'\')">'
+      +'<span style="color:#444;font-size:11px;width:12px;flex-shrink:0">'+(expanded?'▾':'▸')+'</span>'
+      +'<span style="color:#e8e8e8;font-size:13px;font-weight:700;margin-right:4px">'+fmtDate(date)+'</span>'
+      +'<span style="color:#444;font-size:12px">'+hdSum+'</span>'
+      +'</button>';
+
+    if(expanded){
+      html+='<div class="day-body">';
+      // Context bar
+      html+='<div class="ctx-bar">'
+        +'<span style="color:#888">Day record: <strong style="color:#e8e8e8">'+hits+'/'+settled+'</strong>'+(settled?' ('+wr+'%)':' —')+'</span>'
+        +(pend?'<span style="color:#f59e0b">'+pend+' still pending</span>':'<span style="color:#22c55e">All resolved</span>')
+        +'</div>';
+      // Bulk buttons
+      if(pend>0){
+        html+='<div class="bulk-row">'
+          +'<button onclick="bulkResolve(\''+date+'\',\'hit\')" style="background:#1a3326;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✓ Mark All Hit</button>'
+          +'<button onclick="bulkResolve(\''+date+'\',\'miss\')" style="background:#2d1515;color:#ef4444;border:1px solid #ef444433;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✕ Mark All Miss</button>'
+          +'</div>';
+      }
+      // Plays
+      dayVisible.forEach(function(p){html+=renderRow(p);});
+      html+='</div>';
+    }
+    html+='</div>';
+    return html;
+  }).join('');
+}
+
+function renderRow(p){
+  var line=fmtLine(p.line,p.marketDisplay||MKT_DISPLAY[p.market]||p.market);
+  var html='<div class="play-row">'
+    +'<span style="font-weight:600;color:#e8e8e8;font-size:13px;min-width:130px;flex-shrink:0">'+esc(p.player)+'</span>'
+    +'<span style="color:#555;font-size:12px;min-width:90px">'+esc(p.marketDisplay||MKT_DISPLAY[p.market]||p.market)+'</span>'
+    +'<span style="font-family:monospace;color:#aaa;font-size:12px;min-width:110px">'+esc(line)+'</span>'
+    +'<span style="font-size:12px;font-weight:600;min-width:40px;color:'+confColor(p.confidence)+'">'+p.confidence+'%</span>'
+    +'<span class="badge '+esc(p.tier)+'">'+esc(p.tier)+'</span>'
+    +'<div style="display:flex;gap:3px;margin-left:auto;flex-shrink:0">';
+  ['hit','miss','void','pending'].forEach(function(r){
+    var active=p.result===r;
+    var lbl={hit:'✓ Hit',miss:'✕ Miss',void:'⊘',pending:'?'}[r];
+    html+='<button class="res-btn'+(active?' active-'+r:'')+'" onclick="setResult('+p._idx+',\''+r+'\')">'+lbl+'</button>';
+  });
+  html+='</div></div>';
+  return html;
+}
+
+/* actions */
+function setFilter(f){filter=f;renderFilterPills();renderDays();}
+function onSearch(q){searchQ=q;renderDays();}
+function toggleDay(date){expandedDays[date]=!expandedDays[date];renderDays();}
+
+function setResult(idx,result){
+  var p=plays.find(function(x){return x._idx===idx;});
+  if(!p) return;
+  p.result=result;
+  markDirty();
+  render();
+}
+
+function bulkResolve(date,result){
+  plays.forEach(function(p){if(p.date===date&&p.result==='pending') p.result=result;});
+  markDirty();
+  render();
+}
+
+function markDirty(){dirty=true;document.getElementById('exportReminder').style.display='block';}
+
+function toggleAdd(){
+  var p=document.getElementById('addPanel');
+  var open=p.style.display!=='none';
+  p.style.display=open?'none':'block';
+  document.getElementById('addArrow').textContent=open?'▶':'▼';
+}
+
+function addPlay(){
+  var date=document.getElementById('f_date').value;
+  var player=document.getElementById('f_player').value.trim();
+  var mkt=document.getElementById('f_market').value;
+  var line=document.getElementById('f_line').value.trim();
+  var conf=parseInt(document.getElementById('f_conf').value)||0;
+  var result=document.getElementById('f_result').value;
+  if(!date||!player||!conf){alert('Date, player, and confidence are required.');return;}
+  plays.push({date:date,player:player,market:mkt,marketDisplay:MKT_DISPLAY[mkt]||mkt,
+    sport:'MLB',line:line||'—',confidence:conf,tier:tierOf(conf),result:result,_idx:plays.length});
+  markDirty();
+  document.getElementById('f_player').value='';
+  document.getElementById('f_line').value='';
+  document.getElementById('f_conf').value='';
+  render();
+}
+
+function exportJSON(){
+  var out=Object.assign({},rawData,{
+    lastUpdated:new Date().toISOString().slice(0,10),
+    plays:plays.map(function(p){var c=Object.assign({},p);delete c._idx;return c;})
+  });
+  var blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='propdesk-stats.json';a.click();
+  URL.revokeObjectURL(url);
+  alert('Downloaded propdesk-stats.json\nUpload this file to GitHub to update the live site.');
+}
 </script>
 </body>
 </html>
