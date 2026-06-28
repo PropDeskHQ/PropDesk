@@ -5059,38 +5059,8 @@ function _buildHistEntry(p){
 
 function _phDedupKey(player,market,date){ return (player||"").toLowerCase().trim()+"|"+market+"|"+date; }
 
-function _logSinglePropHistory(p){
-  try{
-    var entry=_buildHistEntry(p); if(!entry) return;
-    var h=loadPlayHist();
-    var key=_phDedupKey(entry.player,entry.market,entry.date);
-    if(h.some(function(e){ return _phDedupKey(e.player,e.market,e.date)===key; })) return;
-    h.unshift(entry); savePlayHist(h);
-    if($("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
-  }catch(e){}
-}
-
-function logPlaysToHistory(plays){
-  try{
-    if(!plays||!plays.length) return;
-    var h=loadPlayHist();
-    var today=new Date().toISOString().slice(0,10);
-    var seen={};
-    h.forEach(function(e){ seen[_phDedupKey(e.player,e.market,e.date)]=true; });
-    var changed=false;
-    plays.forEach(function(p){
-      var entry=_buildHistEntry(p); if(!entry) return;
-      var key=_phDedupKey(entry.player,entry.market,today);
-      if(seen[key]) return;
-      seen[key]=true;
-      h.unshift(entry); changed=true;
-    });
-    if(changed){
-      savePlayHist(h);
-      if($("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
-    }
-  }catch(e){}
-}
+function _logSinglePropHistory(){ /* auto-logging removed — use + Track button */ }
+function logPlaysToHistory(){ /* auto-logging removed — use + Track button */ }
 
 /* ── stats helpers ── */
 function _phRate(hits,total){ return total>0?Math.round(hits/total*100):null; }
@@ -5807,7 +5777,7 @@ function renderPlayHistory(){
 
   /* ─── PLAY TABLE ─── */
   if(!filtered.length){
-    html+='<div class="empty" style="padding:24px 0">'+(all.length?'No plays match the current filters.':'Open a game — 75%+ props will auto-log here.')+'</div>';
+    html+='<div class="empty" style="padding:24px 0">'+(all.length?'No plays match the current filters.':'No plays tracked yet — use the + Track button on any prop to add plays here.')+'</div>';
   } else {
     var TH='text-align:left;padding:8px 10px;font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bd);white-space:nowrap;cursor:pointer;user-select:none';
     var TH_S='text-align:left;padding:8px 10px;font-size:10px;font-weight:800;color:var(--mut);border-bottom:1px solid var(--bd);white-space:nowrap';
