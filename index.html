@@ -4515,7 +4515,7 @@ async function silentRefresh(){
 
 /* ============ PARLAY MODAL ============ */
 var PARLAY_LEG_MIN_CONF=60; // each leg must hit the GOOD tier floor (≥60%) to qualify
-var PARLAY_OVERALL_MIN=75;  // average confidence across all legs must be ≥75 (GREAT-level parlay)
+var PARLAY_OVERALL_MIN=60;  // average confidence across all legs must be ≥60 (GOOD-tier parlay)
 
 function getEffectiveConf(p){
   if(p.enriched&&p.pdConfidence!=null&&!p.pdNoValue)
