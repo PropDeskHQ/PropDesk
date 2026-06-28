@@ -212,9 +212,12 @@ function renderFilterPills(){
   document.getElementById('filterPills').innerHTML=[
     {k:'all',l:'All'},{k:'pending',l:'Pending'},{k:'hit',l:'Hit'},{k:'miss',l:'Miss'},{k:'void',l:'Void'}
   ].map(function(it){
-    return '<button class="pill-btn'+(filter===it.k?' active':'')+'" data-act="pill" data-res="'+it.k+'">'
+    return '<button class="pill-btn'+(filter===it.k?' active':'')+'" data-res="'+it.k+'">'
       +it.l+' <span style="opacity:.5">'+cnts[it.k]+'</span></button>';
   }).join('');
+  document.querySelectorAll('#filterPills [data-res]').forEach(function(btn){
+    btn.addEventListener('click',function(){setFilter(btn.getAttribute('data-res'));});
+  });
 }
 
 function visiblePlays(){
@@ -247,7 +250,7 @@ function renderDays(){
     var hdSum=allDay.length+' play'+(allDay.length!==1?'s':'')+' · '+hits+' hit / '+miss+' miss'+(pend?' · <span style="color:#f59e0b">'+pend+' pending</span>':'');
 
     var html='<div class="day-wrap">'
-      +'<button class="day-hdr" data-act="day" data-date="'+date+'">'
+      +'<button class="day-hdr" data-date="'+date+'">'
       +'<span style="color:#444;font-size:11px;width:12px;flex-shrink:0">'+(expanded?'▾':'▸')+'</span>'
       +'<span style="color:#e8e8e8;font-size:13px;font-weight:700;margin-right:4px">'+fmtDate(date)+'</span>'
       +'<span style="color:#444;font-size:12px">'+hdSum+'</span>'
@@ -263,8 +266,8 @@ function renderDays(){
       // Bulk buttons
       if(pend>0){
         html+='<div class="bulk-row">'
-          +'<button data-act="bulk" data-date="'+date+'" data-res="hit" style="background:#1a3326;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✓ Mark All Hit</button>'
-          +'<button data-act="bulk" data-date="'+date+'" data-res="miss" style="background:#2d1515;color:#ef4444;border:1px solid #ef444433;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✕ Mark All Miss</button>'
+          +'<button data-bulk-date="'+date+'" data-bulk-res="hit" style="background:#1a3326;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✓ Mark All Hit</button>'
+          +'<button data-bulk-date="'+date+'" data-bulk-res="miss" style="background:#2d1515;color:#ef4444;border:1px solid #ef444433;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✕ Mark All Miss</button>'
           +'</div>';
       }
       // Plays
@@ -274,6 +277,26 @@ function renderDays(){
     html+='</div>';
     return html;
   }).join('');
+  // Wire all interactive buttons directly — no delegation
+  document.querySelectorAll('.day-hdr[data-date]').forEach(function(btn){
+    var d=btn.getAttribute('data-date');
+    btn.addEventListener('click',function(){toggleDay(d);});
+  });
+  document.querySelectorAll('[data-bulk-date]').forEach(function(btn){
+    var d=btn.getAttribute('data-bulk-date'),r=btn.getAttribute('data-bulk-res');
+    btn.addEventListener('click',function(){bulkResolve(d,r);});
+  });
+  document.querySelectorAll('[data-res-idx]').forEach(function(btn){
+    var idx=+btn.getAttribute('data-res-idx'),res=btn.getAttribute('data-res-val');
+    btn.addEventListener('click',function(){
+      var p=plays.find(function(x){return x._idx===idx;});
+      var name=p?p.player:'?';
+      if(res==='hit') console.log('Hit clicked:',name);
+      else if(res==='miss') console.log('Miss clicked:',name);
+      else if(res==='void') console.log('Void clicked:',name);
+      setResult(idx,res);
+    });
+  });
 }
 
 function renderRow(p){
@@ -288,7 +311,7 @@ function renderRow(p){
   ['hit','miss','void','pending'].forEach(function(r){
     var active=p.result===r;
     var lbl={hit:'✓ Hit',miss:'✕ Miss',void:'⊘',pending:'?'}[r];
-    html+='<button class="res-btn'+(active?' active-'+r:'')+'" data-act="res" data-idx="'+p._idx+'" data-res="'+r+'">'+lbl+'</button>';
+    html+='<button class="res-btn'+(active?' active-'+r:'')+'" data-res-idx="'+p._idx+'" data-res-val="'+r+'">'+lbl+'</button>';
   });
   html+='</div></div>';
   return html;
@@ -351,15 +374,6 @@ function exportJSON(){
   alert('Downloaded propdesk-stats.json\nUpload this file to GitHub to update the live site.');
 }
 
-document.addEventListener('click',function(e){
-  var btn=e.target.closest('[data-act]');
-  if(!btn) return;
-  var act=btn.getAttribute('data-act');
-  if(act==='res') setResult(+btn.getAttribute('data-idx'),btn.getAttribute('data-res'));
-  else if(act==='day') toggleDay(btn.getAttribute('data-date'));
-  else if(act==='bulk') bulkResolve(btn.getAttribute('data-date'),btn.getAttribute('data-res'));
-  else if(act==='pill') setFilter(btn.getAttribute('data-res'));
-});
 </script>
 </body>
 </html>
