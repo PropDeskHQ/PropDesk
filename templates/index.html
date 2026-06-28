@@ -1768,7 +1768,6 @@ async function fetchEvents(){
   var row=$("gamesRow"); row.innerHTML='<div class="empty" style="padding:18px">Loading games...</div>';
   try{
     var _evUrl=apiUrl("/sports/"+ST.sport+"/events",{dateFormat:"iso"});
-    console.log("[PropDesk] fetchEvents URL:", _evUrl);
     var r=await fetch(_evUrl);
     var q=readQuota(r);
     if(!r.ok){ var _evErr=await r.text(); console.error("[PropDesk] fetchEvents FAILED",r.status,_evErr); setStatus("err",""); row.innerHTML='<div class="empty">Failed to load games (status '+r.status+'). Check your API key.</div>'; return; }
@@ -1801,7 +1800,6 @@ async function fetchOdds(eventId,markets){
   var _oddsUrl=apiUrl("/sports/"+ST.sport+"/events/"+eventId+"/odds",{
     regions:"us,us2", markets:markets, oddsFormat:"american", dateFormat:"iso"
   });
-  console.log("[PropDesk] fetchOdds URL:", _oddsUrl);
   var r=await fetch(_oddsUrl);
   var q=readQuota(r);
   if(q) setStatus("on",q);
@@ -2145,17 +2143,6 @@ async function enrichWithConfidence(p){
       // 4. Days rest + pitch depth (15%) — 5-day rotation = 85
       var wRest=daysRest>=7?82:daysRest>=5?72:daysRest>=4?55:25;
       var composite=(wOpp*0.33)+(wL5*0.28)+(wSzn*0.22)+(wRest*0.17);
-      // ── Pitcher K pipeline debug — open browser console to inspect ───────
-      console.log("[PropDesk Pitcher K]", p.player, {
-        bookLine: bookLine,
-        l5Ks: vals.slice(0,5),
-        l5K: +l5K.toFixed(2), sznK: +sznK.toFixed(2),
-        daysRest: daysRest,
-        oppTeam: oppTeam, oppKPct: oppKPct!=null ? +(oppKPct*100).toFixed(1)+"%" : null,
-        wOpp: wOpp, wL5: wL5, wSzn: wSzn, wRest: wRest,
-        composite: +composite.toFixed(1),
-        finalScore: Math.round(Math.min(95,composite))
-      });
       p.value=Math.round(Math.min(95,composite));
       // Confidence = historical hit rate at book line
       var kConfRaw=compositeConf(vals,bookLine,true);
@@ -2676,14 +2663,12 @@ async function loadBoard(){
   try{
     var data=await fetchOdds(ST.eventId, ST.market);
     ST.props=parseProps(data, ST.market);
-    console.log("[PropDesk] "+ST.sport+" / "+ST.market+" — "+ST.props.length+" props from API");
     _propStore[ST.sport+"|"+ST.market]=ST.props;
     if(!_gamePropsCache[ST.eventId]) _gamePropsCache[ST.eventId]={};
     _gamePropsCache[ST.eventId][ST.market]=ST.props;
     // Augment with full active roster — adds every player without a posted odds line
     var _ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
     await augmentWithRoster(ST.props, _ev);
-    console.log("[PropDesk] After roster augment: "+ST.props.length+" total ("+ST.market+")");
     if(!ST.props.length){
       $("tableMount").innerHTML='<div class="empty">No '+esc(marketName(ST.market))+' lines posted for this game yet. Try another market.</div>';
       return;
@@ -3138,12 +3123,11 @@ function _hiddenPropCount(){
 }
 function _updateShowHiddenBtn(){
   var btn=$("showNoValueBtn"); if(!btn) return;
-  if(ST_showNoValue){ btn.textContent="Hide Hidden"; btn.classList.add("on"); }
-  else{ var n=_hiddenPropCount(); btn.textContent=n?"Show Hidden ("+n+")":"Show Hidden"; btn.classList.remove("on"); }
+  if(ST_showNoValue){ btn.textContent="Hide Hidden"; btn.classList.add("on"); btn.style.display=""; }
+  else{ var n=_hiddenPropCount(); if(!n){ btn.style.display="none"; return; } btn.style.display=""; btn.textContent="Show Hidden ("+n+")"; btn.classList.remove("on"); }
 }
 function renderTable(silent){
   var props=filteredProps();
-  if(!silent) console.log("[PropDesk] Displaying "+props.length+" of "+ST.props.length+" props after filters (sport: "+ST.sport+", market: "+ST.market+")");
   var cols=bookColumns();
   $("resCount").textContent=props.length+" prop"+(props.length===1?"":"s");
   var thead='<tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>Confidence</th>';
@@ -3239,7 +3223,6 @@ function rowHtml(p,cols,idx,silent){
       '<div class="pl-acts">'+
         '<button class="mini" data-act="analyze" data-pid="'+p._id+'">Analyze</button>'+
         '<button class="mini" data-act="stats" data-pid="'+p._id+'">More Stats</button>'+
-        '<button class="mini" data-act="save" data-pid="'+p._id+'">Save</button>'+
         '<button class="mini" data-act="share" data-pid="'+p._id+'">Share</button>'+
         (function(){ var inCart=ST.parlayCart&&ST.parlayCart.find(function(c){return c._id===p._id;}); return '<button class="mini mpb-add'+(inCart?' in-cart':'')+'" data-act="parlay" data-pid="'+p._id+'">'+(inCart?'✓ Added':'＋ Parlay')+'</button>'; })()+
         (function(){ var isTrk=_trackedThisSession[p._id]; return '<button class="mini trk-btn'+(isTrk?' trk-done':'')+'" data-act="track" data-pid="'+p._id+'"'+(isTrk?' disabled':'')+'>'+( isTrk?'✓ Tracked':'+ Track')+'</button>'; })()+
@@ -6314,7 +6297,6 @@ function init(){
   // Key existence drives Live — if key is saved, auto-connect and start Live immediately
   var k=getKey();
   if(k){
-    console.log("API key loaded from localStorage");
     $("keyInput").value=k; setStatus("on","");
     $("disconnectBtn").style.display="inline";
     ST.live=true;
@@ -7299,7 +7281,6 @@ async function trendsLoadSport(){
   mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading games…</p></div>';
   try{
     var _trUrl=apiUrl("/sports/"+_trendsSport+"/events",{dateFormat:"iso"});
-    console.log("[PropDesk] trendsLoadSport URL:", _trUrl);
     var r=await fetch(_trUrl,{signal:AbortSignal.timeout(8000)});
     if(!r.ok){ var _trErr=await r.text(); console.error("[PropDesk] trendsLoadSport FAILED",r.status,_trErr); mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Failed to load games ('+r.status+').</p></div>'; return; }
     var data=await r.json();
@@ -7332,12 +7313,10 @@ async function trendsFetchAndLoad(){
           var _trMkUrl=apiUrl("/sports/"+_trendsSport+"/events/"+ev.id+"/odds",{
             regions:"us,us2",markets:mk,oddsFormat:"american",dateFormat:"iso"
           });
-          console.log("[PropDesk] trendsFetch market:", mk, "event:", ev.id);
           var r=await fetch(_trMkUrl,{signal:AbortSignal.timeout(8000)});
           if(!r.ok){ console.warn("[PropDesk] trendsFetch SKIP "+mk,r.status); continue; }
           var oddsData=await r.json();
           var mkProps=parseProps(oddsData,mk);
-          console.log("[PropDesk] trendsFetch", mk, "game", ei+1, "→", mkProps.length, "props");
           mkProps.forEach(function(p){
             if(p.bestOdds==null||p.yesNo||p.bestLine==null) return;
             p._market=mk; p._sport=_trendsSport; p._game=gameLabel;
@@ -7347,7 +7326,6 @@ async function trendsFetchAndLoad(){
         }catch(e){ console.warn("[PropDesk] trendsFetch error",mk,e); }
       }
     }
-    console.log("[PropDesk] trendsFetch total candidates:", allCandidates.length);
     if(!allCandidates.length){
       mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No lines available yet for today\'s games.</p></div>'; return;
     }
@@ -7358,20 +7336,6 @@ async function trendsFetchAndLoad(){
       try{ await enrichWithConfidence(allCandidates[i]); }catch(e){}
     }
     ST.sport=_trendsSport; ST.market=mks[0]||""; ST.props=allCandidates;
-    // DIAGNOSTIC LOGGING
-    console.log('[Trends] Sport:', _trendsSport);
-    console.log('[Trends] Total candidates:', allCandidates.length);
-    var _dbgHasVals=allCandidates.filter(function(p){return !!p._vals;}).length;
-    var _dbgThin=allCandidates.filter(function(p){return !!p.thinData;}).length;
-    console.log('[Trends] _vals populated:', _dbgHasVals, '| thinData:', _dbgThin);
-    allCandidates.slice(0,5).forEach(function(p){
-      console.log('[Trends] Player:', p.player,
-        '| enriched:', p.enriched,
-        '| thinData:', p.thinData,
-        '| _vals:', p._vals ? p._vals.length+' values' : 'NULL',
-        '| l5Avg:', p.l5Avg,
-        '| market:', p._market);
-    });
     var trends=[],calcErr=null;
     try{
       ST.eventId=_trendsEvents[0]?_trendsEvents[0].id:null;
@@ -7387,12 +7351,9 @@ async function trendsFetchAndLoad(){
       // Multi-condition systems — MLB only, real boxscore/standings/final-score data, no fabricated odds.
       // First load per session is slower (boxscore/schedule fetches); cached aggressively after that.
       if(_trendsSport==="baseball_mlb") mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Building matchup &amp; team systems from real game data&hellip;</p></div>';
-      console.log("[PropDesk] trendsFetch: computing matchup + team-situational systems…");
       var matchupTrends=await calcPlayerMatchupTrends();
-      console.log("[PropDesk] trendsFetch matchup systems found:", matchupTrends.length);
       if(matchupTrends.length) trends=trends.concat(matchupTrends);
       var teamSitTrends=await calcTeamSituationalTrends();
-      console.log("[PropDesk] trendsFetch team-situational systems found:", teamSitTrends.length);
       if(teamSitTrends.length) trends=trends.concat(teamSitTrends);
       trends.sort(function(a,b){ return b.conf-a.conf; });
     }catch(ce){ calcErr=ce; }
@@ -7738,7 +7699,6 @@ async function t10LoadSport(){
   c.innerHTML='<div class="empty" style="padding:18px">Loading games&hellip;</div>';
   try{
     var _t10SUrl=apiUrl("/sports/"+_t10Sport+"/events",{dateFormat:"iso"});
-    console.log("[PropDesk] t10LoadSport URL:", _t10SUrl);
     var r=await fetch(_t10SUrl);
     if(!r.ok){ var _t10SE=await r.text(); console.error("[PropDesk] t10LoadSport FAILED",r.status,_t10SE); c.innerHTML='<div class="empty" style="padding:18px">Failed to load games ('+r.status+').</div>'; return; }
     var data=await r.json();
@@ -7769,16 +7729,13 @@ async function t10LoadGame(){
         var _mkUrl=apiUrl("/sports/"+_t10Sport+"/events/"+_t10EventId+"/odds",{
           regions:"us,us2",markets:mk,oddsFormat:"american",dateFormat:"iso"
         });
-        console.log("[PropDesk] t10LoadGame market fetch:", mk, _mkUrl);
         var mkR=await fetch(_mkUrl);
         if(!mkR.ok){ var _mkE=await mkR.text(); console.warn("[PropDesk] t10LoadGame SKIP "+mk,mkR.status,_mkE); continue; }
         var mkData=await mkR.json();
         var mkProps=parseProps(mkData,mk);
-        console.log("[PropDesk] t10LoadGame", mk, "→", mkProps.length, "props");
         mkProps.forEach(function(p){ p._market=mk; p._sport=_t10Sport; p._game=gameLabel; candidates.push(p); });
       }catch(mkE){ console.warn("[PropDesk] t10LoadGame market error",mk,mkE); }
     }
-    console.log("[PropDesk] t10LoadGame total candidates:", candidates.length);
     if(!candidates.length){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No prop lines available for this game yet. Check back closer to game time.</p></div>'; return; }
     // Deduplicate: one per player+market
     var seen={},unique=[];
@@ -7797,9 +7754,6 @@ async function t10LoadGame(){
       try{ await enrichWithConfidence(toEnrich[i]); }catch(e){}
     }
     ST.sport=savedSport; ST.market=savedMkt;
-    console.log("[PropDesk] t10LoadGame after enrichment:", toEnrich.map(function(p){
-      return p.player+"/"+p._market+":"+(p.pdConfidence!=null?Math.round(p.pdConfidence*100)+"%":"null");
-    }));
     var qualified=toEnrich.filter(function(p){
       if(p.enriched&&p.pdNoValue) return false;
       if(p.enriched&&p.pdConfidence!=null) return Math.round(p.pdConfidence*100)>=45;
@@ -7807,7 +7761,6 @@ async function t10LoadGame(){
     });
     qualified.sort(function(a,b){ return getEffectiveConf(b)-getEffectiveConf(a); });
     _t10Data=qualified.slice(0,10);
-    console.log("[PropDesk] t10LoadGame qualified for Top 10:", _t10Data.length, _t10Data.map(function(p){return p.player;}));
     renderTop10(_t10Data);
   }catch(e){
     mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Error loading props. Try again.</p></div>';
@@ -8037,8 +7990,6 @@ function parseH2HOdds(event){
       if(ao!=null) aProbs.push(americanToProb(ao));
     });
   });
-  console.log("[ML] parseH2HOdds",event.away_team+"@"+event.home_team,
-    "books:"+books.length,"hProbs:"+hProbs.length,"bestH:"+bestH,"bestA:"+bestA);
   if(!hProbs.length) return null;
   var avgH=hProbs.reduce(function(a,b){return a+b;},0)/hProbs.length;
   var avgA=aProbs.length?aProbs.reduce(function(a,b){return a+b;},0)/aProbs.length:1-avgH;
@@ -8290,20 +8241,6 @@ function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
   var rawTier=hasOdds&&absEdge>=0.15?"ELITE":hasOdds&&absEdge>=0.10?"GREAT":hasOdds&&absEdge>=0.05?"GOOD":null;
   var tier=!rawTier||numSig===0?null:(rawTier==="ELITE"||rawTier==="GREAT")&&numSig<2?"GOOD":rawTier;
 
-  // Console breakdown so you can verify what's driving the edge
-  console.group("[ML] "+mlSportCode(sport).toUpperCase()+" "+mlNick(away)+"@"+mlNick(home));
-  console.log("eloDiff="+Math.round(eloDiff)+" | PD:"+Math.round(pdHomeProb*100)+"% Book:"+(hasOdds?Math.round(homeImplied*100)+"%":"n/a")+" | edge="+Math.round(edge*100)+"% numSig="+numSig+" tier="+tier);
-  factors.forEach(function(f){
-    if(Math.abs(f.net)<1) return;
-    var d="";
-    if(f.key==="winPct")  d=" (H:"+f.homeWp+"% A:"+f.awayWp+"%)";
-    if(f.key==="margin")  d=" (H:"+f.homeMargin+" A:"+f.awayMargin+")";
-    if(f.key==="l10")     d=" (H:"+f.homeL10+" A:"+f.awayL10+")";
-    if(f.key==="pitcher") d=" ("+(hPitcherInfo?hPitcherInfo.name+" "+hPitcherInfo.era+"ERA":"–")+" vs "+(aPitcherInfo?aPitcherInfo.name+" "+aPitcherInfo.era+"ERA":"–")+")";
-    console.log("  "+f.label+": "+(f.net>0?"+":"")+f.net+" Elo"+d);
-  });
-  console.groupEnd();
-
   adjustments.sort(function(a,b){return b.mag-a.mag;});
   return{home:home,away:away,time:ev.commence_time,
     homeProb:pdHomeProb,awayProb:1-pdHomeProb,
@@ -8490,12 +8427,10 @@ async function loadMoneylineBoard(){
   if(!ev){ mlMount.innerHTML='<div class="empty">Select a game above.</div>'; return; }
   try{
     var oddsUrl=apiUrl("/sports/"+ST.sport+"/events/"+ST.eventId+"/odds",{regions:"us",markets:"h2h",oddsFormat:"american"});
-    console.log("[ML] board URL:",oddsUrl);
     var r=await fetch(oddsUrl,{signal:AbortSignal.timeout(10000)});
     var q=readQuota(r); if(q) setStatus("on",q);
     if(!r.ok){var t=await r.text();throw new Error("Odds API "+r.status+": "+t.slice(0,80));}
     var oddsData=await r.json();
-    console.log("[ML] bookmakers:",(oddsData.bookmakers||[]).length);
     var standings=await mlFetchStandings(ST.sport);
     var extraData={};
     if(ST.sport==="baseball_mlb"){
@@ -8660,9 +8595,6 @@ async function startGameEnrichment(eventId){
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
-  console.log("[BP] startGameEnrichment final pass — "+qFinal.length+" props at 75%+:");
-  qFinal.forEach(function(p){ console.log("  [BP]",p.player,"|",p._market,"| pdConf:",+(( p.pdConfidence||0)*100).toFixed(1)+"%","| enriched:",p.enriched,"| thinData:",!!p.thinData,"| pdNoValue:",!!p.pdNoValue); });
-  if(!qFinal.length) console.log("  [BP] none qualified — full cache dump:"); Object.keys(_gamePropsCache[eventId]||{}).forEach(function(mk){ (_gamePropsCache[eventId][mk]||[]).forEach(function(p){ console.log("    [cache]",p.player,mk,"pdConf:",p.pdConfidence,"enriched:",p.enriched,"thinData:",!!p.thinData); }); });
   try{
     var _hist=JSON.parse(localStorage.getItem("pe_g5_hist")||"{}");
     var _newH={};
@@ -8702,8 +8634,6 @@ function _g5TsHtml(eventId,isScanning){
   return '<div class="g5-ts">Last updated: '+hh+':'+mm+' '+ampm+' \xb7 '+info.mkts+' market'+(info.mkts!==1?'s':'')+(info.mkts?' scanned':'')+'</div>';
 }
 function renderGameTop5(picks,isScanning){
-  console.log("[BP] renderGameTop5 called — "+picks.length+" props received, isScanning:"+isScanning);
-  picks.forEach(function(p){ console.log("  [render]",p.player,"|",p._market,"| pdConf:",+(( p.pdConfidence||0)*100).toFixed(1)+"%"); });
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
