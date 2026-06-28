@@ -2804,7 +2804,8 @@ function filteredProps(){
   var results=ST.props.filter(function(p){
     // Search filter
     if(q&&p.player.toLowerCase().indexOf(q)<0) return false;
-    // "Show Hidden" toggle — POOR tier (<45% confidence) hidden by default
+    // "Show Hidden" toggle — pdNoValue and POOR tier (<45%) hidden by default
+    if(!ST_showNoValue && p.enriched && p.pdNoValue) return false;
     if(!ST_showNoValue && p.enriched && !p.pdNoValue && p.pdConfidence!=null && Math.round(p.pdConfidence*100)<45) return false;
     // "Best Bets Only" toggle — restrict to GREAT+ (≥75%); thin-data and no-value excluded
     if(ST_bestOnly){
@@ -2907,8 +2908,20 @@ function renderSummaryBar(){
       btn.onclick=function(){ ST_tierFilter=btn.getAttribute('data-tier'); renderTable(true); renderSummaryBar(); };
     });
   }
+  _updateShowHiddenBtn();
 }
 
+function _hiddenPropCount(){
+  return ST.props.filter(function(p){
+    if(!p.enriched) return false;
+    return p.pdNoValue||(p.pdConfidence!=null&&Math.round(p.pdConfidence*100)<45);
+  }).length;
+}
+function _updateShowHiddenBtn(){
+  var btn=$("showNoValueBtn"); if(!btn) return;
+  if(ST_showNoValue){ btn.textContent="Hide Hidden"; btn.classList.add("on"); }
+  else{ var n=_hiddenPropCount(); btn.textContent=n?"Show Hidden ("+n+")":"Show Hidden"; btn.classList.remove("on"); }
+}
 function renderTable(silent){
   var props=filteredProps();
   if(!silent) console.log("[PropDesk] Displaying "+props.length+" of "+ST.props.length+" props after filters (sport: "+ST.sport+", market: "+ST.market+")");
@@ -5823,9 +5836,8 @@ function init(){
   $("parlayBtn").onclick=openParlay;
   $("showNoValueBtn").onclick=function(){
     ST_showNoValue=!ST_showNoValue;
-    this.classList.toggle("on",ST_showNoValue);
-    this.textContent=ST_showNoValue?"Hide Hidden":"Show Hidden";
     if(ST.props.length){ renderTable(true); renderSummaryBar(); }
+    else _updateShowHiddenBtn();
   };
   $("bestBetsBtn").onclick=function(){
     ST_bestOnly=!ST_bestOnly;
