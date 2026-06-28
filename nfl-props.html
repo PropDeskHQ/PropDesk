@@ -2345,7 +2345,7 @@ function updatePropValueDisplay(p){
         _ws.parentNode.replaceChild(_wb,_ws);
       }
       var _wp=document.getElementById("whypanel-"+p._id);
-      if(_wp&&!_wp.textContent.trim()) _wp.innerHTML=buildConfExplanation(p);
+      if(_wp&&!_wp.textContent.trim()) _wp.innerHTML=generateWhyExplanation(p);
     }
   } else {
     // Phase-1 only — show dash (enrichment pending)
@@ -3186,7 +3186,7 @@ function renderTable(silent){
   renderSummaryBar();
 }
 
-function buildConfExplanation(p){
+function generateWhyExplanation(p){
   var mk=p._market||ST.market, sp=p._sport||ST.sport;
   var isThresh=isThreshProp(p);
   var side=p.pdSide||"Over", isO=side==="Over";
@@ -3343,7 +3343,7 @@ function rowHtml(p,cols,idx,silent){
   h+='<td><div class="col-val-center"><span class="vs"><b id="vsc-'+p._id+'" class="'+ct.c+'">'+dispStr+'</b><span class="vt '+ct.c+'">'+ct.t+'</span></span>'+_whyBtnHtml+'</div></td>';
   cols.forEach(function(bk){ h+='<td>'+bookCellHtml(p,bk)+'</td>'; });
   h+='</tr>';
-  h+='<tr class="why-row" id="whydata-'+p._id+'"><td colspan="'+(4+cols.length)+'"><div class="why-panel" id="whypanel-'+p._id+'">'+(_hasWhy?buildConfExplanation(p):'')+'</div></td></tr>';
+  h+='<tr class="why-row" id="whydata-'+p._id+'"><td colspan="'+(4+cols.length)+'"><div class="why-panel" id="whypanel-'+p._id+'">'+(_hasWhy?generateWhyExplanation(p):'')+'</div></td></tr>';
   return h;
 }
 
@@ -3399,7 +3399,7 @@ function handleWhyClick(p,btn){
   btn.innerHTML=isOpen?"Why? &#9662;":"Why? &#9656;";
   if(isOpen){
     var panel=document.getElementById("whypanel-"+p._id);
-    if(panel&&!panel.textContent.trim()) panel.innerHTML=buildConfExplanation(p);
+    if(panel&&!panel.textContent.trim()) panel.innerHTML=generateWhyExplanation(p);
   }
 }
 
@@ -7530,27 +7530,6 @@ var _t10EventId=null;
 var _t10Data=[];
 
 
-function buildTop10Analysis(p,mktName){
-  var parts=[];
-  var conf=getEffectiveConf(p);
-  var side=p.pdSide||"Over";
-  var line=p.pdLine!=null?p.pdLine:p.bestLine;
-  var isO=side==="Over";
-  if(p.seasonAvgEnrich!=null){
-    parts.push(p.player+" is averaging "+p.seasonAvgEnrich.toFixed(1)+" "+mktName.toLowerCase()+" per game this season.");
-  }
-  if(p._vals&&p._vals.length>=5&&line!=null){
-    var hits5=p._vals.slice(0,5).filter(function(v){return isO?v>line:v<line;}).length;
-    parts.push("In the last 5 games, the "+(isO?"Over":"Under")+" has hit "+hits5+" of 5 times at "+line+".");
-  }
-  if(p.pdLine!=null&&p.bestLine!=null&&Math.abs(p.pdLine-p.bestLine)>=0.5){
-    var dir=p.pdLine>p.bestLine?"higher":"lower";
-    parts.push("PropDesk edges the line at "+p.pdLine+" ("+dir+" than the book line of "+p.bestLine+").");
-  }
-  parts.push("Our model rates this "+conf+"% confidence — "+confTierOf(conf).t+" tier.");
-  return parts.join(" ");
-}
-
 function buildShareGameText(picks){
   var ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
   var matchup=ev?(ev.away_team+" @ "+ev.home_team):"Game";
@@ -7714,7 +7693,7 @@ function renderTop10(picks){
       '<span class="t10-line-badge" style="text-decoration:line-through;opacity:.45">'+esc(fmtLine(p.bestLine,"Over"))+'</span><span style="color:var(--mut2);font-size:10px;margin:0 2px">→</span><span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine,side))+'</span>':
       '<span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine||p.bestLine,side))+'</span>';
     var snap=buildT10SnapLine(p,mktName);
-    var analysis=buildTop10Analysis(p,mktName);
+    var analysis=generateWhyExplanation(p);
     var gameShort=p._game||"";
     var subLine=esc(mktName)+(gameShort?' <span style="color:var(--mut2)">&middot; '+esc(gameShort)+'</span>':'');
     html+=
@@ -7741,7 +7720,7 @@ function renderTop10(picks){
             '<button class="t10-share-btn" data-t10share="'+i+'">Share ↗</button>'+
           '</div>'+
         '</div>'+
-        '<div class="t10-analysis t10-hidden" id="t10why-'+i+'">'+esc(analysis)+'</div>'+
+        '<div class="t10-analysis t10-hidden" id="t10why-'+i+'">'+analysis+'</div>'+
       '</div>';
   });
   mount.innerHTML=html;
@@ -8782,7 +8761,7 @@ function renderGameTop5(picks,isScanning){
       '<span class="t10-line-badge" style="text-decoration:line-through;opacity:.45">'+esc(fmtLine(p.bestLine,"Over"))+'</span><span style="color:var(--mut2);font-size:10px;margin:0 2px">→</span><span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine,side))+'</span>':
       '<span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine||p.bestLine,side))+'</span>';
     var snap=buildT10SnapLine(p,mktName);
-    var analysis=buildTop10Analysis(p,mktName);
+    var analysis=generateWhyExplanation(p);
     html+=
       '<div class="t10-card '+cardCls+'">'+
         '<div class="t10-row-top">'+
@@ -8806,7 +8785,7 @@ function renderGameTop5(picks,isScanning){
             '<button class="t10-share-btn" data-g5share="'+i+'">Share ↗</button>'+
           '</div>'+
         '</div>'+
-        '<div class="t10-analysis t10-hidden" id="g5why-'+i+'">'+esc(analysis)+'</div>'+
+        '<div class="t10-analysis t10-hidden" id="g5why-'+i+'">'+analysis+'</div>'+
       '</div>';
   });
   mount.innerHTML=html;
