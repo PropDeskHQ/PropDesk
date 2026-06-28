@@ -1694,7 +1694,7 @@ function el(tag,cls,html){ var e=document.createElement(tag); if(cls)e.className
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
 function getKey(){ return (localStorage.getItem("pe_key")||"").trim(); }
 function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._tm); t._tm=setTimeout(function(){t.classList.remove("show");},1600); }
-function clean(name){ return String(name||"").replace(/\s+(Jr|Sr|II|III|IV|V)\.?$/i,"").trim(); }
+function clean(name){ return String(name||"").replace(/\s+(Jr|Sr|II|III|IV|V)\.?$/i,"").replace(/\s*\(\d{4}\)\s*$/,"").trim(); }
 function avg(arr){ if(!arr.length) return 0; var s=0; for(var i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
 function fmtStat(v){ v=Number(v); if(isNaN(v)) return "-"; if(Number.isInteger(v)) return ""+v; return v.toFixed(1); }
 
