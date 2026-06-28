@@ -27,9 +27,6 @@ input:focus,select:focus{border-color:var(--accent)}
 .hdr{position:sticky;top:0;z-index:60;height:52px;background:rgba(15,15,15,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:12px;padding:0 14px}
 .hdr-l{display:flex;align-items:center;gap:12px;min-width:0}
 .hdr-r{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:nowrap}
-.hamb{display:flex;flex-direction:column;gap:4px;padding:6px;border-radius:6px}
-.hamb span{width:18px;height:2px;background:var(--text);border-radius:2px;transition:.2s}
-.hamb:hover{background:var(--surf2)}
 .logo{font-weight:800;font-size:17px;letter-spacing:-.5px}
 .logo b{color:var(--accent)}
 .hdr-date{font-size:12px;color:var(--mut);white-space:nowrap}
@@ -50,18 +47,6 @@ input:focus,select:focus{border-color:var(--accent)}
 .countdown{font-size:11px;color:var(--accent);font-variant-numeric:tabular-nums}
 
 /* DRAWER */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:80;opacity:0;pointer-events:none;transition:.25s}
-.overlay.open{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;left:0;height:100%;width:50vw;min-width:260px;max-width:380px;background:var(--surf);border-right:1px solid var(--bd2);z-index:90;transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;padding:18px 0}
-.drawer.open{transform:translateX(0)}
-.drawer-h{padding:0 20px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
-.drawer-h .logo{font-size:18px}
-.drawer-close{font-size:22px;color:var(--mut);padding:0 6px}
-.drawer-nav{padding:14px 12px;display:flex;flex-direction:column;gap:4px}
-.drawer-nav button{text-align:left;padding:13px 16px;border-radius:10px;font-size:15px;font-weight:600;color:var(--mut);transition:.15s}
-.drawer-nav button:hover{background:var(--surf2);color:var(--text)}
-.drawer-nav button.active{background:rgba(0,255,135,.1);color:var(--accent)}
-.drawer-foot{margin-top:auto;padding:16px 20px;font-size:11px;color:var(--mut2);border-top:1px solid var(--bd)}
 
 /* CONTAINER */
 .wrap{max-width:1280px;margin:0 auto;padding:14px 16px 60px}
@@ -572,18 +557,25 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .t10-hidden{display:none}
 
 /* MOBILE BOTTOM NAV */
-.botnav{position:fixed;bottom:0;left:0;right:0;width:100%;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:1000;display:none;align-items:stretch}
+.botnav{position:fixed;bottom:0;left:0;right:0;width:100%;height:56px;background:var(--surf);border-top:1px solid var(--bd2);z-index:1000;display:flex;align-items:stretch}
 .botnav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--mut)}
 .botnav button .bn-ic{font-size:18px;font-weight:800;line-height:1}
 .botnav button .bn-lbl{font-size:9px;font-weight:600;line-height:1}
 .botnav button.active{color:var(--accent)}
-/* MORE SLIDE-UP DRAWER (mobile only) */
-.more-overlay,.more-drawer{display:none}
+body{padding-bottom:56px}
+.wrap{padding-bottom:70px}
+.toast{bottom:74px}
+/* MORE SLIDE-UP DRAWER */
+.more-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:78;opacity:0;pointer-events:none;transition:opacity .2s}
+.more-overlay.open{opacity:1;pointer-events:auto}
+.more-drawer{position:fixed;left:0;right:0;bottom:56px;background:var(--surf);border:1px solid var(--bd2);border-bottom:none;border-radius:16px 16px 0 0;z-index:79;transform:translateY(110%);transition:transform .25s cubic-bezier(.4,0,.2,1)}
+.more-drawer.open{transform:translateY(0)}
+.more-drawer-handle{width:36px;height:4px;background:#333;border-radius:2px;margin:10px auto 4px}
+.more-drawer-item{display:flex;align-items:center;gap:14px;width:100%;padding:15px 22px;font-size:15px;font-weight:600;color:var(--text);border-bottom:1px solid var(--bd);text-align:left;border-radius:0;transition:background .12s}
+.more-drawer-item:last-child{border-bottom:none}
+.more-drawer-item:active{background:var(--surf2)}
+.more-drawer-ic{font-size:18px;width:24px;text-align:center;flex-shrink:0}
 @media(max-width:639px){
-  .botnav{display:flex}
-  body{padding-bottom:56px}
-  .wrap{padding-bottom:70px}
-  .toast{bottom:74px}
   .hdr-date{display:none}
   .keyin{display:none}
   #connectBtn{display:none}
@@ -591,15 +583,6 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   #statusDot{display:none}
   .quota{display:none}
   .topval{flex-wrap:wrap}
-  .more-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:78;opacity:0;pointer-events:none;transition:opacity .2s}
-  .more-overlay.open{opacity:1;pointer-events:auto}
-  .more-drawer{display:block;position:fixed;left:0;right:0;bottom:56px;background:var(--surf);border:1px solid var(--bd2);border-bottom:none;border-radius:16px 16px 0 0;z-index:79;transform:translateY(110%);transition:transform .25s cubic-bezier(.4,0,.2,1)}
-  .more-drawer.open{transform:translateY(0)}
-  .more-drawer-handle{width:36px;height:4px;background:#333;border-radius:2px;margin:10px auto 4px}
-  .more-drawer-item{display:flex;align-items:center;gap:14px;width:100%;padding:15px 22px;font-size:15px;font-weight:600;color:var(--text);border-bottom:1px solid var(--bd);text-align:left;border-radius:0;transition:background .12s}
-  .more-drawer-item:last-child{border-bottom:none}
-  .more-drawer-item:active{background:var(--surf2)}
-  .more-drawer-ic{font-size:18px;width:24px;text-align:center;flex-shrink:0}
 }
 @media(max-width:480px){
   .filterbar input.search{width:100%}
@@ -700,7 +683,6 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 <!-- HEADER -->
 <header class="hdr">
   <div class="hdr-l">
-    <button class="hamb" id="hambBtn" aria-label="Menu"><span></span><span></span><span></span></button>
     <div class="logo">Prop<b>Desk</b></div>
     <div class="hdr-date" id="hdrDate"></div>
   </div>
@@ -714,22 +696,6 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
     <span class="quota" id="quota"></span>
   </div>
 </header>
-
-<!-- DRAWER -->
-<div class="overlay" id="overlay"></div>
-<aside class="drawer" id="drawer">
-  <div class="drawer-h">
-    <div class="logo">Prop<b>Desk</b></div>
-    <button class="drawer-close" id="drawerClose">&times;</button>
-  </div>
-  <nav class="drawer-nav" id="drawerNav">
-    <button data-page="games" class="active">Games</button>
-    <button data-page="history">History</button>
-    <button data-page="how">How It Works</button>
-    <button data-page="disclaimer">Disclaimer</button>
-  </nav>
-  <div class="drawer-foot">PropDesk analyzes live sportsbook lines. Not financial advice. 21+ where applicable.</div>
-</aside>
 
 <div class="wrap">
 
@@ -5730,13 +5696,10 @@ function exportPlayHistStats(all,allRes,allHits,allRate,rate7,rate30,r7len,r30le
   _phDownloadCSV(csv,'propdesk-stats-'+new Date().toISOString().slice(0,10)+'.csv');
 }
 
-/* ============ NAV / DRAWER ============ */
-function openDrawer(){ $("drawer").classList.add("open"); $("overlay").classList.add("open"); }
-function closeDrawer(){ $("drawer").classList.remove("open"); $("overlay").classList.remove("open"); }
+/* ============ NAV ============ */
 function openMoreDrawer(){ $("moreOverlay").classList.add("open"); $("moreDrawer").classList.add("open"); }
 function closeMoreDrawer(){ $("moreOverlay").classList.remove("open"); $("moreDrawer").classList.remove("open"); }
 function updateBotnavActive(name){
-  // how/disclaimer pages → highlight "more" in bottom nav
   var eff=(name==="how"||name==="disclaimer")?"more":name;
   $("botnav").querySelectorAll("[data-nav]").forEach(function(b){
     b.classList.toggle("active",b.getAttribute("data-nav")===eff);
@@ -5745,7 +5708,6 @@ function updateBotnavActive(name){
 function showPage(name){
   document.querySelectorAll(".page").forEach(function(p){ p.classList.remove("active"); });
   var pg=$("page-"+name); if(pg) pg.classList.add("active");
-  $("drawerNav").querySelectorAll("button").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-page")===name); });
   updateBotnavActive(name);
   if(name==="history") renderHistory();
   window.scrollTo(0,0);
@@ -5819,13 +5781,6 @@ function init(){
   $("liveBtn").onclick=toggleLive;
   $("disconnectBtn").onclick=doDisconnect;
 
-  $("hambBtn").onclick=openDrawer;
-  $("drawerClose").onclick=closeDrawer;
-  $("overlay").onclick=closeDrawer;
-  $("drawerNav").querySelectorAll("button").forEach(function(b){
-    b.onclick=function(){ showPage(b.getAttribute("data-page")); closeDrawer(); };
-  });
-
   $("botnav").querySelectorAll("[data-nav]").forEach(function(b){
     b.onclick=function(){
       var nav=b.getAttribute("data-nav");
@@ -5848,7 +5803,6 @@ function init(){
       if(action==="parlay") openParlay(); else showPage(action);
     };
   });
-
   $("searchIn").addEventListener("input",function(){ renderTable(false); });
   $("bookSel").addEventListener("change",function(){ ST.book=$("bookSel").value; localStorage.setItem("pe_book",ST.book); if(ST.props.length) renderTable(false); });
   if(ST.book) $("bookSel").value=ST.book;
