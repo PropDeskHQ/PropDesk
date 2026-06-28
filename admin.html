@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PropDesk — Record</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#111;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;padding:24px 16px 48px}
+h1{font-size:20px;font-weight:700;letter-spacing:.5px;color:#fff;margin-bottom:4px}
+.sub{font-size:13px;color:#555;margin-bottom:24px}
+.record-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+.stat-card{background:#1a1a1a;border:1px solid #252525;border-radius:12px;padding:16px 20px;min-width:110px;flex:1}
+.stat-label{font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.stat-val{font-size:28px;font-weight:700;line-height:1}
+.stat-val.green{color:#22c55e}
+.stat-val.red{color:#ef4444}
+.stat-val.amber{color:#f59e0b}
+.stat-val.dim{color:#888}
+.win-rate{font-size:13px;color:#555;margin-top:4px}
+
+.tier-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.tier-chip{background:#1a1a1a;border:1px solid #252525;border-radius:8px;padding:8px 14px;font-size:12px;text-align:center;flex:1;min-width:80px}
+.tier-chip .t-name{font-weight:600;margin-bottom:4px}
+.tier-chip .t-rec{color:#888;font-size:12px}
+.tier-chip.elite .t-name{color:#a78bfa}
+.tier-chip.great .t-name{color:#22c55e}
+.tier-chip.good .t-name{color:#3b82f6}
+.tier-chip.value .t-name{color:#f59e0b}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#444;border-bottom:1px solid #222;font-weight:600}
+tbody tr{border-bottom:1px solid #1c1c1c}
+tbody tr:last-child{border-bottom:none}
+tbody td{padding:10px 10px;vertical-align:middle}
+.date-cell{color:#555;white-space:nowrap;font-size:12px}
+.player-cell{font-weight:600;color:#e8e8e8}
+.mkt-cell{color:#888;font-size:12px}
+.line-cell{font-family:monospace;font-size:12px;color:#aaa}
+.conf-cell{font-size:12px;font-weight:600}
+.tier-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.4px}
+.tier-badge.ELITE{background:#2d1f5e;color:#a78bfa}
+.tier-badge.GREAT{background:#1a3326;color:#22c55e}
+.tier-badge.GOOD{background:#1a2a3e;color:#3b82f6}
+.tier-badge.VALUE{background:#3b2a0a;color:#f59e0b}
+.result-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700}
+.result-badge.hit{background:#1a3326;color:#22c55e}
+.result-badge.miss{background:#2d1515;color:#ef4444}
+.result-badge.void{background:#252525;color:#666}
+.result-badge.pending{background:#1e2a1e;color:#888}
+.section-title{font-size:13px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px}
+.loading{color:#444;font-size:14px;padding:40px 0;text-align:center}
+</style>
+</head>
+<body>
+<h1>PropDesk Record</h1>
+<div class="sub" id="subtitle">Loading…</div>
+
+<div class="record-row" id="statsRow"></div>
+<div class="tier-row" id="tierRow"></div>
+
+<div class="section-title">All Plays</div>
+<table id="playsTable">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Player</th>
+      <th>Market</th>
+      <th>Line</th>
+      <th>Conf</th>
+      <th>Tier</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody id="tbody"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+</table>
+
+<script>
+function fmtDate(s){
+  var d=new Date(s+'T12:00:00');
+  return d.toLocaleDateString([],{month:'short',day:'numeric'});
+}
+
+fetch('propdesk-stats.json')
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var plays=data.plays||[];
+    var settled=plays.filter(function(p){return p.result==='hit'||p.result==='miss';});
+    var hits=settled.filter(function(p){return p.result==='hit';}).length;
+    var misses=settled.filter(function(p){return p.result==='miss';}).length;
+    var winRate=settled.length?Math.round(hits/settled.length*100):0;
+    var voids=plays.filter(function(p){return p.result==='void';}).length;
+    var pending=plays.filter(function(p){return p.result==='pending';}).length;
+
+    document.getElementById('subtitle').textContent=
+      'Since '+data.recordStart+' · Updated '+data.lastUpdated;
+
+    var statsRow=document.getElementById('statsRow');
+    statsRow.innerHTML=
+      '<div class="stat-card"><div class="stat-label">Record</div><div class="stat-val">'
+        +'<span class="stat-val green">'+hits+'</span>–<span class="stat-val red">'+misses+'</span>'
+      +'</div><div class="win-rate">'+winRate+'% win rate</div></div>'
+      +'<div class="stat-card"><div class="stat-label">Total Plays</div><div class="stat-val dim">'+plays.length+'</div></div>'
+      +'<div class="stat-card"><div class="stat-label">Voids</div><div class="stat-val amber">'+voids+'</div></div>'
+      +'<div class="stat-card"><div class="stat-label">Pending</div><div class="stat-val dim">'+pending+'</div></div>';
+
+    var tiers=['ELITE','GREAT','GOOD','VALUE'];
+    var tierCls={ELITE:'elite',GREAT:'great',GOOD:'good',VALUE:'value'};
+    var tierRow=document.getElementById('tierRow');
+    tierRow.innerHTML=tiers.map(function(t){
+      var tp=settled.filter(function(p){return p.tier===t;});
+      var th=tp.filter(function(p){return p.result==='hit';}).length;
+      return '<div class="tier-chip '+tierCls[t]+'">'
+        +'<div class="t-name">'+t+'</div>'
+        +'<div class="t-rec">'+th+'-'+(tp.length-th)+(tp.length?' ('+Math.round(th/tp.length*100)+'%)':'')+'</div>'
+        +'</div>';
+    }).join('');
+
+    var sorted=plays.slice().sort(function(a,b){return b.date.localeCompare(a.date);});
+    var tbody=document.getElementById('tbody');
+    tbody.innerHTML=sorted.map(function(p){
+      return '<tr>'
+        +'<td class="date-cell">'+fmtDate(p.date)+'</td>'
+        +'<td class="player-cell">'+esc(p.player)+'</td>'
+        +'<td class="mkt-cell">'+esc(p.marketDisplay||p.market)+'</td>'
+        +'<td class="line-cell">'+esc(p.line||'—')+'</td>'
+        +'<td class="conf-cell" style="color:'+confColor(p.confidence)+'">'+p.confidence+'%</td>'
+        +'<td><span class="tier-badge '+esc(p.tier)+'">'+esc(p.tier)+'</span></td>'
+        +'<td><span class="result-badge '+esc(p.result)+'">'+p.result+'</span></td>'
+        +'</tr>';
+    }).join('');
+  })
+  .catch(function(){
+    document.getElementById('tbody').innerHTML=
+      '<tr><td colspan="7" class="loading">Failed to load stats.</td></tr>';
+  });
+
+function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]);});}
+function confColor(c){if(c>=82)return'#22c55e';if(c>=68)return'#3b82f6';return'#888';}
+</script>
+</body>
+</html>
