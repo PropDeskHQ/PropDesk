@@ -212,7 +212,7 @@ function renderFilterPills(){
   document.getElementById('filterPills').innerHTML=[
     {k:'all',l:'All'},{k:'pending',l:'Pending'},{k:'hit',l:'Hit'},{k:'miss',l:'Miss'},{k:'void',l:'Void'}
   ].map(function(it){
-    return '<button class="pill-btn'+(filter===it.k?' active':'')+'" onclick="setFilter(\''+it.k+'\')">'
+    return '<button class="pill-btn'+(filter===it.k?' active':'')+'" data-act="pill" data-res="'+it.k+'">'
       +it.l+' <span style="opacity:.5">'+cnts[it.k]+'</span></button>';
   }).join('');
 }
@@ -351,13 +351,14 @@ function exportJSON(){
   alert('Downloaded propdesk-stats.json\nUpload this file to GitHub to update the live site.');
 }
 
-document.getElementById('days').addEventListener('click',function(e){
+document.addEventListener('click',function(e){
   var btn=e.target.closest('[data-act]');
   if(!btn) return;
   var act=btn.getAttribute('data-act');
   if(act==='res') setResult(+btn.getAttribute('data-idx'),btn.getAttribute('data-res'));
   else if(act==='day') toggleDay(btn.getAttribute('data-date'));
   else if(act==='bulk') bulkResolve(btn.getAttribute('data-date'),btn.getAttribute('data-res'));
+  else if(act==='pill') setFilter(btn.getAttribute('data-res'));
 });
 </script>
 </body>
