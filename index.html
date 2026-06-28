@@ -466,6 +466,26 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 /* Trends filter rows */
 .tc-spark{width:100%;height:50px;display:block;margin:10px 0 8px}
 .tc-streak-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(0,232,122,.12);color:var(--accent);border:1px solid rgba(0,232,122,.2);letter-spacing:.3px}
+/* Signal strength borders */
+.tcard.tc-strong{border-left:3px solid #00e87a!important;padding-left:17px}
+.tcard.tc-moderate{border-left:3px solid #f59e0b!important;padding-left:17px}
+.tcard.tc-weak{border-left:3px solid #333!important;padding-left:17px}
+/* Card header row */
+.tc-card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+.tc-signal-lbl{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}
+.tc-signal-strong{color:#00e87a}
+.tc-signal-moderate{color:#f59e0b}
+/* Card title — replaces the long headline as the main visual anchor */
+.tc-title-main{font-size:16px;font-weight:800;color:var(--text);line-height:1.35;margin-bottom:5px}
+/* Subtitle — the original descriptive sentence, now smaller */
+.tc-sub-hl{font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:8px}
+/* Action line */
+.tc-action{font-size:12px;font-style:italic;color:#888;margin-top:8px;line-height:1.4;padding-top:8px;border-top:1px solid #1e1e1e}
+/* Sort/filter controls above grid */
+.trends-controls{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.trends-sort-row,.trends-filter-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+.trends-ctl-lbl{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--mut2);white-space:nowrap;padding-right:4px}
+.trends-sort-row .pill,.trends-filter-row .pill{font-size:11px;padding:5px 11px;min-width:0}
 /* TREND DETAIL PANEL */
 .td-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:150;display:none;justify-content:flex-end}
 .td-overlay.open{display:flex}
@@ -6537,6 +6557,7 @@ function saveManualParlay(){
 
 var _trendsTime=null;
 var _trendsFilter="all";
+var _trendsSort="strength";
 var _trendsData=[];
 var _trendsSport="basketball_nba";
 var _trendsEvents=[];
@@ -7045,40 +7066,148 @@ function renderSparkline(vals,line,isOver){
 }
 
 /* --- Render -------------------------------------------------------- */
-function renderTrendCard(t){
+function _trendCardTitle(t){
+  var mkt=t._rawMarket||marketName(t._market||"");
+  if(t.type==="streak"){
+    if(t.streak>=3) return t.player+" — "+t.streak+"-game hit streak";
+    if(t.streak<=-3) return t.player+" — "+Math.abs(t.streak)+"-game cold streak";
+    return t.player+" — "+t.record+" hit rate";
+  }
+  if(t.type==="linevalue"){
+    if(t.recordCls==="under") return t.player+" "+mkt+" — Book line above recent form";
+    return t.player+" "+mkt+" — Book line below season average";
+  }
+  if(t.type==="movement"){
+    return t.title||("Sharp Money: "+t.player);
+  }
+  if(t.type==="totals"){
+    var side=t.recordCls==="under"?"Under":"Over";
+    return t.player+" — "+side+" has the pricing edge";
+  }
+  if(t.type==="matchup") return t.player+" — Situational matchup edge";
+  if(t.type==="teamsit") return t.player+" — Team situational system";
+  return t.title||t.player;
+}
+function _trendActionLine(t){
+  var mkt=t._rawMarket||marketName(t._market||"");
+  if(t.type==="streak"){
+    return "Consider backing "+t.player+" on "+mkt+" today";
+  }
+  if(t.type==="linevalue"){
+    var side=t.recordCls==="under"?"Under":"Over";
+    return "Book line may be off — consider the "+side+" on "+t.player;
+  }
+  if(t.type==="movement"){
+    if(t.recordCls==="neutral") return "Shop for the best available line on "+t.player;
+    var mvside=t.recordCls==="under"?"Under":"Over";
+    return "Sharp action detected — "+mvside+" likely to move on "+t.player;
+  }
+  if(t.type==="totals"){
+    var totside=t.recordCls==="under"?"Under":"Over";
+    return "Game total may be mispriced — "+totside+" has the pricing edge";
+  }
+  if(t.type==="matchup"){
+    var mside=t.recordCls==="under"?"Under":"Over";
+    return "Favorable matchup for "+t.player+" — historical splits back the "+mside;
+  }
+  if(t.type==="teamsit"){
+    return "Team historically performs well in this spot — situational edge detected";
+  }
+  return "";
+}
+function renderTrendCard(t, sigCls, sigLabel){
+  var sigCls=sigCls||"tc-weak";
   var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
     t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":"GAME TOTAL";
-  var headline=t.headline||t.title;
+  var title=_trendCardTitle(t);
+  var action=_trendActionLine(t);
   var systemName=t.systemName?'<div class="tc-system-name">'+esc(t.systemName)+'</div>':'';
-  var streakBadge=t.streak>=3?'<span class="tc-streak-badge">🔥 STREAK '+t.streak+'</span>':'';
+  var streakBadge=(t.streak>=3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge">🔥 STREAK '+t.streak+'</span></div>':
+    (t.streak<=-3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge" style="background:rgba(255,80,80,.1);color:#ff5050;border-color:rgba(255,80,80,.2)">❄ COLD '+Math.abs(t.streak)+'</span></div>':'';
   var spark=(t._rawVals&&t._rawVals.length>=3&&t._rawLine!=null)?renderSparkline(t._rawVals,t._rawLine,t._rawIsOver!==false):'';
   var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%"></div></div><span class="tc-hitbar-pct">'+t.hitRate+'%</span></div>':'';
-  return '<div class="tcard" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
-    '<div class="tc-tags"><span class="tc-type">'+typeLabel+'</span>'+streakBadge+'</div>'+
+  var signalHtml=sigLabel?'<span class="tc-signal-lbl tc-signal-'+sigCls.replace("tc-","")+'">'+sigLabel+'</span>':'<span></span>';
+  return '<div class="tcard '+sigCls+'" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
+    '<div class="tc-card-hdr">'+signalHtml+'<span class="tc-type">'+typeLabel+'</span></div>'+
     systemName+
-    '<div class="tc-player">'+esc(headline)+'</div>'+
+    '<div class="tc-title-main">'+esc(title)+'</div>'+
+    '<div class="tc-sub-hl">'+esc(t.headline||"")+'</div>'+
+    streakBadge+
     (spark?'<div>'+spark+'</div>':'')+
     '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
     hitBar+
+    (action?'<div class="tc-action">'+esc(action)+'</div>':'')+
     '<div class="tc-footer"><button class="tc-share-sm" data-share="'+esc(t.shareText)+'">Share ↗</button></div>'+
   '</div>';
 }
 
 function renderTrends(trends){
   var mount=$("trendsMount"); if(!mount) return;
+  // Filter
   var visible=trends.filter(function(t){
-    if(_trendsFilter!=="all"&&t.type!==_trendsFilter) return false;
-    return true;
+    return _trendsFilter==="all"||t.type===_trendsFilter;
   });
-  document.querySelectorAll("#trendTabs .pill").forEach(function(b){
-    b.classList.toggle("active", b.getAttribute("data-ttype")===_trendsFilter);
-  });
-  if(!visible.length){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔍</div><p>No trends found — try a different filter or check back as lines post.</p></div>';
-    return;
+  // Sort
+  var TYPE_RECENT={movement:0,totals:1,streak:2,linevalue:3,matchup:4,teamsit:5};
+  var TYPE_ALPHA={linevalue:0,matchup:1,movement:2,streak:3,teamsit:4,totals:5};
+  if(_trendsSort==="strength"){
+    visible=visible.slice().sort(function(a,b){return b.conf-a.conf;});
+  } else if(_trendsSort==="recent"){
+    visible=visible.slice().sort(function(a,b){
+      var ra=TYPE_RECENT[a.type]!=null?TYPE_RECENT[a.type]:9;
+      var rb=TYPE_RECENT[b.type]!=null?TYPE_RECENT[b.type]:9;
+      return ra!==rb?ra-rb:b.conf-a.conf;
+    });
+  } else {
+    visible=visible.slice().sort(function(a,b){
+      var ra=TYPE_ALPHA[a.type]!=null?TYPE_ALPHA[a.type]:9;
+      var rb=TYPE_ALPHA[b.type]!=null?TYPE_ALPHA[b.type]:9;
+      return ra!==rb?ra-rb:b.conf-a.conf;
+    });
   }
-  mount.innerHTML='<div class="trend-grid">'+visible.map(renderTrendCard).join("")+'</div>'+
-    '<p class="trends-empty-note">'+visible.length+' trend'+(visible.length!==1?"s":"")+'&nbsp;&nbsp;·&nbsp;&nbsp;Click any card for details&nbsp;&nbsp;·&nbsp;&nbsp;All data live</p>';
+  // Signal strength thresholds (fixed — conf range is ~55-95)
+  var STRONG_THRESH=82, MOD_THRESH=68;
+  function _sigInfo(t){
+    if(t.conf>=STRONG_THRESH) return {cls:"tc-strong",label:"STRONG SIGNAL"};
+    if(t.conf>=MOD_THRESH)    return {cls:"tc-moderate",label:"MODERATE"};
+    return {cls:"tc-weak",label:""};
+  }
+  // Sort/filter controls HTML
+  var FILTER_OPTS=[
+    {k:"all",lbl:"All"},{k:"streak",lbl:"Streaks"},{k:"linevalue",lbl:"Line Value"},
+    {k:"movement",lbl:"Sharp Money"},{k:"totals",lbl:"Game Totals"},
+    {k:"matchup",lbl:"Matchups"},{k:"teamsit",lbl:"Situational"}
+  ];
+  var SORT_OPTS=[{k:"strength",lbl:"Strongest First"},{k:"recent",lbl:"Most Recent"},{k:"type",lbl:"By Type"}];
+  var ctrlHtml='<div class="trends-controls">'+
+    '<div class="trends-sort-row"><span class="trends-ctl-lbl">Sort</span>'+
+    SORT_OPTS.map(function(o){return '<button class="pill'+(o.k===_trendsSort?" active":"")
+      +'" data-tsort="'+o.k+'">'+o.lbl+'</button>';}).join("")+
+    '</div>'+
+    '<div class="trends-filter-row">'+
+    FILTER_OPTS.map(function(o){return '<button class="pill'+(o.k===_trendsFilter?" active":"")
+      +'" data-ttype="'+o.k+'">'+o.lbl+'</button>';}).join("")+
+    '</div></div>';
+  // Empty state for filtered view
+  if(!visible.length){
+    var FILTER_NAMES={streak:"Streak",linevalue:"Line Value",movement:"Sharp Money",
+      totals:"Game Total",matchup:"Matchup",teamsit:"Situational"};
+    var emptyMsg=_trendsFilter==="all"
+      ?"No trends found — check back as lines post closer to game time"
+      :"No "+( FILTER_NAMES[_trendsFilter]||_trendsFilter)+" trends detected today — check back as lines move closer to game time";
+    mount.innerHTML=ctrlHtml+'<div class="tc-no-data"><div class="nd-icon">🔍</div><p>'+emptyMsg+'</p></div>';
+  } else {
+    mount.innerHTML=ctrlHtml+
+      '<div class="trend-grid">'+visible.map(function(t){var s=_sigInfo(t);return renderTrendCard(t,s.cls,s.label);}).join("")+'</div>'+
+      '<p class="trends-empty-note">'+visible.length+' trend'+(visible.length!==1?"s":"")+'&nbsp;&nbsp;·&nbsp;&nbsp;Click any card for details&nbsp;&nbsp;·&nbsp;&nbsp;All data live</p>';
+  }
+  // Wire sort/filter handlers
+  mount.querySelectorAll("[data-tsort]").forEach(function(btn){
+    btn.onclick=function(){ _trendsSort=btn.getAttribute("data-tsort"); renderTrends(_trendsData); };
+  });
+  mount.querySelectorAll("[data-ttype]").forEach(function(btn){
+    btn.onclick=function(){ _trendsFilter=btn.getAttribute("data-ttype"); renderTrends(_trendsData); };
+  });
   mount.querySelectorAll(".tc-share-sm").forEach(function(btn){
     btn.onclick=function(e){ e.stopPropagation(); copyText(btn.getAttribute("data-share")); toast("Copied!"); };
   });
