@@ -247,7 +247,7 @@ function renderDays(){
     var hdSum=allDay.length+' play'+(allDay.length!==1?'s':'')+' · '+hits+' hit / '+miss+' miss'+(pend?' · <span style="color:#f59e0b">'+pend+' pending</span>':'');
 
     var html='<div class="day-wrap">'
-      +'<button class="day-hdr" onclick="toggleDay(\''+date+'\')">'
+      +'<button class="day-hdr" data-act="day" data-date="'+date+'">'
       +'<span style="color:#444;font-size:11px;width:12px;flex-shrink:0">'+(expanded?'▾':'▸')+'</span>'
       +'<span style="color:#e8e8e8;font-size:13px;font-weight:700;margin-right:4px">'+fmtDate(date)+'</span>'
       +'<span style="color:#444;font-size:12px">'+hdSum+'</span>'
@@ -263,8 +263,8 @@ function renderDays(){
       // Bulk buttons
       if(pend>0){
         html+='<div class="bulk-row">'
-          +'<button onclick="bulkResolve(\''+date+'\',\'hit\')" style="background:#1a3326;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✓ Mark All Hit</button>'
-          +'<button onclick="bulkResolve(\''+date+'\',\'miss\')" style="background:#2d1515;color:#ef4444;border:1px solid #ef444433;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✕ Mark All Miss</button>'
+          +'<button data-act="bulk" data-date="'+date+'" data-res="hit" style="background:#1a3326;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✓ Mark All Hit</button>'
+          +'<button data-act="bulk" data-date="'+date+'" data-res="miss" style="background:#2d1515;color:#ef4444;border:1px solid #ef444433;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✕ Mark All Miss</button>'
           +'</div>';
       }
       // Plays
@@ -288,7 +288,7 @@ function renderRow(p){
   ['hit','miss','void','pending'].forEach(function(r){
     var active=p.result===r;
     var lbl={hit:'✓ Hit',miss:'✕ Miss',void:'⊘',pending:'?'}[r];
-    html+='<button class="res-btn'+(active?' active-'+r:'')+'" onclick="setResult('+p._idx+',\''+r+'\')">'+lbl+'</button>';
+    html+='<button class="res-btn'+(active?' active-'+r:'')+'" data-act="res" data-idx="'+p._idx+'" data-res="'+r+'">'+lbl+'</button>';
   });
   html+='</div></div>';
   return html;
@@ -350,6 +350,15 @@ function exportJSON(){
   URL.revokeObjectURL(url);
   alert('Downloaded propdesk-stats.json\nUpload this file to GitHub to update the live site.');
 }
+
+document.getElementById('days').addEventListener('click',function(e){
+  var btn=e.target.closest('[data-act]');
+  if(!btn) return;
+  var act=btn.getAttribute('data-act');
+  if(act==='res') setResult(+btn.getAttribute('data-idx'),btn.getAttribute('data-res'));
+  else if(act==='day') toggleDay(btn.getAttribute('data-date'));
+  else if(act==='bulk') bulkResolve(btn.getAttribute('data-date'),btn.getAttribute('data-res'));
+});
 </script>
 </body>
 </html>
