@@ -579,8 +579,23 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .more-drawer-item:last-child{border-bottom:none}
 .more-drawer-item:active{background:var(--surf2)}
 .more-drawer-ic{font-size:18px;width:24px;text-align:center;flex-shrink:0}
+/* MORE DRAWER CONNECTION SECTION */
+.drawer-conn-section{display:none}
+@media(max-width:639px){.drawer-conn-section{display:block;border-bottom:1px solid #1e1e1e}}
+.dc-label{font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#444;padding:14px 22px 6px}
+.dc-row{display:flex;align-items:center;padding:10px 22px;border-top:1px solid #1a1a1a;min-height:48px;gap:10px}
+.dc-left{flex:1;min-width:0}
+.dc-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
+.dc-sub{font-size:11px;color:var(--mut);margin-top:2px}
+.dc-val{font-size:13px;color:var(--mut);flex-shrink:0}
+.dc-key-val{font-size:12px;color:var(--mut2);font-family:monospace;letter-spacing:.05em;cursor:pointer;transition:color .1s}
+.dc-key-val:active{color:var(--accent)}
+.dc-btn{font-size:11px;font-weight:700;padding:5px 11px;white-space:nowrap;flex-shrink:0;height:auto}
+.dc-key-input-row{gap:8px;padding:8px 22px;border-top:1px solid #1a1a1a}
+.dc-key-input-row .keyin{display:block;flex:1;margin:0;font-size:12px;padding:6px 10px}
 @media(max-width:639px){
-  .hdr-date{display:none}
+  #liveBtn{display:none}
+  #countdown{display:none!important}
   .keyin{display:none}
   #connectBtn{display:none}
   #disconnectBtn{display:none!important}
@@ -986,6 +1001,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 <div class="more-overlay" id="moreOverlay"></div>
 <div class="more-drawer" id="moreDrawer">
   <div class="more-drawer-handle"></div>
+  <div id="drawerConn" class="drawer-conn-section"></div>
   <button class="more-drawer-item" data-more-action="parlay"><span class="more-drawer-ic">+</span>Parlay Builder</button>
   <button class="more-drawer-item" data-more-action="how"><span class="more-drawer-ic">?</span>How It Works</button>
   <button class="more-drawer-item" data-more-action="disclaimer"><span class="more-drawer-ic">!</span>Disclaimer</button>
@@ -4501,11 +4517,13 @@ function toggleLive(){
     btn.textContent="Live OFF"; btn.classList.remove("on");
     cd.style.display="none"; clearInterval(ST.liveTimer);
   }
+  _updateDrawerConnection();
 }
 function tickLive(){
   ST.liveSecs--;
   var m=Math.floor(ST.liveSecs/60), s=ST.liveSecs%60;
   $("countdown").textContent="Refresh in "+m+":"+(s<10?"0":"")+s;
+  var dc=$("drawerCountdown"); if(dc) dc.textContent="in "+m+":"+(s<10?"0":"")+s;
   if(ST.liveSecs<=0){ ST.liveSecs=300; silentRefresh(); }
 }
 async function silentRefresh(){
@@ -5713,7 +5731,38 @@ function exportPlayHistStats(all,allRes,allHits,allRate,rate7,rate30,r7len,r30le
 }
 
 /* ============ NAV ============ */
-function openMoreDrawer(){ $("moreOverlay").classList.add("open"); $("moreDrawer").classList.add("open"); }
+function _updateDrawerConnection(){
+  var el=$("drawerConn"); if(!el) return;
+  var key=getKey(), connected=!!key, live=ST.live;
+  var m=Math.floor((ST.liveSecs||0)/60), s=(ST.liveSecs||0)%60;
+  var quotaText=($("quota").textContent||"").trim();
+  var html='<div class="dc-label">CONNECTION</div>';
+  // Row 1: Live Mode
+  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Live Mode</div><div class="dc-sub">Auto-refresh prop data</div></div>'
+    +'<button class="btn live-btn dc-btn'+(live?" on":"")+(connected?"":" disabled")+'" id="drawerLiveBtn"'+(connected?"":" disabled")+'>'+(live?"Live ON":"Live OFF")+'</button></div>';
+  // Row 2: API Status
+  var sc=connected?"#00e87a":"#ff5050", sl=connected?"Connected":"Disconnected";
+  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:'+sc+'">'+sl+'</div></div>'
+    +(connected?'<button class="btn btn-disc dc-btn" id="drawerDiscBtn">Disconnect</button>':'<button class="btn btn-accent dc-btn" id="drawerConnTrigger">Connect</button>')+'</div>';
+  // Key input row (disconnected only)
+  if(!connected) html+='<div class="dc-row dc-key-input-row"><input class="keyin" id="drawerKeyInput" placeholder="Paste API key…" autocomplete="off"><button class="btn btn-accent dc-btn" id="drawerConnBtn">Go</button></div>';
+  // Row 3: API Key (connected only)
+  if(connected){ var tk=key.length>8?key.slice(0,8)+"...":key; html+='<div class="dc-row" id="drawerKeyRow"><div class="dc-left"><div class="dc-title">API Key</div></div><span class="dc-val dc-key-val" id="drawerKeyCopy">'+tk+'</span></div>'; }
+  // Row 4: Next refresh (live only)
+  if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="drawerCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="drawerRefreshBtn">Refresh Now</button></div>';
+  // Row 5: Quota
+  if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
+  el.innerHTML=html;
+  // Wire handlers
+  var dlb=$("drawerLiveBtn"); if(dlb) dlb.onclick=function(){ if(connected) toggleLive(); };
+  var ddb=$("drawerDiscBtn"); if(ddb) ddb.onclick=doDisconnect;
+  var dct=$("drawerConnTrigger"); if(dct) dct.onclick=function(){ var i=$("drawerKeyInput"); if(i) i.focus(); };
+  var dcb=$("drawerConnBtn"); if(dcb) dcb.onclick=function(){ var i=$("drawerKeyInput"); if(i&&i.value.trim()) doConnect(i.value.trim()); };
+  var dki=$("drawerKeyInput"); if(dki) dki.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()) doConnect(this.value.trim()); });
+  var dkr=$("drawerKeyRow"); if(dkr) dkr.onclick=function(){ navigator.clipboard.writeText(key||"").then(function(){ var kc=$("drawerKeyCopy"); if(kc){kc.textContent="Copied!"; setTimeout(_updateDrawerConnection,1200);} }).catch(function(){ toast("Copy failed"); }); };
+  var drb=$("drawerRefreshBtn"); if(drb) drb.onclick=function(){ closeMoreDrawer(); toast("Refreshing…"); silentRefresh(); };
+}
+function openMoreDrawer(){ $("moreOverlay").classList.add("open"); $("moreDrawer").classList.add("open"); _updateDrawerConnection(); }
 function closeMoreDrawer(){ $("moreOverlay").classList.remove("open"); $("moreDrawer").classList.remove("open"); }
 function updateBotnavActive(name){
   var eff=(name==="how"||name==="disclaimer")?"more":name;
@@ -5749,6 +5798,7 @@ function doConnect(key){
     ST.liveTimer=setInterval(tickLive,1000);
   }
   fetchEvents();
+  _updateDrawerConnection();
 }
 
 function doDisconnect(){
@@ -5763,6 +5813,7 @@ function doDisconnect(){
     clearInterval(ST.liveTimer); ST.liveTimer=null;
   }
   toast("Disconnected");
+  _updateDrawerConnection();
 }
 
 /* ============ INIT ============ */
