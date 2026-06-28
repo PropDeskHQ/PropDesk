@@ -593,6 +593,23 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .dc-btn{font-size:11px;font-weight:700;padding:5px 11px;white-space:nowrap;flex-shrink:0;height:auto}
 .dc-key-input-row{gap:8px;padding:8px 22px;border-top:1px solid #1a1a1a}
 .dc-key-input-row .keyin{display:block;flex:1;margin:0;font-size:12px;padding:6px 10px}
+/* SETTINGS PANEL (desktop) */
+.settings-btn{display:none;font-size:18px;color:#888;padding:4px 8px;line-height:1;transition:color .15s ease;border-radius:6px}
+.settings-btn:hover{color:#bbb}
+.settings-btn.live{color:#00e87a}
+.settings-btn.open{color:#00e87a}
+.settings-panel{position:fixed;top:52px;right:14px;width:320px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.75);z-index:200;display:none;overflow:hidden}
+.settings-panel.open{display:block}
+@media(min-width:640px){
+  .settings-btn{display:flex;align-items:center;justify-content:center}
+  #liveBtn{display:none}
+  #countdown{display:none!important}
+  .keyin{display:none}
+  #connectBtn{display:none}
+  #disconnectBtn{display:none!important}
+  #statusDot{display:none}
+  .quota{display:none}
+}
 @media(max-width:639px){
   #liveBtn{display:none}
   #countdown{display:none!important}
@@ -713,8 +730,10 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
     <button class="btn btn-disc" id="disconnectBtn" style="display:none">Disconnect</button>
     <span class="dot" id="statusDot"></span>
     <span class="quota" id="quota"></span>
+    <button id="settingsBtn" class="settings-btn" title="Connection settings">⚙</button>
   </div>
 </header>
+<div id="settingsPanel" class="settings-panel"></div>
 
 <div class="wrap">
 
@@ -4518,12 +4537,14 @@ function toggleLive(){
     cd.style.display="none"; clearInterval(ST.liveTimer);
   }
   _updateDrawerConnection();
+  _updateSettingsPanel();
 }
 function tickLive(){
   ST.liveSecs--;
   var m=Math.floor(ST.liveSecs/60), s=ST.liveSecs%60;
   $("countdown").textContent="Refresh in "+m+":"+(s<10?"0":"")+s;
   var dc=$("drawerCountdown"); if(dc) dc.textContent="in "+m+":"+(s<10?"0":"")+s;
+  var sc=$("spCountdown"); if(sc) sc.textContent="in "+m+":"+(s<10?"0":"")+s;
   if(ST.liveSecs<=0){ ST.liveSecs=300; silentRefresh(); }
 }
 async function silentRefresh(){
@@ -5764,6 +5785,40 @@ function _updateDrawerConnection(){
 }
 function openMoreDrawer(){ $("moreOverlay").classList.add("open"); $("moreDrawer").classList.add("open"); _updateDrawerConnection(); }
 function closeMoreDrawer(){ $("moreOverlay").classList.remove("open"); $("moreDrawer").classList.remove("open"); }
+function _updateGearIcon(){
+  var btn=$("settingsBtn"); if(!btn) return;
+  var open=$("settingsPanel")&&$("settingsPanel").classList.contains("open");
+  btn.classList.toggle("live",ST.live);
+  btn.classList.toggle("open",!!open);
+}
+function openSettingsPanel(){ var p=$("settingsPanel"); if(!p) return; p.classList.add("open"); _updateSettingsPanel(); }
+function closeSettingsPanel(){ var p=$("settingsPanel"); if(!p) return; p.classList.remove("open"); _updateGearIcon(); }
+function toggleSettingsPanel(){ var p=$("settingsPanel"); if(!p) return; if(p.classList.contains("open")) closeSettingsPanel(); else openSettingsPanel(); }
+function _updateSettingsPanel(){
+  var el=$("settingsPanel"); if(!el) return;
+  var key=getKey(), connected=!!key, live=ST.live;
+  var m=Math.floor((ST.liveSecs||0)/60), s=(ST.liveSecs||0)%60;
+  var quotaText=($("quota").textContent||"").trim();
+  var sc=connected?"#00e87a":"#ff5050", sl=connected?"Connected":"Disconnected";
+  var html='<div class="dc-label">CONNECTION</div>';
+  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Live Mode</div><div class="dc-sub">Auto-refresh prop data</div></div>'
+    +'<button class="btn live-btn dc-btn'+(live?" on":"")+(connected?"":" disabled")+'" id="spLiveBtn"'+(connected?"":" disabled")+'>'+(live?"Live ON":"Live OFF")+'</button></div>';
+  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:'+sc+'">'+sl+'</div></div>'
+    +(connected?'<button class="btn btn-disc dc-btn" id="spDiscBtn">Disconnect</button>':'<button class="btn btn-accent dc-btn" id="spConnTrigger">Connect</button>')+'</div>';
+  if(!connected) html+='<div class="dc-row dc-key-input-row"><input class="keyin" id="spKeyInput" placeholder="Paste API key…" autocomplete="off"><button class="btn btn-accent dc-btn" id="spConnBtn">Go</button></div>';
+  if(connected){ var tk=key.length>8?key.slice(0,8)+"...":key; html+='<div class="dc-row" id="spKeyRow"><div class="dc-left"><div class="dc-title">API Key</div></div><span class="dc-val dc-key-val" id="spKeyCopy">'+tk+'</span></div>'; }
+  if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="spCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="spRefreshBtn">Refresh Now</button></div>';
+  if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
+  el.innerHTML=html;
+  var slb=$("spLiveBtn"); if(slb) slb.onclick=function(e){ e.stopPropagation(); if(connected) toggleLive(); };
+  var sdb=$("spDiscBtn"); if(sdb) sdb.onclick=function(e){ e.stopPropagation(); doDisconnect(); };
+  var sct=$("spConnTrigger"); if(sct) sct.onclick=function(e){ e.stopPropagation(); var i=$("spKeyInput"); if(i) i.focus(); };
+  var scb=$("spConnBtn"); if(scb) scb.onclick=function(e){ e.stopPropagation(); var i=$("spKeyInput"); if(i&&i.value.trim()) doConnect(i.value.trim()); };
+  var ski=$("spKeyInput"); if(ski) ski.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()){ e.stopPropagation(); doConnect(this.value.trim()); } });
+  var skr=$("spKeyRow"); if(skr) skr.onclick=function(e){ e.stopPropagation(); navigator.clipboard.writeText(key||"").then(function(){ var kc=$("spKeyCopy"); if(kc){kc.textContent="Copied ✓"; setTimeout(_updateSettingsPanel,1200);} }).catch(function(){ toast("Copy failed"); }); };
+  var srb=$("spRefreshBtn"); if(srb) srb.onclick=function(e){ e.stopPropagation(); closeSettingsPanel(); toast("Refreshing…"); silentRefresh(); };
+  _updateGearIcon();
+}
 function updateBotnavActive(name){
   var eff=(name==="how"||name==="disclaimer")?"more":name;
   $("botnav").querySelectorAll("[data-nav]").forEach(function(b){
@@ -5799,6 +5854,7 @@ function doConnect(key){
   }
   fetchEvents();
   _updateDrawerConnection();
+  _updateSettingsPanel();
 }
 
 function doDisconnect(){
@@ -5814,6 +5870,7 @@ function doDisconnect(){
   }
   toast("Disconnected");
   _updateDrawerConnection();
+  _updateSettingsPanel();
 }
 
 /* ============ INIT ============ */
@@ -5840,6 +5897,7 @@ function init(){
     ST.liveSecs=300; tickLive();
     ST.liveTimer=setInterval(tickLive,1000);
   }
+  _updateGearIcon();
 
   renderSportTabs(); renderPropTabs();
 
@@ -5861,6 +5919,11 @@ function init(){
       closeMoreDrawer();
       showPage(nav);
     };
+  });
+  $("settingsBtn").onclick=function(e){ e.stopPropagation(); toggleSettingsPanel(); };
+  document.addEventListener("click",function(e){
+    var p=$("settingsPanel");
+    if(p&&p.classList.contains("open")&&!p.contains(e.target)&&e.target!==$("settingsBtn")) closeSettingsPanel();
   });
   $("moreOverlay").onclick=closeMoreDrawer;
   $("moreDrawer").querySelectorAll("[data-more-action]").forEach(function(b){
