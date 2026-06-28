@@ -4765,6 +4765,8 @@ var _histSearch="";
 var _phCollapsedDates={};
 var _phAnalyticsSport="all";
 var _phAnalyticsMkt="all";
+var _histView="my";
+var _pdStatsCache=null;
 
 function loadPlayHist(){ try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]"); }catch(e){ return []; } }
 function savePlayHist(h){ try{ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h)); }catch(e){ console.warn("[History] storage full",e); } }
@@ -5084,8 +5086,189 @@ function _phAnalyticsCharts(all,sport,mkt){
   return html;
 }
 
+function _renderPdStats(mount){
+  mount.innerHTML='<div style="padding:32px;text-align:center"><div style="font-size:12px;color:var(--mut)">Loading PropDesk Stats…</div></div>';
+  if(_pdStatsCache){ _renderPdStatsData(mount,_pdStatsCache); return; }
+  fetch("/propdesk-stats.json?_="+Math.floor(Date.now()/86400000))
+    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(d){ _pdStatsCache=d; _renderPdStatsData(mount,d); })
+    .catch(function(){ mount.innerHTML='<div style="padding:32px;text-align:center;font-size:13px;color:var(--mut)">PropDesk Stats unavailable — check back soon.</div>'; });
+}
+
+function _renderPdStatsData(mount,data){
+  var plays=data.plays||[];
+  var lu=data.lastUpdated||"", rs=data.recordStart||"";
+  function fmtD(s){ if(!s) return "–"; var p=s.split('-'),M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return M[parseInt(p[1])-1]+' '+parseInt(p[2])+', '+p[0]; }
+  var allRes=plays.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
+  var allHits=allRes.filter(function(e){ return e.result==="hit"; }).length;
+  var allRate=_phRate(allHits,allRes.length);
+  var d7=new Date(); d7.setDate(d7.getDate()-7);
+  var d30=new Date(); d30.setDate(d30.getDate()-30);
+  var r7=allRes.filter(function(e){ return new Date(e.date)>=d7; });
+  var r30=allRes.filter(function(e){ return new Date(e.date)>=d30; });
+  var rate7=_phRate(r7.filter(function(e){ return e.result==="hit"; }).length,r7.length);
+  var rate30=_phRate(r30.filter(function(e){ return e.result==="hit"; }).length,r30.length);
+  /* by sport */
+  var sportMap={};
+  plays.forEach(function(e){
+    if(!sportMap[e.sport]) sportMap[e.sport]={plays:0,hits:0,misses:0,pending:0};
+    var m=sportMap[e.sport]; m.plays++;
+    if(e.result==="hit") m.hits++; else if(e.result==="miss") m.misses++; else if(e.result!=="void") m.pending++;
+  });
+  /* by market */
+  var mktMap={};
+  plays.forEach(function(e){
+    var k=e.marketDisplay||e.market||"";
+    if(!mktMap[k]) mktMap[k]={plays:0,hits:0,misses:0,confSum:0,curStreak:0,bestStreak:0};
+    var m=mktMap[k]; m.plays++; m.confSum+=(e.confidence||0);
+    if(e.result==="hit"){ m.hits++; m.curStreak=m.curStreak>0?m.curStreak+1:1; m.bestStreak=Math.max(m.bestStreak,m.curStreak); }
+    else if(e.result==="miss"){ m.misses++; m.curStreak=m.curStreak<0?m.curStreak-1:-1; }
+  });
+  var topMkts=Object.keys(mktMap).sort(function(a,b){ return mktMap[b].plays-mktMap[a].plays; }).slice(0,10);
+  /* tiers */
+  var TIER_DEF=[{label:"ELITE",min:90,max:100,exp:92},{label:"GREAT",min:75,max:89,exp:82},{label:"GOOD",min:60,max:74,exp:67},{label:"VALUE",min:45,max:59,exp:52},{label:"POOR",min:0,max:44,exp:35}];
+  var tierMap={}; TIER_DEF.forEach(function(t){ tierMap[t.label]={plays:0,hits:0}; });
+  allRes.forEach(function(e){
+    var c=e.confidence||0, td=TIER_DEF.filter(function(t){ return c>=t.min&&c<=t.max; })[0];
+    if(td){ tierMap[td.label].plays++; if(e.result==="hit") tierMap[td.label].hits++; }
+  });
+  /* streaks */
+  var resolvedAsc=allRes.slice().sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+  var streaks=_phCalcStreaks(resolvedAsc);
+  /* hot/cold */
+  var mktRanks=Object.keys(mktMap).filter(function(k){ var m=mktMap[k]; return (m.hits+m.misses)>=3; })
+    .map(function(k){ var m=mktMap[k]; return {k:k,rate:_phRate(m.hits,m.hits+m.misses)}; }).sort(function(a,b){ return b.rate-a.rate; });
+  var hotMkts=mktRanks.slice(0,3), _hotKeys={};
+  hotMkts.forEach(function(m){_hotKeys[m.k]=1;});
+  var coldMkts=mktRanks.filter(function(m){return !_hotKeys[m.k];}).slice(-3).reverse();
+
+  function chartCard(title,desc,body){
+    return '<div style="background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
+      '<div style="font-size:10px;font-weight:800;color:rgba(0,232,122,.7);letter-spacing:.1em;text-transform:uppercase">'+title+'</div>'+
+      '<div style="font-size:8px;font-weight:800;color:#333;letter-spacing:.08em">PROPDESK</div></div>'+
+      body+'<div style="font-size:11px;color:#888;font-style:italic;margin-top:8px;line-height:1.5">'+desc+'</div></div>';
+  }
+  function ph(msg){ return '<div style="font-size:11px;color:#555;text-align:center;padding:16px 0;font-style:italic">'+msg+'</div>'; }
+
+  var html='<div style="padding:16px">';
+  /* header banner */
+  html+='<div style="background:#111;border:1px solid #1e1e1e;border-left:3px solid #00e87a;border-radius:8px;padding:14px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  html+='<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-weight:800;font-size:15px;letter-spacing:-.3px">Prop<b style="color:#00e87a">Desk</b></span>';
+  html+='<span style="font-size:9px;font-weight:800;color:#00e87a;letter-spacing:.08em;text-transform:uppercase">Official Record</span></div>';
+  html+='<div style="font-size:11px;color:#888">Tracking since '+fmtD(rs)+'</div></div>';
+  html+='<div style="text-align:right"><div style="font-size:10px;color:#555">Last updated</div><div style="font-size:11px;color:#666">'+esc(lu)+'</div></div>';
+  html+='</div>';
+  /* overall record */
+  html+=_phSectionHdr("Overall Record");
+  if(!allRes.length){
+    html+='<div style="margin-bottom:32px"><div style="font-size:28px;font-weight:800;color:var(--mut);margin-bottom:6px">–</div>';
+    html+='<div style="font-size:12px;color:var(--mut)">No resolved plays yet.</div></div>';
+  } else {
+    var rateColor=_phRateColor(allRate);
+    html+='<div style="margin-bottom:32px">';
+    html+='<div style="font-size:28px;font-weight:800;color:'+rateColor+';margin-bottom:2px">'+(allRate!==null?allRate+'%':'–')+'</div>';
+    html+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+allHits+' hits / '+allRes.length+' resolved</div>';
+    html+='<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px"><div style="background:'+rateColor+';width:'+(allRate||0)+'%;height:100%;border-radius:4px"></div></div>';
+    html+='<div style="display:flex;gap:24px">';
+    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 7 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate7)+'">'+_phRateStr(rate7)+'</div><div style="font-size:9px;color:var(--mut)">'+r7.length+' resolved</div></div>';
+    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate30)+'">'+_phRateStr(rate30)+'</div><div style="font-size:9px;color:var(--mut)">'+r30.length+' resolved</div></div>';
+    html+='</div></div>';
+  }
+  /* by sport */
+  var sportKeys=Object.keys(sportMap);
+  if(sportKeys.length&&allRes.length){
+    html+=_phSectionHdr("By Sport");
+    html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate'],sportKeys.map(function(s){
+      var m=sportMap[s], rate=_phRate(m.hits,m.hits+m.misses);
+      return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+esc(s)+'</td><td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
+        '<td style="padding:5px 8px;font-size:11px;color:var(--accent)">'+m.hits+'</td><td style="padding:5px 8px;font-size:11px;color:var(--red)">'+m.misses+'</td>'+
+        '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+m.pending+'</td><td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td></tr>';
+    }),true);
+    html+='<div style="margin-bottom:16px"></div>';
+  }
+  /* by market */
+  if(topMkts.length){
+    html+=_phSectionHdr("By Market");
+    html+=_phTbl(['Market','Plays','Hit Rate','Best Streak','Avg Conf'],topMkts.map(function(k){
+      var m=mktMap[k], rate=_phRate(m.hits,m.hits+m.misses);
+      return '<tr><td style="padding:5px 8px;font-size:11px">'+esc(k)+'</td><td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
+        '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td>'+
+        '<td style="padding:5px 8px;font-size:11px">'+(m.bestStreak||'–')+'</td><td style="padding:5px 8px;font-size:11px">'+(m.plays>0?Math.round(m.confSum/m.plays)+'%':'–')+'</td></tr>';
+    }),true);
+    html+='<div style="margin-bottom:16px"></div>';
+  }
+  /* by tier */
+  if(allRes.length){
+    html+=_phSectionHdr("By Confidence Tier");
+    html+=_phTbl(['Tier','Range','Plays','Hit Rate','Expected','Gap'],TIER_DEF.map(function(t){
+      var tm=tierMap[t.label], rate=_phRate(tm.hits,tm.plays);
+      var gap=rate!==null?rate-t.exp:null;
+      var gc=gap===null?"var(--mut)":Math.abs(gap)<=5?"var(--accent)":Math.abs(gap)<=10?"var(--yellow)":"var(--red)";
+      return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+t.label+'</td>'+
+        '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+t.min+'–'+t.max+'%</td>'+
+        '<td style="padding:5px 8px;font-size:11px">'+(tm.plays||'–')+'</td>'+
+        '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td>'+
+        '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+t.exp+'%</td>'+
+        '<td style="padding:5px 8px;font-size:11px;font-weight:700;color:'+gc+'">'+(gap===null?"–":(gap>=0?"+":"")+gap+'%')+'</td></tr>';
+    }),true);
+    html+='<div style="margin-bottom:16px"></div>';
+  }
+  /* streaks */
+  html+=_phSectionHdr("Streaks & Trends");
+  if(allRes.length<5){
+    html+='<div style="font-size:11px;color:var(--mut);margin-bottom:32px">Streak data available after 5 resolved plays.</div>';
+  } else {
+    var curS=streaks.cur, bH=streaks.bHit, bM=streaks.bMiss;
+    var curStr=curS.len?(curS.len+" "+(curS.dir?"hit":"miss")+" streak"):"—";
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px">';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">CURRENT STREAK</div><div style="font-size:15px;font-weight:800;color:'+(curS.len?(curS.dir?"var(--accent)":"var(--red)"):"var(--mut)")+'">'+curStr+'</div></div>';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST HIT STREAK</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(bH.len?bH.len+" hits":"–")+'</div>'+(bH.len?'<div style="font-size:9px;color:var(--mut)">'+bH.start+(bH.start!==bH.end?" → "+bH.end:"")+'</div>':"")+'</div>';
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">WORST MISS STREAK</div><div style="font-size:15px;font-weight:800;color:var(--red)">'+(bM.len?bM.len+" misses":"–")+'</div></div>';
+    html+='</div>';
+    var _hotShow=hotMkts.length>=2, _coldShow=coldMkts.length>=2;
+    if(_hotShow||_coldShow){
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">';
+      html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">HOT MARKETS</div>';
+      if(_hotShow) hotMkts.forEach(function(m){html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--accent);font-weight:700">'+m.rate+'%</span></div>';});
+      else html+='<div style="font-size:10px;color:var(--mut);font-style:italic">Not enough data yet</div>';
+      html+='</div><div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">COLD MARKETS</div>';
+      if(_coldShow) coldMkts.forEach(function(m){html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--red);font-weight:700">'+m.rate+'%</span></div>';});
+      else html+='<div style="font-size:10px;color:var(--mut);font-style:italic">Not enough data yet</div>';
+      html+='</div></div>';
+    }
+    html+='<div style="margin-bottom:16px"></div>';
+  }
+  /* charts */
+  if(allRes.length){
+    var s1=_phChartTimelineSvg(allRes);
+    html+=_phSectionHdr("Hit Rate Over Time");
+    html+=chartCard("30-Day Rolling Hit Rate","Daily hit rate across all resolved PropDesk plays. Dashed line marks the 75% model target.",s1||ph("Need data from 3+ different days to render"));
+    var s2=_phChartCalibrationSvg(allRes);
+    html+=_phSectionHdr("Model Calibration");
+    html+=chartCard("Calibration by Confidence Tier","Actual hit rate vs expected per tier. Green = model accurate, red = overconfident.",s2||ph("Need 3+ plays per tier to render"));
+  }
+  var s3=_phChartPlayersHtml(plays);
+  if(s3){
+    html+=_phSectionHdr("Player Performance");
+    html+=chartCard("Top Performers","Players PropDesk has the strongest track record on (min 3 resolved plays).",s3);
+  }
+  html+='<div style="margin-top:16px;padding-bottom:8px;font-size:10px;color:var(--mut2)">'+plays.length+' tracked plays · data updated weekly</div>';
+  html+='</div>';
+  mount.innerHTML=html;
+}
+
 function renderPlayHistory(){
   var mount=$("playHistMount"); if(!mount) return;
+  if(_histView==="pd"){
+    mount.innerHTML='<div style="padding:16px 16px 0"><div class="tabrow" style="gap:6px;margin-bottom:0">'+
+      '<button class="pill" data-hist-view="my">My History</button>'+
+      '<button class="pill active" data-hist-view="pd">PropDesk Stats</button>'+
+      '</div></div><div id="pdStatsMount"></div>';
+    mount.querySelectorAll("[data-hist-view]").forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute("data-hist-view"); renderPlayHistory(); }; });
+    _renderPdStats($("pdStatsMount"));
+    return;
+  }
   var all=loadPlayHist();
   var today=new Date().toISOString().slice(0,10);
 
@@ -5200,6 +5383,11 @@ function renderPlayHistory(){
   var showTrendCols=Object.keys(pmMap).some(function(k){ return pmMap[k].length>1; });
   var hasStreak=topMkts.some(function(k){return mktMap[k].bestStreak>0;});
   var html='<div style="padding:16px">';
+  /* view pills */
+  html+='<div class="tabrow" style="gap:6px;margin-bottom:16px">';
+  html+='<button class="pill active" data-hist-view="my">My History</button>';
+  html+='<button class="pill" data-hist-view="pd">PropDesk Stats</button>';
+  html+='</div>';
 
   /* title row */
   html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:20px">';
@@ -5548,6 +5736,9 @@ function renderPlayHistory(){
       _phAnalyticsMkt=v; _histFilters.market=v;
       renderPlayHistory();
     };
+  });
+  mount.querySelectorAll('[data-hist-view]').forEach(function(b){
+    b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); };
   });
 }
 

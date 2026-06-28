@@ -1,0 +1,259 @@
+{
+  "lastUpdated": "2026-06-27",
+  "recordStart": "2026-06-04",
+  "plays": [
+    {
+      "date": "2026-06-04",
+      "player": "Shohei Ohtani",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 82,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-04",
+      "player": "Freddie Freeman",
+      "market": "batter_total_bases",
+      "marketDisplay": "Total Bases",
+      "sport": "MLB",
+      "line": "Over 1.5",
+      "confidence": 76,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-06",
+      "player": "Gunnar Henderson",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 79,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-06",
+      "player": "Luis Robert Jr.",
+      "market": "batter_total_bases",
+      "marketDisplay": "Total Bases",
+      "sport": "MLB",
+      "line": "Over 1.5",
+      "confidence": 65,
+      "tier": "GOOD",
+      "result": "miss"
+    },
+    {
+      "date": "2026-06-08",
+      "player": "Paul Skenes",
+      "market": "pitcher_strikeouts",
+      "marketDisplay": "Strikeouts",
+      "sport": "MLB",
+      "line": "Over 6.5",
+      "confidence": 91,
+      "tier": "ELITE",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-08",
+      "player": "Shohei Ohtani",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 85,
+      "tier": "GREAT",
+      "result": "miss"
+    },
+    {
+      "date": "2026-06-10",
+      "player": "Trea Turner",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 83,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-10",
+      "player": "Aaron Judge",
+      "market": "batter_home_runs",
+      "marketDisplay": "Home Runs",
+      "sport": "MLB",
+      "line": "1+ HR",
+      "confidence": 52,
+      "tier": "VALUE",
+      "result": "miss"
+    },
+    {
+      "date": "2026-06-13",
+      "player": "Freddie Freeman",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 80,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-13",
+      "player": "Spencer Schwellenbach",
+      "market": "pitcher_strikeouts",
+      "marketDisplay": "Strikeouts",
+      "sport": "MLB",
+      "line": "Over 5.5",
+      "confidence": 77,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-15",
+      "player": "Corbin Carroll",
+      "market": "batter_total_bases",
+      "marketDisplay": "Total Bases",
+      "sport": "MLB",
+      "line": "Over 1.5",
+      "confidence": 68,
+      "tier": "GOOD",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-15",
+      "player": "Paul Skenes",
+      "market": "pitcher_strikeouts",
+      "marketDisplay": "Strikeouts",
+      "sport": "MLB",
+      "line": "Over 7.5",
+      "confidence": 88,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-18",
+      "player": "Trea Turner",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 79,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-18",
+      "player": "Freddie Freeman",
+      "market": "batter_total_bases",
+      "marketDisplay": "Total Bases",
+      "sport": "MLB",
+      "line": "Over 1.5",
+      "confidence": 75,
+      "tier": "GREAT",
+      "result": "miss"
+    },
+    {
+      "date": "2026-06-20",
+      "player": "Gunnar Henderson",
+      "market": "batter_total_bases",
+      "marketDisplay": "Total Bases",
+      "sport": "MLB",
+      "line": "Over 1.5",
+      "confidence": 81,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-20",
+      "player": "Vladimir Guerrero Jr.",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 76,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-22",
+      "player": "Shohei Ohtani",
+      "market": "batter_home_runs",
+      "marketDisplay": "Home Runs",
+      "sport": "MLB",
+      "line": "1+ HR",
+      "confidence": 56,
+      "tier": "VALUE",
+      "result": "void"
+    },
+    {
+      "date": "2026-06-22",
+      "player": "Paul Skenes",
+      "market": "pitcher_strikeouts",
+      "marketDisplay": "Strikeouts",
+      "sport": "MLB",
+      "line": "Over 7.5",
+      "confidence": 92,
+      "tier": "ELITE",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-24",
+      "player": "Trea Turner",
+      "market": "batter_total_bases",
+      "marketDisplay": "Total Bases",
+      "sport": "MLB",
+      "line": "Over 1.5",
+      "confidence": 82,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-24",
+      "player": "Aaron Judge",
+      "market": "batter_total_bases",
+      "marketDisplay": "Total Bases",
+      "sport": "MLB",
+      "line": "Over 1.5",
+      "confidence": 71,
+      "tier": "GOOD",
+      "result": "miss"
+    },
+    {
+      "date": "2026-06-26",
+      "player": "Freddie Freeman",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 84,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-26",
+      "player": "Vladimir Guerrero Jr.",
+      "market": "batter_total_bases",
+      "marketDisplay": "Total Bases",
+      "sport": "MLB",
+      "line": "Over 1.5",
+      "confidence": 78,
+      "tier": "GREAT",
+      "result": "hit"
+    },
+    {
+      "date": "2026-06-27",
+      "player": "Gunnar Henderson",
+      "market": "batter_hits",
+      "marketDisplay": "Hits",
+      "sport": "MLB",
+      "line": "1+ Hits",
+      "confidence": 81,
+      "tier": "GREAT",
+      "result": "pending"
+    }
+  ]
+}
