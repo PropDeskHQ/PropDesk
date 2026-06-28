@@ -67,11 +67,19 @@ input:focus,select:focus{border-color:var(--accent)}
 
 /* GAMES */
 .games{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px}
-.game{flex:0 0 auto;background:var(--surf);border:1px solid var(--bd2);border-radius:12px;padding:10px 14px;min-width:150px;transition:.15s;text-align:left}
-.game:hover{border-color:#3a3a3a;background:var(--surf2)}
-.game.active{border-color:var(--accent);background:rgba(0,255,135,.06)}
+.game{flex:0 0 auto;background:var(--surf);border:1px solid var(--bd2);border-radius:12px;padding:10px 14px;min-width:160px;transition:.15s;text-align:left}
+.game:hover{border-color:#3a3a3a;background:var(--surf2);box-shadow:0 0 8px rgba(0,232,122,.15)}
+.game.active{border-color:var(--accent);border-left:3px solid var(--accent);background:rgba(0,255,135,.06)}
+.game .gm-header{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
 .game .gm-t{font-size:13px;font-weight:700;line-height:1.3}
-.game .gm-s{font-size:11px;color:var(--mut);margin-top:3px}
+.game .gm-s{font-size:11px;color:var(--mut);white-space:nowrap;padding-top:2px}
+.game .gm-preview{margin-top:8px;padding-top:6px;border-top:1px solid #1e1e1e;animation:gmFadeIn .4s}
+.game .gm-best{display:flex;align-items:center;gap:5px;border-left:2px solid rgba(0,232,122,.4);padding-left:6px;margin-bottom:3px}
+.game .gm-best-pl{font-size:10px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px}
+.game .gm-best-line{font-size:10px;color:var(--mut2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.game .gm-count{font-size:10px;color:#555;margin-top:2px}
+.game .gm-scan{font-size:10px;color:#444;margin-top:7px;padding-top:7px;border-top:1px solid #1a1a1a;display:flex;align-items:center;gap:5px}
+@keyframes gmFadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 
 /* FILTER BAR */
 .filterbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surf);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin:12px 0}
@@ -1629,6 +1637,15 @@ var _gamePropsCache={};
 // Task-ID tracker — cancels stale enrichment runs when the user switches games.
 var _gameEnrichTaskId={};
 var _gameEnrichCompletedAt={};  // { eventId: {ts:timestamp, mkts:N} }
+// Card preview enrichment — lightweight 2-market pre-scan shown on each game card
+var CARD_PREVIEW_MKTS={
+  baseball_mlb:["batter_hits","batter_total_bases"],
+  basketball_nba:["player_points","player_rebounds"],
+  americanfootball_nfl:["player_reception_yds","player_rush_yds"],
+  icehockey_nhl:["player_shots_on_goal","player_goals"]
+};
+var _cardPreviewData={};  // { eventId: {bestPlay:prop|null, count80:N} }
+var _bgPreviewToken=0;    // increment to cancel stale background preview runs
 
 /* ============ MATH ============ */
 function impliedProb(o){ o=Number(o); if(o>0) return 100/(o+100); return Math.abs(o)/(Math.abs(o)+100); }
@@ -1724,6 +1741,7 @@ async function fetchEvents(){
     var now=Date.now();
     ST.events=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime() > now-3*3600*1000; }).slice(0,24);
     renderGames();
+    _startBgCardPreview();
     // Auto-restore last selected game if it's still in today's slate
     if(ST.eventId && ST.events.some(function(e){return e.id===ST.eventId;})){
       startGameEnrichment(ST.eventId);
@@ -2432,14 +2450,94 @@ function renderPropTabs(){
 }
 
 /* ============ GAMES ============ */
+function _gameCardInner(ev){
+  var dt=new Date(ev.commence_time);
+  var when=dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+  var pd=_cardPreviewData[ev.id];
+  var html='<div class="gm-header"><div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div></div>';
+  if(pd){
+    html+='<div class="gm-preview">';
+    if(pd.bestPlay){
+      var conf=getEffectiveConf(pd.bestPlay);
+      var tierC=confTierOf(conf).c;
+      var lineStr=fmtLine(pd.bestPlay.pdLine!=null?pd.bestPlay.pdLine:pd.bestPlay.bestLine,pd.bestPlay.pdSide||pd.bestPlay.side||"Over");
+      html+='<div class="gm-best"><span class="gm-best-pl">'+esc(pd.bestPlay.player||"")+'</span><span class="gm-best-line">'+esc(lineStr)+'</span><span class="t10-tier '+tierC+'">'+conf+'%</span></div>';
+    }
+    if(pd.count80>0){
+      html+='<div class="gm-count">'+pd.count80+' play'+(pd.count80===1?'':'s')+' 80%+</div>';
+    } else if(!pd.bestPlay){
+      html+='<div class="gm-count" style="color:#3a3a3a">No high-conf plays</div>';
+    }
+    html+='</div>';
+  } else if(_bgPreviewToken>0&&!_cardPreviewData[ev.id]){
+    html+='<div class="gm-scan"><span class="g5-ts-dot"></span>Scanning…</div>';
+  }
+  return html;
+}
+function _updateGameCard(eventId){
+  var card=document.getElementById("gcard-"+eventId); if(!card) return;
+  var ev=(ST.events||[]).filter(function(e){return e.id===eventId;})[0]; if(!ev) return;
+  card.innerHTML=_gameCardInner(ev);
+}
+function _buildPreviewFromCache(eventId){
+  var cached=_gamePropsCache[eventId]; if(!cached) return;
+  var bestPlay=null, count80=0;
+  Object.keys(cached).forEach(function(mk){
+    (cached[mk]||[]).forEach(function(p){
+      if(!p.enriched||p.pdNoValue||p.thinData||p.pdConfidence==null) return;
+      var conf=Math.round(p.pdConfidence*100);
+      if(conf>=80){ count80++; if(!bestPlay||conf>getEffectiveConf(bestPlay)) bestPlay=p; }
+    });
+  });
+  _cardPreviewData[eventId]={bestPlay:bestPlay,count80:count80};
+  _updateGameCard(eventId);
+}
+async function _startBgCardPreview(){
+  var token=++_bgPreviewToken;
+  var sport=ST.sport;
+  var events=(ST.events||[]).slice();
+  var mkts=(CARD_PREVIEW_MKTS[sport]||[]);
+  if(!mkts.length||!getKey()||!events.length) return;
+  var mktsStr=mkts.join(",");
+  for(var i=0;i<events.length;i++){
+    if(_bgPreviewToken!==token) return;
+    var ev=events[i];
+    var eventId=ev.id;
+    if(_cardPreviewData[eventId]){ _updateGameCard(eventId); continue; }
+    if(_gameEnrichCompletedAt[eventId]){ _buildPreviewFromCache(eventId); continue; }
+    _updateGameCard(eventId);  // show scanning state
+    try{
+      var data=await fetchOdds(eventId,mktsStr);
+      if(_bgPreviewToken!==token) return;
+      var bestPlay=null, count80=0;
+      for(var mi=0;mi<mkts.length;mi++){
+        var mk=mkts[mi];
+        var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
+        var mkProps=parseProps(data,mk).filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null;});
+        mkProps.forEach(function(p){p._market=mk;p._sport=sport;p._game=gameLabel;});
+        for(var pi=0;pi<mkProps.length;pi++){
+          if(_bgPreviewToken!==token) return;
+          try{await enrichWithConfidence(mkProps[pi]);}catch(e){}
+          if(mkProps[pi].enriched&&!mkProps[pi].pdNoValue&&!mkProps[pi].thinData&&mkProps[pi].pdConfidence!=null){
+            var c=Math.round(mkProps[pi].pdConfidence*100);
+            if(c>=80){count80++;if(!bestPlay||c>getEffectiveConf(bestPlay)) bestPlay=mkProps[pi];}
+          }
+        }
+      }
+      if(_bgPreviewToken!==token) return;
+      _cardPreviewData[eventId]={bestPlay:bestPlay,count80:count80};
+      _updateGameCard(eventId);
+    }catch(e){}
+    if(i<events.length-1) await new Promise(function(r){setTimeout(r,500);});
+  }
+}
 function renderGames(){
   var c=$("gamesRow"); c.innerHTML="";
   if(!ST.events.length){ c.innerHTML='<div class="empty" style="padding:18px">No upcoming games for this sport right now.</div>'; return; }
   ST.events.forEach(function(ev){
-    var dt=new Date(ev.commence_time);
-    var when=dt.toLocaleDateString([], {month:"short",day:"numeric"})+" "+dt.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
     var b=el("button","game"+(ev.id===ST.eventId?" active":""));
-    b.innerHTML='<div class="gm-t">'+esc(ev.away_team)+'<br>@ '+esc(ev.home_team)+'</div><div class="gm-s">'+esc(when)+'</div>';
+    b.id="gcard-"+ev.id;
+    b.innerHTML=_gameCardInner(ev);
     b.onclick=function(){ ST.eventId=ev.id; localStorage.setItem("pe_event",ev.id); _glCache={}; _qsCache={}; _gamePropsCache={}; _gameEnrichTaskId={}; renderGames(); startGameEnrichment(ev.id); loadGameDetail(); };
     c.appendChild(b);
   });
@@ -8318,6 +8416,7 @@ async function startGameEnrichment(eventId){
     localStorage.setItem("pe_g5_hist",JSON.stringify(_hist));
   }catch(e){}
   _gameEnrichCompletedAt[eventId]={ts:Date.now(),mkts:allMkts.length};
+  _buildPreviewFromCache(eventId);
   if(ST.eventId===eventId) renderGameTop5(qFinal,false);
   logPlaysToHistory(qFinal);
 }
