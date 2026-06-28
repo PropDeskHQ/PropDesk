@@ -168,6 +168,11 @@ input:focus,select:focus{border-color:var(--accent)}
 .g5-track-all-btn{font-size:11px;font-weight:700;padding:5px 11px;border-radius:7px;border:1px solid rgba(0,255,135,.45);background:rgba(0,255,135,.06);color:var(--accent);cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0}
 .g5-track-all-btn:hover{background:rgba(0,255,135,.14);border-color:rgba(0,255,135,.7)}
 .g5-track-all-btn:disabled{opacity:.35;cursor:default;pointer-events:none}
+.why-btn{display:block;font-size:10px;font-weight:700;color:rgba(0,232,122,.55);background:none;border:none;cursor:pointer;padding:0;margin-top:4px;transition:color .12s;white-space:nowrap;line-height:1}
+.why-btn:hover{color:var(--accent)}
+.why-row{display:none}
+.why-row.open{display:table-row}
+.why-panel{font-size:12px;color:#aaa;line-height:1.65;padding:10px 16px 12px;border-top:1px solid #1a1a1a;background:#0d0d0d}
 /* ---- END MANUAL PARLAY BAR ---- */
 .leg-reason{font-size:11px;color:var(--mut);margin-top:3px;line-height:1.4}
 .leg-conf{font-size:12px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;align-self:flex-start}
@@ -2329,6 +2334,19 @@ function updatePropValueDisplay(p){
     var row=node.closest("tr");
     if(row){ row.classList.remove("tier-lock","tier-elite"); if(tier.c==="t-lock") row.classList.add("tier-lock"); else if(tier.c==="t-elite") row.classList.add("tier-elite"); }
     renderSummaryBar();
+    if(p.enriched&&!p.thinData){
+      var _ws=document.getElementById("whybtn-"+p._id);
+      if(_ws&&_ws.tagName==="SPAN"){
+        var _wb=document.createElement("button");
+        _wb.className="why-btn";
+        _wb.setAttribute("data-pid",p._id);
+        _wb.innerHTML="Why? &#9656;";
+        (function(_pp,_bb){ _bb.onclick=function(){ handleWhyClick(_pp,_bb); }; })(p,_wb);
+        _ws.parentNode.replaceChild(_wb,_ws);
+      }
+      var _wp=document.getElementById("whypanel-"+p._id);
+      if(_wp&&!_wp.textContent.trim()) _wp.innerHTML=buildConfExplanation(p);
+    }
   } else {
     // Phase-1 only — show dash (enrichment pending)
     node.textContent="—"; node.className="t-pass";
@@ -3168,6 +3186,91 @@ function renderTable(silent){
   renderSummaryBar();
 }
 
+function buildConfExplanation(p){
+  var mk=p._market||ST.market, sp=p._sport||ST.sport;
+  var isThresh=isThreshProp(p);
+  var side=p.pdSide||"Over", isO=side==="Over";
+  var line=p.pdLine!=null?p.pdLine:p.bestLine;
+  var vals=p._vals||[], n=vals.length;
+  if(n<3) return "Insufficient game log data exists for "+esc(p.player)+" on this market to calculate a meaningful confidence score. The Thin Data flag has been applied.";
+  var conf=Math.round(((p._adjConfidence!=null?p._adjConfidence:p.pdConfidence)||0)*100);
+  var tier=confTierOf(conf);
+  var mktDisplay=marketName(mk);
+  var lastName=p.player.split(" ").slice(-1)[0];
+  var lineLabel=line!=null?(isThresh?threshLabel(line,mk):fmtLine(line,side)):"this line";
+  var n5=Math.min(5,n), n10=Math.min(10,n);
+  var hits5=line!=null?vals.slice(0,n5).filter(function(v){return isO?v>line:v<line;}).length:null;
+  var hits10=line!=null?vals.slice(0,n10).filter(function(v){return isO?v>line:v<line;}).length:null;
+  var sznAvg=p.seasonAvgEnrich!=null?p.seasonAvgEnrich:null;
+  var parts=[];
+  // S1 — Hit rate base
+  var s1;
+  if(hits5!=null&&n5>=3){
+    var l5pct=Math.round(hits5/n5*100);
+    s1=esc(p.player)+" has hit "+esc(lineLabel)+" in "+hits5+" of "+n5+" recent games ("+l5pct+"% L"+n5+")";
+    if(hits10!=null&&n10>n5){ var l10pct=Math.round(hits10/n10*100); s1+=", and "+hits10+" of "+n10+" over the last "+n10+" ("+l10pct+"% L"+n10+")"; }
+    s1+=sznAvg!=null?(", with a season average of "+sznAvg.toFixed(sznAvg<5?2:1)+" "+esc(mktDisplay.toLowerCase())+"."):".";
+  } else if(sznAvg!=null){
+    s1=esc(p.player)+" is averaging "+sznAvg.toFixed(sznAvg<5?2:1)+" "+esc(mktDisplay.toLowerCase())+" per game this season.";
+  } else {
+    s1="Limited recent game log data is available for "+esc(p.player)+" on this market.";
+  }
+  parts.push(s1);
+  // S2 — Streak and momentum
+  var streak=p.streak||0, abs=Math.abs(streak);
+  var s2;
+  if(abs>=4){
+    s2=streak>0?esc(lastName)+" is on a "+streak+"-game hitting streak at this line, adding a +4% momentum bonus.":esc(lastName)+" has missed this line in "+abs+" straight games, applying a −4% cold streak penalty.";
+  } else if(abs===3){
+    s2=streak>0?esc(lastName)+" has hit "+esc(lineLabel)+" in 3 straight games, adding a +2.5% momentum bonus.":esc(lastName)+" has gone cold, missing this line 3 consecutive games, applying a −2.5% penalty.";
+  } else if(abs===2){
+    s2=streak>0?esc(lastName)+" has hit this line in each of the last 2 games, adding a +1% momentum bonus.":esc(lastName)+" has missed this line in 2 straight games, applying a −1% cold streak penalty.";
+  } else {
+    s2="No significant streak is present in either direction.";
+  }
+  parts.push(s2);
+  // S3 — Talent and matchup (optional)
+  var s3Parts=[];
+  if(p.seasonBA!=null){
+    var ba=p.seasonBA;
+    var baAdj=ba>=0.300?"+4% talent bonus":ba>=0.280?"+2% talent bonus":ba>=0.260?"no BA adjustment":ba>=0.240?"−1% BA penalty":"−2% BA penalty";
+    s3Parts.push("season batting average of ."+Math.round(ba*1000)+" ("+baAdj+")");
+  }
+  if(p.opposingPitcherERA!=null){
+    var era=p.opposingPitcherERA;
+    var eraAdj=era>=5.00?"+5% favorable":era>=4.00?"+2.5% favorable":era>=3.50?"neutral matchup":era>=2.75?"−3% tough matchup":"−5% tough matchup";
+    s3Parts.push("opposing pitcher ERA "+era.toFixed(2)+" ("+eraAdj+")");
+  }
+  if(p.todayOrderSlot!=null&&p.opposingPitcherERA==null){
+    var slot=p.todayOrderSlot;
+    var ordinals=["","1st","2nd","3rd","4th","5th","6th","7th","8th","9th"];
+    var slotAdj=slot<=3?"+2% PA bonus":slot<=6?"neutral slot":"−2% PA penalty";
+    s3Parts.push(esc(lastName)+" bats "+(ordinals[slot]||slot+"th")+" in the lineup today ("+slotAdj+")");
+  }
+  if(p.avgMins!=null&&sp!=="baseball_mlb"){
+    s3Parts.push("averaging "+Math.round(p.avgMins)+" minutes per game this season");
+  }
+  if(s3Parts.length) parts.push("Additional factors: "+s3Parts.join("; ")+".");
+  // S4 — Flags and final tier
+  var gf=p.guardrailFlags||[];
+  var thinPenalty=n<5?7:(n<10?4:0);
+  var flagMap={FEW_BOOKS:"few books posting this line",SHORT_REST:"pitcher on short rest",CONTACT_TEAM:"opposing team has low K rate",LINE_ABOVE_L5:"book line above pitcher's recent average",ALT_LINE_ONLY:"only alt-line props available",COLD_STREAK:"cold streak"};
+  var s4;
+  if(gf.indexOf("THIN_DATA")>=0&&thinPenalty>0){
+    s4="Thin data flag active: only "+n+" games in the log, applying a −"+thinPenalty+"% sample-size penalty. Final confidence: "+conf+"% ("+tier.t+" tier).";
+  } else {
+    var activeGf=gf.filter(function(f){return !!flagMap[f];});
+    if(activeGf.length){
+      var descs=activeGf.map(function(f){return flagMap[f];});
+      s4="Guardrail flag"+(activeGf.length>1?"s":"")+" triggered: "+descs.join("; ")+". Final confidence: "+conf+"% ("+tier.t+" tier).";
+    } else {
+      s4="No guardrails triggered. Final confidence: "+conf+"% ("+tier.t+" tier).";
+    }
+  }
+  parts.push(s4);
+  return parts.join(" ");
+}
+
 function rowHtml(p,cols,idx,silent){
   if(p._id==null) p._id=Math.random().toString(36).slice(2,9);
   var tier=tierOf(p.value);
@@ -3235,9 +3338,12 @@ function rowHtml(p,cols,idx,silent){
   var confPct=isConf?Math.round(p.pdConfidence*100):null;
   var ct=isConf?confTierOf(confPct):{c:"t-pass",t:""};
   var dispStr=silent?(isConf?(confPct+"%"):(p.pdNoValue?"—":String(p.value))):"—";
-  h+='<td><div class="col-val-center"><span class="vs"><b id="vsc-'+p._id+'" class="'+ct.c+'">'+dispStr+'</b><span class="vt '+ct.c+'">'+ct.t+'</span></span></div></td>';
+  var _hasWhy=silent&&isConf&&p.enriched&&!p.thinData;
+  var _whyBtnHtml=_hasWhy?'<button class="why-btn" data-pid="'+p._id+'">Why? &#9656;</button>':'<span id="whybtn-'+p._id+'"></span>';
+  h+='<td><div class="col-val-center"><span class="vs"><b id="vsc-'+p._id+'" class="'+ct.c+'">'+dispStr+'</b><span class="vt '+ct.c+'">'+ct.t+'</span></span>'+_whyBtnHtml+'</div></td>';
   cols.forEach(function(bk){ h+='<td>'+bookCellHtml(p,bk)+'</td>'; });
   h+='</tr>';
+  h+='<tr class="why-row" id="whydata-'+p._id+'"><td colspan="'+(4+cols.length)+'"><div class="why-panel" id="whypanel-'+p._id+'">'+(_hasWhy?buildConfExplanation(p):'')+'</div></td></tr>';
   return h;
 }
 
@@ -3280,6 +3386,21 @@ function bindRowActions(){
       if(act==="track") return handleTrackClick(p,b);
     };
   });
+  document.querySelectorAll('.why-btn[data-pid]').forEach(function(b){
+    var p=findProp(b.getAttribute("data-pid"));
+    if(!p) return;
+    b.onclick=function(){ handleWhyClick(p,b); };
+  });
+}
+function handleWhyClick(p,btn){
+  var row=document.getElementById("whydata-"+p._id);
+  if(!row) return;
+  var isOpen=row.classList.toggle("open");
+  btn.innerHTML=isOpen?"Why? &#9662;":"Why? &#9656;";
+  if(isOpen){
+    var panel=document.getElementById("whypanel-"+p._id);
+    if(panel&&!panel.textContent.trim()) panel.innerHTML=buildConfExplanation(p);
+  }
 }
 
 /* ============ MANUAL TRACK ============ */
