@@ -56,7 +56,11 @@ label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transfor
       <h1 style="font-size:19px;font-weight:700;color:#fff">PropDesk Admin</h1>
       <div id="subtitle" style="font-size:12px;color:#555;margin-top:3px"></div>
     </div>
-    <button onclick="exportJSON()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;white-space:nowrap">↓ Export Updated JSON</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button onclick="clearLocalChanges()" style="background:transparent;color:#3b82f6;border:1px solid #3b82f644;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;white-space:nowrap">✓ Clear Local Changes</button>
+      <button onclick="resetToOriginal()" style="background:transparent;color:#ef4444;border:1px solid #ef444433;border-radius:8px;padding:9px 14px;font-size:12px;font-weight:600;white-space:nowrap">↺ Reset to Original</button>
+      <button onclick="exportJSON()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;white-space:nowrap">↓ Export Updated JSON</button>
+    </div>
   </div>
 
   <!-- Summary cards -->
@@ -118,10 +122,13 @@ label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transfor
   <div id="days"></div>
 </div>
 
+<div id="lsToast" style="position:fixed;bottom:20px;right:20px;background:#1a2a1a;border:1px solid #22c55e44;border-radius:8px;padding:8px 14px;font-size:12px;color:#22c55e;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100">Changes saved locally</div>
+
 <script>
 var plays=[], rawData={}, filter='pending', searchQ='', expandedDays={}, dirty=false;
 var MKT_DISPLAY={batter_hits:'Hits',batter_total_bases:'Total Bases',pitcher_strikeouts:'Strikeouts',
   batter_home_runs:'Home Runs',batter_rbis:'RBIs',batter_runs_scored:'Runs',pitcher_walks:'Walks'};
+var LS_KEY='propdesk_admin_changes';
 
 /* password */
 document.getElementById('pwInput').addEventListener('keydown',function(e){if(e.key==='Enter')checkPw();});
@@ -142,9 +149,12 @@ function loadData(){
     .then(function(r){return r.json();})
     .then(function(d){
       rawData=d;
-      plays=(d.plays||[]).map(function(p,i){return Object.assign({},p,{_idx:i});});
+      var saved=null;
+      try{var s=localStorage.getItem(LS_KEY);if(s)saved=JSON.parse(s);}catch(e){}
+      plays=(saved||d.plays||[]).map(function(p,i){return Object.assign({},p,{_idx:i});});
       var pDays=uniq(plays.filter(function(p){return p.result==='pending';}).map(function(p){return p.date;})).sort();
       if(pDays.length) expandedDays[pDays[0]]=true;
+      if(saved) document.getElementById('exportReminder').style.display='block';
       render();
     })
     .catch(function(){document.getElementById('days').innerHTML='<div style="color:#555;padding:40px;text-align:center">Failed to load propdesk-stats.json</div>';});
@@ -350,7 +360,31 @@ function deleteDay(date){
   render();
 }
 
-function markDirty(){dirty=true;document.getElementById('exportReminder').style.display='block';}
+function markDirty(){dirty=true;document.getElementById('exportReminder').style.display='block';saveLocal();}
+
+function saveLocal(){
+  try{localStorage.setItem(LS_KEY,JSON.stringify(plays.map(function(p){var c=Object.assign({},p);delete c._idx;return c;})));}catch(e){}
+  showSaved();
+}
+
+function showSaved(){
+  var el=document.getElementById('lsToast');
+  if(!el) return;
+  el.style.opacity='1';
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){el.style.opacity='0';},2000);
+}
+
+function resetToOriginal(){
+  if(!confirm('This will discard all your unsaved hit/miss changes and reload from propdesk-stats.json. Are you sure?')) return;
+  try{localStorage.removeItem(LS_KEY);}catch(e){}
+  location.reload();
+}
+
+function clearLocalChanges(){
+  try{localStorage.removeItem(LS_KEY);}catch(e){}
+  location.reload();
+}
 
 function toggleAdd(){
   var p=document.getElementById('addPanel');
@@ -385,7 +419,7 @@ function exportJSON(){
   var url=URL.createObjectURL(blob);
   var a=document.createElement('a');a.href=url;a.download='propdesk-stats.json';a.click();
   URL.revokeObjectURL(url);
-  alert('Downloaded propdesk-stats.json\nUpload this file to GitHub to update the live site.');
+  alert('Downloaded propdesk-stats.json\nAfter uploading to GitHub, click “Clear Local Changes” to reset your working copy.');
 }
 
 </script>
