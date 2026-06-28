@@ -263,13 +263,14 @@ function renderDays(){
         +'<span style="color:#888">Day record: <strong style="color:#e8e8e8">'+hits+'/'+settled+'</strong>'+(settled?' ('+wr+'%)':' —')+'</span>'
         +(pend?'<span style="color:#f59e0b">'+pend+' still pending</span>':'<span style="color:#22c55e">All resolved</span>')
         +'</div>';
-      // Bulk buttons
-      if(pend>0){
-        html+='<div class="bulk-row">'
-          +'<button data-bulk-date="'+date+'" data-bulk-res="hit" style="background:#1a3326;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✓ Mark All Hit</button>'
+      // Bulk row (always shown)
+      html+='<div class="bulk-row">'
+        +(pend>0
+          ?'<button data-bulk-date="'+date+'" data-bulk-res="hit" style="background:#1a3326;color:#22c55e;border:1px solid #22c55e33;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✓ Mark All Hit</button>'
           +'<button data-bulk-date="'+date+'" data-bulk-res="miss" style="background:#2d1515;color:#ef4444;border:1px solid #ef444433;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700">✕ Mark All Miss</button>'
-          +'</div>';
-      }
+          :'')
+        +'<button data-del-date="'+date+'" style="margin-left:auto;background:transparent;color:#ef4444;border:1px solid #ef444433;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:700">✕ Remove Day</button>'
+        +'</div>';
       // Plays
       dayVisible.forEach(function(p){html+=renderRow(p);});
       html+='</div>';
@@ -285,6 +286,10 @@ function renderDays(){
   document.querySelectorAll('[data-bulk-date]').forEach(function(btn){
     var d=btn.getAttribute('data-bulk-date'),r=btn.getAttribute('data-bulk-res');
     btn.addEventListener('click',function(){bulkResolve(d,r);});
+  });
+  document.querySelectorAll('[data-del-date]').forEach(function(btn){
+    var d=btn.getAttribute('data-del-date');
+    btn.addEventListener('click',function(){deleteDay(d);});
   });
   document.querySelectorAll('[data-res-idx]').forEach(function(btn){
     var idx=+btn.getAttribute('data-res-idx'),res=btn.getAttribute('data-res-val');
@@ -332,6 +337,15 @@ function setResult(idx,result){
 
 function bulkResolve(date,result){
   plays.forEach(function(p){if(p.date===date&&p.result==='pending') p.result=result;});
+  markDirty();
+  render();
+}
+
+function deleteDay(date){
+  var count=plays.filter(function(p){return p.date===date;}).length;
+  if(!confirm('Remove all '+count+' play'+(count!==1?'s':'')+' for '+fmtDate(date)+'? This cannot be undone.')) return;
+  plays=plays.filter(function(p){return p.date!==date;});
+  delete expandedDays[date];
   markDirty();
   render();
 }
