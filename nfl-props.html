@@ -63,6 +63,14 @@ input:focus,select:focus{border-color:var(--accent)}
 .tabrow.prop .pill.active{background:rgba(79,159,255,.13);color:var(--blue);border-color:rgba(79,159,255,.42);box-shadow:0 0 0 1px rgba(79,159,255,.12),0 2px 16px rgba(79,159,255,.26);font-weight:700}
 /* Sport-selector tabs (4 buttons) fill the row equally */
 #sportTabs .pill,#t10SportTabs .pill,#trendsSportTabs .pill{flex:1;min-width:0}
+.pill-ct{font-size:10px;font-weight:700;margin-left:5px;color:#444;transition:.18s}
+.pill.has-games .pill-ct{color:rgba(0,180,90,.6)}
+.pill.active .pill-ct{color:rgba(0,232,122,.65)}
+.pill.no-games{opacity:.6}
+.sp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;gap:6px}
+.sp-empty-title{font-size:14px;font-weight:600;color:var(--mut);margin-top:4px}
+.sp-empty-sub{font-size:12px;color:#3a3a3a}
+.sp-empty-next{font-size:11px;color:var(--mut2);margin-top:6px;padding:4px 12px;background:#111;border:1px solid #1e1e1e;border-radius:6px}
 .lbl{font-size:11px;font-weight:700;letter-spacing:1px;color:var(--mut2);text-transform:uppercase;margin:14px 0 7px}
 
 /* GAMES */
@@ -1646,6 +1654,9 @@ var CARD_PREVIEW_MKTS={
 };
 var _cardPreviewData={};  // { eventId: {bestPlay:prop|null, count80:N} }
 var _bgPreviewToken=0;    // increment to cancel stale background preview runs
+var _sportGameCounts={};  // { sportKey: N } — cached game counts for sport pill badges
+var _sportNextDate={};    // { sportKey: "Jun 29" } — next event date when today count is 0
+var _sportCountsToken=0;  // cancel stale background count fetches on sport switch
 
 /* ============ MATH ============ */
 function impliedProb(o){ o=Number(o); if(o>0) return 100/(o+100); return Math.abs(o)/(Math.abs(o)+100); }
@@ -1740,8 +1751,16 @@ async function fetchEvents(){
     var data=await r.json();
     var now=Date.now();
     ST.events=(data||[]).filter(function(e){ return new Date(e.commence_time).getTime() > now-3*3600*1000; }).slice(0,24);
+    _sportGameCounts[ST.sport]=ST.events.length;
+    if(ST.events.length===0){
+      var _fut=(data||[]).filter(function(e){return new Date(e.commence_time).getTime()>now;}).sort(function(a,b){return new Date(a.commence_time)-new Date(b.commence_time);});
+      if(_fut.length) _sportNextDate[ST.sport]=new Date(_fut[0].commence_time).toLocaleDateString([],{month:"short",day:"numeric"});
+      else delete _sportNextDate[ST.sport];
+    }
+    renderSportTabs();
     renderGames();
     _startBgCardPreview();
+    _fetchSportCounts();
     // Auto-restore last selected game if it's still in today's slate
     if(ST.eventId && ST.events.some(function(e){return e.id===ST.eventId;})){
       startGameEnrichment(ST.eventId);
@@ -2417,7 +2436,12 @@ function flagTitle(f){
 function renderSportTabs(){
   var c=$("sportTabs"); c.innerHTML="";
   SPORTS.forEach(function(sp){
-    var b=el("button","pill"+(sp.key===ST.sport?" active":""),sp.label);
+    var cnt=_sportGameCounts[sp.key];
+    var hasGames=cnt!=null&&cnt>0;
+    var noGames=cnt!=null&&cnt===0;
+    var cls="pill"+(sp.key===ST.sport?" active":"")+(hasGames?" has-games":"")+(noGames?" no-games":"");
+    var ctBadge=cnt!=null?'<span class="pill-ct">'+cnt+'</span>':'';
+    var b=el("button",cls,sp.label+ctBadge);
     b.onclick=function(){ if(ST.sport===sp.key) return; ST.sport=sp.key; ST.eventId=null; ST.props=[]; ST.snapshot={};
       ST.market=MARKETS[sp.key][0].k;
       localStorage.setItem("pe_sport",sp.key); localStorage.setItem("pe_market",ST.market); localStorage.removeItem("pe_event");
@@ -2450,6 +2474,31 @@ function renderPropTabs(){
 }
 
 /* ============ GAMES ============ */
+async function _fetchSportCounts(){
+  var token=++_sportCountsToken;
+  var key=getKey(); if(!key) return;
+  var now=Date.now();
+  for(var i=0;i<SPORTS.length;i++){
+    if(_sportCountsToken!==token) return;
+    var sp=SPORTS[i];
+    if(sp.key===ST.sport) continue;
+    if(_sportGameCounts[sp.key]!=null) continue;
+    try{
+      var r=await fetch(apiUrl("/sports/"+sp.key+"/events",{dateFormat:"iso"}));
+      if(_sportCountsToken!==token) return;
+      if(!r.ok) continue;
+      var d=await r.json();
+      var cnt=(d||[]).filter(function(e){return new Date(e.commence_time).getTime()>now-3*3600*1000;}).length;
+      _sportGameCounts[sp.key]=cnt;
+      if(cnt===0){
+        var fut=(d||[]).filter(function(e){return new Date(e.commence_time).getTime()>now;}).sort(function(a,b){return new Date(a.commence_time)-new Date(b.commence_time);});
+        if(fut.length) _sportNextDate[sp.key]=new Date(fut[0].commence_time).toLocaleDateString([],{month:"short",day:"numeric"});
+      }
+      renderSportTabs();
+    }catch(e){}
+    if(i<SPORTS.length-1) await new Promise(function(r){setTimeout(r,400);});
+  }
+}
 function _gameCardInner(ev){
   var dt=new Date(ev.commence_time);
   var when=dt.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
@@ -2533,7 +2582,22 @@ async function _startBgCardPreview(){
 }
 function renderGames(){
   var c=$("gamesRow"); c.innerHTML="";
-  if(!ST.events.length){ c.innerHTML='<div class="empty" style="padding:18px">No upcoming games for this sport right now.</div>'; return; }
+  if(!ST.events.length){
+    var _sl=sportLabel(ST.sport);
+    var _nd=_sportNextDate[ST.sport];
+    c.innerHTML='<div class="sp-empty">'+
+      '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">'+
+      '<rect x="4" y="8" width="24" height="20" rx="2.5" stroke="#2e2e2e" stroke-width="2"/>'+
+      '<line x1="4" y1="14" x2="28" y2="14" stroke="#2e2e2e" stroke-width="2"/>'+
+      '<line x1="11" y1="4" x2="11" y2="11" stroke="#2e2e2e" stroke-width="2" stroke-linecap="round"/>'+
+      '<line x1="21" y1="4" x2="21" y2="11" stroke="#2e2e2e" stroke-width="2" stroke-linecap="round"/>'+
+      '</svg>'+
+      '<div class="sp-empty-title">No '+esc(_sl)+' games scheduled today.</div>'+
+      '<div class="sp-empty-sub">Check back tomorrow or select another sport.</div>'+
+      (_nd?'<div class="sp-empty-next">Next '+esc(_sl)+' games: '+esc(_nd)+'</div>':'')+
+      '</div>';
+    return;
+  }
   ST.events.forEach(function(ev){
     var b=el("button","game"+(ev.id===ST.eventId?" active":""));
     b.id="gcard-"+ev.id;
