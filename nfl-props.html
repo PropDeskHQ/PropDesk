@@ -7302,6 +7302,17 @@ async function trendsFetchAndLoad(){
       try{ await enrichWithConfidence(allCandidates[i]); }catch(e){}
     }
     ST.sport=_trendsSport; ST.market=mks[0]||""; ST.props=allCandidates;
+    // DIAGNOSTIC LOGGING — remove after confirming root cause
+    console.log('[Trends] Sport:', _trendsSport);
+    console.log('[Trends] Total candidates:', allCandidates.length);
+    allCandidates.slice(0,5).forEach(function(p){
+      console.log('[Trends] Player:', p.player,
+        '| enriched:', p.enriched,
+        '| thinData:', p.thinData,
+        '| _vals:', p._vals ? p._vals.length+' values' : 'NULL',
+        '| l5Avg:', p.l5Avg,
+        '| market:', p._market);
+    });
     var trends=[],calcErr=null;
     try{
       ST.eventId=_trendsEvents[0]?_trendsEvents[0].id:null;
