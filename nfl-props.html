@@ -3796,8 +3796,9 @@ async function getGameLog(name,market){
   var result=null;
   if(ST.sport==="baseball_mlb"){
     var meta=await getMeta(name);
-    if(!meta||!meta.id){ _cacheSet(_glCache,ckey,null); return null; }
-    try{ result=await mlbGameLog(meta.id,mkt); }catch(e){}
+    if(!meta||!meta.id){ console.warn('[GL] getMeta NULL for',name,'sport:',ST.sport); _cacheSet(_glCache,ckey,null); return null; }
+    try{ result=await mlbGameLog(meta.id,mkt); }catch(e){ console.warn('[GL] mlbGameLog threw',name,e); }
+    if(!result) console.warn('[GL] mlbGameLog NULL for',name,'id:',meta.id,'mkt:',mkt);
   } else if(ST.sport==="icehockey_nhl"){
     // NHL official API gives reliable game log data; ESPN unreliable for NHL
     var nhlId=await nhlSearch(name);
@@ -7302,9 +7303,12 @@ async function trendsFetchAndLoad(){
       try{ await enrichWithConfidence(allCandidates[i]); }catch(e){}
     }
     ST.sport=_trendsSport; ST.market=mks[0]||""; ST.props=allCandidates;
-    // DIAGNOSTIC LOGGING — remove after confirming root cause
+    // DIAGNOSTIC LOGGING
     console.log('[Trends] Sport:', _trendsSport);
     console.log('[Trends] Total candidates:', allCandidates.length);
+    var _dbgHasVals=allCandidates.filter(function(p){return !!p._vals;}).length;
+    var _dbgThin=allCandidates.filter(function(p){return !!p.thinData;}).length;
+    console.log('[Trends] _vals populated:', _dbgHasVals, '| thinData:', _dbgThin);
     allCandidates.slice(0,5).forEach(function(p){
       console.log('[Trends] Player:', p.player,
         '| enriched:', p.enriched,
