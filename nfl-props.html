@@ -950,7 +950,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   <div class="modal-box">
     <button class="modal-close drawer-close" id="parlayClose">&times;</button>
     <h2>Build a Parlay</h2>
-    <p class="sub">Only legs rated 60%+ confidence (GOOD tier or better) qualify. We'll build the best 2 or 3-leg parlay automatically.</p>
+    <p id="parlayQualSub" class="sub"></p>
     <button class="btn btn-accent" id="genParlay" style="width:100%;padding:11px">Generate Parlay</button>
     <div id="parlayResult" style="margin-top:16px"></div>
   </div>
@@ -4539,8 +4539,29 @@ function legReason(l){
   return tier+" ("+conf+"%) on our pre-game value model.";
 }
 
-function openParlay(){ $("parlayResult").innerHTML=""; $("parlayModal").classList.add("open"); }
+function openParlay(){ $("parlayResult").innerHTML=""; $("parlayModal").classList.add("open"); _updateParlayQualCount(); }
 function closeParlay(){ $("parlayModal").classList.remove("open"); }
+function _updateParlayQualCount(){
+  var sub=$("parlayQualSub"),btn=$("genParlay");
+  if(!sub||!btn) return;
+  var seen={},count=0;
+  (ST.props||[]).forEach(function(p){
+    var k=(p.player||"").toLowerCase();
+    if(!seen[k]&&p.bestOdds!=null&&getEffectiveConf(p)>=PARLAY_LEG_MIN_CONF){seen[k]=1;count++;}
+  });
+  var scanning=!_gameEnrichCompletedAt[ST.eventId];
+  var scanTag=scanning?' <span style="color:var(--mut);font-size:10px;font-weight:700;letter-spacing:.04em">Scanning…</span>':'';
+  if(count===0){
+    sub.innerHTML='No props currently meet the '+PARLAY_LEG_MIN_CONF+'% minimum — browse markets to find qualifying plays.'+scanTag;
+    btn.disabled=true;btn.style.opacity=".4";btn.style.cursor="default";
+  } else if(count===1){
+    sub.innerHTML='1 prop qualifies — need at least 2 legs for a parlay.'+scanTag;
+    btn.disabled=true;btn.style.opacity=".4";btn.style.cursor="default";
+  } else {
+    sub.innerHTML=count+' props qualify for parlay legs.'+scanTag;
+    btn.disabled=false;btn.style.opacity="";btn.style.cursor="";
+  }
+}
 function generateParlay(){
   var NO_PARLAY='<div class="parlay-empty"><strong>No parlay today.</strong>Our data couldn\'t find enough high-confidence legs. Check back tomorrow or play the individual props instead.</div>';
   if(!ST.props.length){ $("parlayResult").innerHTML='<div class="empty" style="padding:16px">Load a game and prop market first.</div>'; return; }
@@ -4602,7 +4623,27 @@ function generateParlay(){
 }
 
 function renderParlayResult(legs,dec,am,legNote){
-  var avgConf=Math.round(avg(legs.map(function(l){return getEffectiveConf(l);})));
+  // Joint probability: product of each leg's decimal confidence
+  var jointConf=1.0;
+  legs.forEach(function(l){ jointConf*=(l.pdConfidence!=null&&!l.pdNoValue?l.pdConfidence:getEffectiveConf(l)/100); });
+  var parlayConf=Math.round(jointConf*100);
+
+  // Per-leg breakdown lines
+  var breakdownLines="";
+  legs.forEach(function(l,i){
+    var conf=getEffectiveConf(l);
+    var isThresh=isThreshProp(l);
+    var bet=isThresh?threshLabel(l.bestLine,l._market):fmtLine(l.pdLine!=null?l.pdLine:l.bestLine,l.pdSide||l.side);
+    var pfx=i===legs.length-1?'└ ':'├ ';
+    breakdownLines+='<div style="font-size:11px;color:var(--mut);font-family:monospace">'+pfx+esc(l.player)+' — '+esc(bet)+': <b style="color:var(--mut2)">'+conf+'%</b></div>';
+  });
+  var confBlock=
+    '<div style="margin:8px 0 12px;padding:10px 12px;background:#0f0f0f;border-radius:8px;border:1px solid #1e1e1e">'+
+      '<div style="font-size:12px;color:var(--mut2);font-weight:700;margin-bottom:5px">Joint Confidence: '+parlayConf+'%</div>'+
+      breakdownLines+
+      '<div style="font-size:10px;color:#555;margin-top:6px">Parlay confidence = probability all legs hit simultaneously. Each additional leg multiplies the probability down.</div>'+
+    '</div>';
+
   var legHtml="";
   legs.forEach(function(l,i){
     var isThresh=isThreshProp(l);
@@ -4623,10 +4664,11 @@ function renderParlayResult(legs,dec,am,legNote){
     '</div>';
   });
   $("parlayResult").innerHTML=
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
       '<span class="parlay-odds" style="font-size:26px">'+fmtOdds(am)+'</span>'+
-      '<span class="payout">'+legs.length+'-leg parlay &nbsp;·&nbsp; avg confidence '+avgConf+'%</span>'+
+      '<span class="payout">'+legs.length+'-leg parlay</span>'+
     '</div>'+
+    confBlock+
     '<div class="legs">'+legHtml+'</div>'+
     (legNote?'<p class="parlay-leg-note">'+esc(legNote)+'</p>':'')+
     '<div style="display:flex;gap:8px;margin-top:12px">'+
@@ -7902,6 +7944,7 @@ function updateBestPlaysDisplay(eventId,remaining){
     s.textContent="Scanning "+remaining+" more market"+(remaining!==1?"s":"")+"…";
     var m=$("gameTop5Mount"); if(m) m.appendChild(s);
   }
+  if($("parlayModal")&&$("parlayModal").classList.contains("open")) _updateParlayQualCount();
 }
 
 // Background enrichment — triggered on game select, not on Best Plays page visit.
