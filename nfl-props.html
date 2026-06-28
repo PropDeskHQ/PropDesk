@@ -163,6 +163,11 @@ input:focus,select:focus{border-color:var(--accent)}
 .mpbar-foot{display:flex;gap:8px;padding:2px 0 2px}
 .mpb-add{color:var(--accent)!important;border-color:rgba(0,255,135,.3)!important;transition:.15s}
 .mpb-add.in-cart{color:var(--mut)!important;border-color:var(--bd2)!important}
+.trk-btn{color:var(--accent)!important;border-color:rgba(0,255,135,.3)!important;transition:.15s}
+.trk-btn.trk-done{color:var(--mut)!important;border-color:var(--bd2)!important;cursor:default!important;pointer-events:none!important}
+.g5-track-all-btn{font-size:11px;font-weight:700;padding:5px 11px;border-radius:7px;border:1px solid rgba(0,255,135,.45);background:rgba(0,255,135,.06);color:var(--accent);cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0}
+.g5-track-all-btn:hover{background:rgba(0,255,135,.14);border-color:rgba(0,255,135,.7)}
+.g5-track-all-btn:disabled{opacity:.35;cursor:default;pointer-events:none}
 /* ---- END MANUAL PARLAY BAR ---- */
 .leg-reason{font-size:11px;color:var(--mut);margin-top:3px;line-height:1.4}
 .leg-conf{font-size:12px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;align-self:flex-start}
@@ -2305,7 +2310,6 @@ async function enrichWithConfidence(p){
       p.value=Math.round(p.pdConfidence*100);
     }
 
-    try{ _logSinglePropHistory(p); }catch(e){}
     updatePropValueDisplay(p);
     updatePropPDDisplay(p);
   }catch(e){
@@ -3238,6 +3242,7 @@ function rowHtml(p,cols,idx,silent){
         '<button class="mini" data-act="save" data-pid="'+p._id+'">Save</button>'+
         '<button class="mini" data-act="share" data-pid="'+p._id+'">Share</button>'+
         (function(){ var inCart=ST.parlayCart&&ST.parlayCart.find(function(c){return c._id===p._id;}); return '<button class="mini mpb-add'+(inCart?' in-cart':'')+'" data-act="parlay" data-pid="'+p._id+'">'+(inCart?'✓ Added':'＋ Parlay')+'</button>'; })()+
+        (function(){ var isTrk=_trackedThisSession[p._id]; return '<button class="mini trk-btn'+(isTrk?' trk-done':'')+'" data-act="track" data-pid="'+p._id+'"'+(isTrk?' disabled':'')+'>'+( isTrk?'✓ Tracked':'+ Track')+'</button>'; })()+
       '</div>'+
     '</td>'+
     '<td><div class="col-val-center"><span class="bb '+bbcls+'">'+esc(bb)+'</span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'</div>':'')+'</div></td>'+
@@ -3289,9 +3294,88 @@ function bindRowActions(){
       if(act==="analyze") return toggleExpand(p,"analyze",b);
       if(act==="stats") return toggleExpand(p,"stats",b);
       if(act==="parlay") return toggleParlayCart(p,b);
+      if(act==="track") return handleTrackClick(p,b);
     };
   });
 }
+
+/* ============ MANUAL TRACK ============ */
+var _trackPopoverActive=null;
+function handleTrackClick(p,btn){
+  var existing=document.getElementById('trackPopover');
+  if(existing){ existing.remove(); if(_trackPopoverActive===p._id){_trackPopoverActive=null;return;} }
+  _trackPopoverActive=p._id;
+  var conf=p.pdConfidence!=null?Math.round(p.pdConfidence*100):(p.value||0);
+  var tier=confTierOf(conf);
+  var mkt=p._market||ST.market;
+  var sp=p._sport||ST.sport;
+  var spLabel={baseball_mlb:"MLB",americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL"}[sp]||sp;
+  var mktDisplay=marketName(mkt);
+  var _isT=!!(mkt&&(THRESHOLD_MARKETS[sp]||{})[mkt]);
+  var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
+  var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
+  var today=new Date().toISOString().slice(0,10);
+  var entry={date:today,player:p.player,market:mkt,marketDisplay:mktDisplay,sport:spLabel,line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"};
+  var pop=document.createElement('div');
+  pop.id='trackPopover';
+  pop.innerHTML=
+    '<div style="font-weight:700;font-size:13px;margin-bottom:4px">'+esc(p.player)+'</div>'+
+    '<div style="font-size:11px;color:var(--mut2);margin-bottom:8px">'+esc(mktDisplay)+' \xb7 '+esc(line)+'</div>'+
+    '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">'+
+      '<span style="font-size:13px;font-weight:700;color:var(--accent)">'+conf+'%</span>'+
+      '<span class="'+tier.c+'" style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;background:var(--bd)">'+tier.t+'</span>'+
+      '<span style="font-size:11px;color:var(--mut)">'+today+'</span>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button id="trkConfirm" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Confirm Track</button>'+
+      '<button id="trkCancel" style="background:transparent;color:var(--mut);border:1px solid var(--bd);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">Cancel</button>'+
+    '</div>';
+  var rect=btn.getBoundingClientRect();
+  pop.style.cssText='position:fixed;z-index:9999;background:var(--card);border:1px solid var(--bd2);border-radius:10px;padding:12px 14px;width:220px;box-shadow:0 8px 24px #0006';
+  pop.style.left=Math.min(rect.left,window.innerWidth-240)+'px';
+  pop.style.top=(rect.top-8)+'px';
+  pop.style.transform='translateY(-100%)';
+  document.body.appendChild(pop);
+  pop.querySelector('#trkConfirm').onclick=function(){
+    _saveManualTrack(entry,p._id,btn);
+    pop.remove(); _trackPopoverActive=null;
+  };
+  pop.querySelector('#trkCancel').onclick=function(){
+    pop.remove(); _trackPopoverActive=null;
+  };
+  setTimeout(function(){
+    function _outside(e){ if(!pop.contains(e.target)&&e.target!==btn){ pop.remove(); _trackPopoverActive=null; document.removeEventListener('click',_outside); } }
+    document.addEventListener('click',_outside);
+  },0);
+}
+function _saveManualTrack(entry,pid,btn){
+  try{
+    var h=[];
+    try{h=JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]");}catch(e){h=[];}
+    h.unshift(entry);
+    localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h));
+    _trackedThisSession[pid]=true;
+    btn.textContent="✓ Tracked";
+    btn.classList.add("trk-done");
+    btn.disabled=true;
+    _toastTrack("Added to My Plays ✓");
+    if($("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
+  }catch(e){ console.warn("Track save failed",e); }
+}
+function _toastTrack(msg){
+  var t=document.getElementById('trackToast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='trackToast';
+    t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a3326;border:1px solid #22c55e44;border-radius:8px;padding:8px 16px;font-size:12px;color:#22c55e;opacity:0;transition:opacity .3s;pointer-events:none;z-index:10000;white-space:nowrap';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg;
+  t.style.opacity='1';
+  clearTimeout(t._tm);
+  t._tm=setTimeout(function(){t.style.opacity='0';},2000);
+}
+
 function handleAdj(e,dir,pid){
   e.stopPropagation();
   var p=findProp(pid);
@@ -4938,7 +5022,7 @@ function profitOf(item){
 function renderHistory(){ renderPlayHistory(); setTimeout(function(){ if(!_arRunning) _phAutoResolveAll(); },150); }
 
 /* ============ PLAY HISTORY (AUTO-LOG) ============ */
-var PLAY_HIST_KEY="propdesk_play_history";
+var PLAY_HIST_KEY="propdesk_user_plays";
 var _histFilters={sport:"all",result:"all",days:"all",market:"all"};
 var _histSort={col:"date",dir:"desc"};
 var _histSearch="";
@@ -4947,6 +5031,7 @@ var _phAnalyticsSport="all";
 var _phAnalyticsMkt="all";
 var _histView="my";
 var _pdStatsCache=null;
+var _trackedThisSession={};
 
 function loadPlayHist(){ try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]"); }catch(e){ return []; } }
 function savePlayHist(h){ try{ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h)); }catch(e){ console.warn("[History] storage full",e); } }
@@ -8623,7 +8708,6 @@ async function startGameEnrichment(eventId){
   _gameEnrichCompletedAt[eventId]={ts:Date.now(),mkts:allMkts.length};
   _buildPreviewFromCache(eventId);
   if(ST.eventId===eventId) renderGameTop5(qFinal,false);
-  logPlaysToHistory(qFinal);
 }
 
 // Lightweight: just ensures enrichment is running and shows current cache state.
@@ -8658,7 +8742,7 @@ function renderGameTop5(picks,isScanning){
     mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span>'+emptyShareBtn+'</div>'+_g5TsHtml(ST.eventId,isScanning)+'<div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
     return;
   }
-  var html='<div class="g5-hdr"><span class="g5-title">Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span><button class="g5-share-game-btn" id="g5ShareGameBtn">Share Game</button></div>'+_g5TsHtml(ST.eventId,isScanning);
+  var html='<div class="g5-hdr"><span class="g5-title">Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span><button class="g5-track-all-btn" id="g5TrackAllBtn">+ Track All</button><button class="g5-share-game-btn" id="g5ShareGameBtn">Share Game</button></div>'+_g5TsHtml(ST.eventId,isScanning);
   picks.forEach(function(p,i){
     var conf=getEffectiveConf(p);
     var tier=confTierOf(conf);
@@ -8711,6 +8795,33 @@ function renderGameTop5(picks,isScanning){
       copyText(buildShareGameText(picks));
       shareGameBtn.textContent="Copied ✓";
       setTimeout(function(){ shareGameBtn.textContent="Share Game"; },2000);
+    };
+  }
+  var trackAllBtn=$("g5TrackAllBtn");
+  if(trackAllBtn){
+    trackAllBtn.onclick=function(){
+      if(!confirm('Track all '+picks.length+' Best Play'+(picks.length!==1?'s':'')+' to My Plays?')) return;
+      var today=new Date().toISOString().slice(0,10);
+      var h=[];
+      try{h=JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]");}catch(e){h=[];}
+      var added=0;
+      picks.forEach(function(p){
+        var conf=getEffectiveConf(p);
+        var tier=confTierOf(conf);
+        var mkt=p._market||ST.market;
+        var sp=p._sport||ST.sport;
+        var spLabel={baseball_mlb:"MLB",americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL"}[sp]||sp;
+        var _isT=!!(mkt&&(THRESHOLD_MARKETS[sp]||{})[mkt]);
+        var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
+        var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
+        h.unshift({date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"});
+        added++;
+      });
+      localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h));
+      _toastTrack(added+' play'+(added!==1?'s':'')+' added to My Plays ✓');
+      trackAllBtn.textContent='✓ All Tracked';
+      trackAllBtn.disabled=true;
+      if($("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
     };
   }
   mount.querySelectorAll("[data-g5why]").forEach(function(btn){
