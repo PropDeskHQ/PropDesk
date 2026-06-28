@@ -2483,9 +2483,6 @@ function renderPropTabs(){
   var gi=el("button","pill"+(ST.market==="__gameinfo__"?" active":""),"Game Information");
   gi.onclick=function(){ ST.market="__gameinfo__"; renderPropTabs(); showGameInfoSection(); updateBotnavActive("games"); };
   c.appendChild(gi);
-  var tp=el("button","pill"+(ST.market==="__trends__"?" active":""),"Trends");
-  tp.onclick=function(){ ST.market="__trends__"; renderPropTabs(); showGameContent(); loadGameTrends(); updateBotnavActive("trends"); };
-  c.appendChild(tp);
   (MARKETS[ST.sport]||[]).filter(function(m){return m.k!=="_h2h"&&!MLB_HIDDEN_MARKETS[m.k];}).forEach(function(m){
     var b=el("button","pill"+(m.k===ST.market?" active":""),m.n);
     b.onclick=function(){ ST_tierFilter="all"; ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); showGameContent(); if(ST.eventId) loadBoard(); updateBotnavActive("games"); };
