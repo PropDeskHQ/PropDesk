@@ -393,7 +393,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .hiw-point strong{color:var(--text)}
 .hiw-tiers{margin-top:22px}
 .hiw-tiers-label{font-size:10px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--mut2);margin-bottom:10px}
-.hiw-tier-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hiw-tier-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
 @media(max-width:520px){.hiw-tier-grid{grid-template-columns:1fr}}
 .hiw-tier{padding:13px 15px;border-radius:10px;border:1px solid var(--bd2)}
 .hiw-tier-name{font-size:11px;font-weight:800;letter-spacing:.8px;margin-bottom:6px}
@@ -849,8 +849,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Recent performance carries more weight than season totals.</strong> A player's role, minutes, and form change over a season. What they've done in the last 5 games tells a more honest story than what they did in October.</div></div>
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We require real data before we'll rate anything.</strong> Thin samples get flagged or excluded automatically. If we don't have enough games to be confident, we say so — or we say nothing at all.</div></div>
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>The line matters as much as the average.</strong> A player averaging 22 points doesn't make the Over on a 24.5 line a good bet. We measure actual hit rate at the specific line being offered today.</div></div>
-          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We look across books for mispricing.</strong> When three books agree and one is two points off, that's a signal worth surfacing. We track it in real time.</div></div>
-          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>For MLB, we weight the matchup.</strong> Strikeout props account for the opposing team's contact rate and the starter's handedness. A great pitcher facing a high-strikeout lineup hits different than the raw stat line suggests.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We weight recent games more than season totals.</strong> The model blends L5 (60%), L10 (25%), and full-season (15%) hit rates so that recent form dominates without completely ignoring longer-term patterns.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>For MLB, we factor in true talent signals.</strong> PropDesk also weights season batting average, opposing pitcher quality (ERA/WHIP), and lineup position — giving elite hitters like Ohtani or Freeman an appropriate edge over replacement-level bats at the same line.</div></div>
         </div>
         <div class="hiw-tiers">
           <div class="hiw-tiers-label">Confidence Tiers</div>
@@ -903,6 +903,25 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Sharp money signals</strong> — when multiple sportsbooks move a line in the same direction since opening, it often reflects informed action. We track cross-book movement in real time and surface it when the signal is clear.</div></div>
         </div>
         <div class="hiw-callout">We'd rather show you three real trends than ten weak ones. Small samples are filtered out automatically — even if that means a lighter board on a given day.</div>
+      </div>
+
+      <!-- 5b. BEST PLAYS -->
+      <div class="hiw-section">
+        <div class="hiw-section-label">Best Plays</div>
+        <p>When you select a game, PropDesk automatically scans every available prop market in the background. Any prop with 90%+ ELITE confidence surfaces automatically in the Best Plays section — no market browsing required. Results update in real time as each market completes.</p>
+        <div class="hiw-callout">Best Plays is a full-game sweep, not a filtered view of the market you're looking at. It runs across every market simultaneously so you don't miss a high-confidence play hidden in a market you haven't clicked yet.</div>
+      </div>
+
+      <!-- 5c. ADJUSTABLE LINES -->
+      <div class="hiw-section">
+        <div class="hiw-section-label">Adjustable Lines</div>
+        <p>Every prop shows a stepper control letting you shift the threshold line — for example, from 1+ Hits to 2+ Hits. PropDesk recalculates confidence instantly using the same historical game-log data, so you can see how confidence changes at different thresholds before deciding whether the edge is worth it at a tighter or looser line.</p>
+      </div>
+
+      <!-- 5d. HISTORY TAB -->
+      <div class="hiw-section">
+        <div class="hiw-section-label">Play History</div>
+        <p>The Play History tab automatically logs every prop with 80%+ confidence that surfaces during your session. Track your hit rate over time, review model calibration broken down by confidence tier, and identify which markets and players PropDesk has performed best on. For MLB, past results resolve automatically by pulling the official box score — no manual input needed.</p>
       </div>
 
       <!-- 6. WHAT WE DON'T DO -->
