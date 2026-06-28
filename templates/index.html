@@ -644,6 +644,28 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .settings-btn:hover{color:#bbb}
 .settings-btn.live{color:#00e87a}
 .settings-btn.open{color:#00e87a}
+.settings-btn.disconnected{color:#f0a020;animation:pulse-warn 2s infinite}
+.settings-btn.disconnected:hover{color:#f5b840;animation:none}
+@keyframes pulse-warn{0%{box-shadow:0 0 0 0 rgba(240,160,32,.45)}70%{box-shadow:0 0 0 6px rgba(240,160,32,0)}100%{box-shadow:0 0 0 0 rgba(240,160,32,0)}}
+.gs-card{display:flex;flex-direction:column;align-items:center;text-align:center;padding:44px 24px 36px;gap:14px}
+.gs-logo{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.5px}
+.gs-logo b{color:var(--accent)}
+.gs-card-sub{font-size:13px;color:var(--mut);max-width:300px;line-height:1.6}
+.gs-card-row{display:flex;gap:8px;width:100%;max-width:380px}
+.gs-card-row .keyin{flex:1;margin:0}
+.gs-card-link{font-size:11px;color:#555;text-decoration:none;margin-top:2px}
+.gs-card-link:hover{color:var(--accent)}
+.onb-banner{display:flex;align-items:center;gap:10px;padding:9px 16px;background:#0d0d0d;border-left:3px solid var(--accent);font-size:12px;color:#ccc}
+.onb-banner.hidden{display:none}
+.onb-banner-text{flex:1;line-height:1.4}
+.onb-connect-btn{background:var(--accent);color:#000;font-size:11px;font-weight:700;padding:4px 12px;border:none;border-radius:5px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.onb-dismiss-btn{background:none;border:none;color:#555;font-size:16px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0}
+.onb-dismiss-btn:hover{color:#888}
+.dc-gs-drawer{padding:16px 22px 14px;display:flex;flex-direction:column;gap:10px}
+.dc-gs-title{font-size:14px;font-weight:700;color:#fff}
+.dc-gs-sub{font-size:12px;color:var(--mut);line-height:1.5}
+.dc-gs-link-drawer{font-size:11px;color:#555;text-decoration:none}
+.dc-gs-link-drawer:hover{color:var(--accent)}
 .settings-panel{position:fixed;top:52px;right:14px;width:320px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.75);z-index:200;display:none;overflow:hidden}
 .settings-panel.open{display:block}
 @media(min-width:640px){
@@ -780,6 +802,11 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   </div>
 </header>
 <div id="settingsPanel" class="settings-panel"></div>
+<div id="onbBanner" class="onb-banner hidden">
+  <span class="onb-banner-text">&#128075; New here? Connect your Odds API key to get started &rarr;</span>
+  <button class="onb-connect-btn" id="onbBannerConnBtn">Connect</button>
+  <button class="onb-dismiss-btn" id="onbBannerDismissBtn" title="Dismiss">&#10005;</button>
+</div>
 
 <div class="wrap">
 
@@ -6287,27 +6314,30 @@ function _updateDrawerConnection(){
   var key=getKey(), connected=!!key, live=ST.live;
   var m=Math.floor((ST.liveSecs||0)/60), s=(ST.liveSecs||0)%60;
   var quotaText=($("quota").textContent||"").trim();
-  var html='<div class="dc-label">CONNECTION</div>';
-  // Row 1: Live Mode
-  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Live Mode</div><div class="dc-sub">Auto-refresh prop data</div></div>'
-    +'<button class="btn live-btn dc-btn'+(live?" on":"")+(connected?"":" disabled")+'" id="drawerLiveBtn"'+(connected?"":" disabled")+'>'+(live?"Live ON":"Live OFF")+'</button></div>';
-  // Row 2: API Status
-  var sc=connected?"#00e87a":"#ff5050", sl=connected?"Connected":"Disconnected";
-  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:'+sc+'">'+sl+'</div></div>'
-    +(connected?'<button class="btn btn-disc dc-btn" id="drawerDiscBtn">Disconnect</button>':'<button class="btn btn-accent dc-btn" id="drawerConnTrigger">Connect</button>')+'</div>';
-  // Key input row (disconnected only)
-  if(!connected) html+='<div class="dc-row dc-key-input-row"><input class="keyin" id="drawerKeyInput" placeholder="Paste API key…" autocomplete="off"><button class="btn btn-accent dc-btn" id="drawerConnBtn">Go</button></div>';
-  // Row 3: API Key (connected only)
-  if(connected){ var tk=key.length>8?key.slice(0,8)+"...":key; html+='<div class="dc-row" id="drawerKeyRow"><div class="dc-left"><div class="dc-title">API Key</div></div><span class="dc-val dc-key-val" id="drawerKeyCopy">'+tk+'</span></div>'; }
-  // Row 4: Next refresh (live only)
-  if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="drawerCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="drawerRefreshBtn">Refresh Now</button></div>';
-  // Row 5: Quota
-  if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
+  var html;
+  if(!connected){
+    html='<div class="dc-label">CONNECTION</div>'
+      +'<div class="dc-gs-drawer">'
+      +'<div class="dc-gs-title">Connect to get started</div>'
+      +'<div class="dc-gs-sub">Enter your Odds API key to load live games and props.</div>'
+      +'<div class="dc-key-input-row" style="padding:0;margin-top:4px"><input class="keyin" id="drawerKeyInput" placeholder="Paste API key…" autocomplete="off"><button class="btn btn-accent dc-btn" id="drawerConnBtn">Connect</button></div>'
+      +'<a class="dc-gs-link-drawer" href="https://the-odds-api.com" target="_blank" rel="noopener">Get a free key at the-odds-api.com &rarr;</a>'
+      +'</div>';
+  } else {
+    html='<div class="dc-label">CONNECTION</div>';
+    html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Live Mode</div><div class="dc-sub">Auto-refresh prop data</div></div>'
+      +'<button class="btn live-btn dc-btn'+(live?" on":"")+'" id="drawerLiveBtn">'+(live?"Live ON":"Live OFF")+'</button></div>';
+    html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:#00e87a">Connected</div></div>'
+      +'<button class="btn btn-disc dc-btn" id="drawerDiscBtn">Disconnect</button></div>';
+    var tk=key.length>8?key.slice(0,8)+"...":key;
+    html+='<div class="dc-row" id="drawerKeyRow"><div class="dc-left"><div class="dc-title">API Key</div></div><span class="dc-val dc-key-val" id="drawerKeyCopy">'+tk+'</span></div>';
+    if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="drawerCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="drawerRefreshBtn">Refresh Now</button></div>';
+    if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
+  }
   el.innerHTML=html;
   // Wire handlers
-  var dlb=$("drawerLiveBtn"); if(dlb) dlb.onclick=function(){ if(connected) toggleLive(); };
+  var dlb=$("drawerLiveBtn"); if(dlb) dlb.onclick=toggleLive;
   var ddb=$("drawerDiscBtn"); if(ddb) ddb.onclick=doDisconnect;
-  var dct=$("drawerConnTrigger"); if(dct) dct.onclick=function(){ var i=$("drawerKeyInput"); if(i) i.focus(); };
   var dcb=$("drawerConnBtn"); if(dcb) dcb.onclick=function(){ var i=$("drawerKeyInput"); if(i&&i.value.trim()) doConnect(i.value.trim()); };
   var dki=$("drawerKeyInput"); if(dki) dki.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()) doConnect(this.value.trim()); });
   var dkr=$("drawerKeyRow"); if(dkr) dkr.onclick=function(){ navigator.clipboard.writeText(key||"").then(function(){ var kc=$("drawerKeyCopy"); if(kc){kc.textContent="Copied!"; setTimeout(_updateDrawerConnection,1200);} }).catch(function(){ toast("Copy failed"); }); };
@@ -6318,8 +6348,10 @@ function closeMoreDrawer(){ $("moreOverlay").classList.remove("open"); $("moreDr
 function _updateGearIcon(){
   var btn=$("settingsBtn"); if(!btn) return;
   var open=$("settingsPanel")&&$("settingsPanel").classList.contains("open");
+  var connected=!!getKey();
   btn.classList.toggle("live",ST.live);
   btn.classList.toggle("open",!!open);
+  btn.classList.toggle("disconnected",!connected);
 }
 function openSettingsPanel(){ var p=$("settingsPanel"); if(!p) return; p.classList.add("open"); _updateSettingsPanel(); }
 function closeSettingsPanel(){ var p=$("settingsPanel"); if(!p) return; p.classList.remove("open"); _updateGearIcon(); }
@@ -6368,6 +6400,25 @@ function maybeOnboard(){
   if(!getKey() && !localStorage.getItem("pe_onboarded")) $("onb").classList.add("open");
 }
 
+/* ============ ONBOARDING HELPERS ============ */
+function _renderGamesEmpty(){
+  var row=$("gamesRow"); if(!row) return;
+  row.innerHTML='<div class="gs-card">'
+    +'<div class="gs-logo">Prop<b>Desk</b></div>'
+    +'<div style="font-size:17px;font-weight:700;color:#fff;margin-top:2px">Welcome to PropDesk</div>'
+    +'<div class="gs-card-sub">Connect your Odds API key to load live games and props.</div>'
+    +'<div class="gs-card-row"><input class="keyin" id="gsKeyInput" placeholder="Paste API key&hellip;" autocomplete="off"><button class="btn btn-accent" id="gsConnBtn">Connect</button></div>'
+    +'<a class="gs-card-link" href="https://the-odds-api.com" target="_blank" rel="noopener">Get a free API key at the-odds-api.com &rarr;</a>'
+    +'</div>';
+  var gcb=$("gsConnBtn"); if(gcb) gcb.onclick=function(){ var v=($("gsKeyInput")||{}).value||""; if(v.trim()) doConnect(v.trim()); };
+  var gki=$("gsKeyInput"); if(gki) gki.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()) doConnect(this.value.trim()); });
+}
+function _maybeShowBanner(){
+  if(getKey()) return;
+  if(localStorage.getItem("pe_banner_dismissed")) return;
+  var b=$("onbBanner"); if(b) b.classList.remove("hidden");
+}
+
 /* ============ CONNECT ============ */
 function doConnect(key){
   key=(key||"").trim();
@@ -6383,6 +6434,7 @@ function doConnect(key){
     ST.liveTimer=setInterval(tickLive,1000);
   }
   fetchEvents();
+  var _b=$("onbBanner"); if(_b) _b.classList.add("hidden");
   _updateDrawerConnection();
   _updateSettingsPanel();
 }
@@ -6399,6 +6451,7 @@ function doDisconnect(){
     clearInterval(ST.liveTimer); ST.liveTimer=null;
   }
   toast("Disconnected");
+  _renderGamesEmpty();
   _updateDrawerConnection();
   _updateSettingsPanel();
 }
@@ -6508,7 +6561,9 @@ function init(){
   $("onbDone").onclick=function(){ $("onb").classList.remove("open"); };
 
   maybeOnboard();
-  if(k) fetchEvents();
+  if(k){ fetchEvents(); } else { _renderGamesEmpty(); _maybeShowBanner(); }
+  var _bb=$("onbBannerConnBtn"); if(_bb) _bb.onclick=function(){ openSettingsPanel(); };
+  var _bd=$("onbBannerDismissBtn"); if(_bd) _bd.onclick=function(){ localStorage.setItem("pe_banner_dismissed","1"); var _b=$("onbBanner"); if(_b) _b.classList.add("hidden"); };
 }
 
 /* ============================================================
