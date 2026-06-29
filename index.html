@@ -8288,13 +8288,20 @@ async function mlFetchStandings(sport){
             var wp=g?w/g:0.5;
             var rs=Number(t.runsScored||0),ra=Number(t.runsAllowed||0);
             var margin=g?(rs-ra)/g:0;
-            var l10=(t.records&&t.records.splitRecords||[]).find(function(s){return s.type==="lastTen";});
+            var splits=t.records&&t.records.splitRecords||[];
+            var l10=splits.find(function(s){return s.type==="lastTen";});
             var l10w=l10?l10.wins:5;
+            var homeSplit=splits.find(function(s){return s.type==="home";});
+            var roadSplit=splits.find(function(s){return s.type==="road";});
+            var homeG=homeSplit?(homeSplit.wins+homeSplit.losses):0;
+            var roadG=roadSplit?(roadSplit.wins+roadSplit.losses):0;
+            var homeWP=homeG>0?homeSplit.wins/homeG:wp;
+            var roadWP=roadG>0?roadSplit.wins/roadG:wp;
             var eloBase=(wp-0.5)*params.winScale+margin*params.marginScale;
             var l10Bonus=(l10w/10-0.5)*params.l10Scale;
             var name=(t.team&&t.team.name)||"";
             var nick=(name).trim().split(/\s+/).pop().toLowerCase();
-            var data={eloBase:eloBase,l10Bonus:l10Bonus,record:w+"-"+l,l10:l10w+"-"+(10-l10w),wp:wp,margin:margin};
+            var data={eloBase:eloBase,l10Bonus:l10Bonus,record:w+"-"+l,l10:l10w+"-"+(10-l10w),wp:wp,margin:margin,homeWP:homeWP,roadWP:roadWP};
             result[mlNormKey(name)]=data; result[nick]=data;
           });
         });
@@ -8465,7 +8472,10 @@ function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
   var ad=mlLookup(standings,away)||{eloBase:0,l10Bonus:0,record:"",l10:"",wp:0.5,margin:0};
 
   // Decompose each factor's independent Elo contribution (positive = favors home)
-  var f_winPct=((hd.wp||0.5)-0.5)*params.winScale-((ad.wp||0.5)-0.5)*params.winScale;
+  // MLB uses home/road split win% for each team; other sports fall back to season win%
+  var hWP=sport==="baseball_mlb"&&hd.homeWP!=null?hd.homeWP:(hd.wp||0.5);
+  var aWP=sport==="baseball_mlb"&&ad.roadWP!=null?ad.roadWP:(ad.wp||0.5);
+  var f_winPct=(hWP-0.5)*params.winScale-(aWP-0.5)*params.winScale;
   var f_margin=((hd.margin||0)-(ad.margin||0))*params.marginScale;
   var f_homeAdv=params.homeAdv;
   var f_l10=(hd.l10Bonus||0)-(ad.l10Bonus||0);
@@ -8511,7 +8521,7 @@ function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
 
   // Factor table sorted by absolute Elo contribution
   var factors=[
-    {key:"winPct",label:"Win %",net:Math.round(f_winPct),homeWp:Math.round((hd.wp||0.5)*1000)/10,awayWp:Math.round((ad.wp||0.5)*1000)/10},
+    {key:"winPct",label:"Win %",net:Math.round(f_winPct),homeWp:Math.round(hWP*1000)/10,awayWp:Math.round(aWP*1000)/10},
     {key:"margin",label:"Scoring margin",net:Math.round(f_margin),homeMargin:Math.round((hd.margin||0)*100)/100,awayMargin:Math.round((ad.margin||0)*100)/100},
     {key:"homeAdv",label:"Home advantage",net:Math.round(f_homeAdv)},
     {key:"l10",label:"Last 10",net:Math.round(f_l10),homeL10:hd.l10,awayL10:ad.l10},
