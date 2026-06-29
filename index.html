@@ -3509,6 +3509,8 @@ function _saveManualTrack(entry,pid,btn){
   try{
     var h=[];
     try{h=JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]");}catch(e){h=[];}
+    var alreadyExists=h.some(function(e){return e.player===entry.player&&e.market===entry.market&&e.date===entry.date;});
+    if(alreadyExists){ _trackedThisSession[pid]=true; btn.textContent="✓ Tracked"; btn.classList.add("trk-done"); btn.disabled=true; return; }
     h.unshift(entry);
     localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h));
     _trackedThisSession[pid]=true;
@@ -8896,8 +8898,10 @@ function renderGameTop5(picks,isScanning){
         var _isT=!!(mkt&&(THRESHOLD_MARKETS[sp]||{})[mkt]);
         var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
         var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
-        h.unshift({date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"});
-        added++;
+        if(!h.some(function(e){return e.player===p.player&&e.market===mkt&&e.date===today;})){
+          h.unshift({date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"});
+          added++;
+        }
       });
       localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h));
       _toastTrack(added+' play'+(added!==1?'s':'')+' added to My Plays ✓');
