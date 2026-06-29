@@ -22,6 +22,11 @@ button{cursor:pointer}
 .res-btn.active-void{background:#55555522;color:#555;border-color:#55555544}
 .res-btn.active-pending{background:#88888822;color:#888;border-color:#88888844}
 .day-wrap{margin-bottom:6px;border:1px solid #252525;border-radius:10px;overflow:hidden}
+.imp-tbl{background:#111;border:1px solid #1a1a1a;border-radius:8px;padding:0 12px;margin:10px 0}
+.imp-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #1c1c1c;transition:border-left-color .12s;border-left:3px solid transparent}
+.imp-row:last-child{border-bottom:none}
+.imp-row.sel{border-left-color:#22c55e44}
+.imp-row.dupe{opacity:.32}
 .day-hdr{width:100%;background:#1a1a1a;border:none;padding:11px 14px;text-align:left;display:flex;align-items:center;gap:8px;min-height:44px}
 .day-hdr:hover{background:#1e1e1e}
 .day-body{background:#161616;padding:12px 16px}
@@ -72,6 +77,16 @@ label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transfor
   <!-- Export reminder -->
   <div id="exportReminder" style="display:none;background:#1c2a1c;border:1px solid #22c55e33;border-radius:8px;padding:9px 14px;font-size:12px;color:#22c55e;margin-bottom:14px">
     Unsaved changes. <strong>Export JSON</strong> and upload to GitHub to update the live site.
+  </div>
+
+  <!-- Import from app panel -->
+  <div style="background:#1a1a1a;border:1px solid #252525;border-radius:10px;margin-bottom:18px;overflow:hidden">
+    <button onclick="toggleImport()" style="width:100%;background:none;border:none;color:#555;font-size:13px;font-weight:600;padding:11px 16px;text-align:left;display:flex;align-items:center;gap:6px">
+      <span id="importArrow" style="font-size:10px">▶</span> Import From App
+    </button>
+    <div id="importPanel" style="display:none;padding:0 16px 16px">
+      <div id="importContent"></div>
+    </div>
   </div>
 
   <!-- Add play panel -->
@@ -408,6 +423,144 @@ function addPlay(){
   document.getElementById('f_line').value='';
   document.getElementById('f_conf').value='';
   render();
+}
+
+/* ── Import From App ─────────────────────────────────────────── */
+var _importCandidates=[], _importTracked=[], _importQueued=[];
+
+function toggleImport(){
+  var p=document.getElementById('importPanel');
+  var open=p.style.display!=='none';
+  if(!open){ loadAndRenderImport(); p.style.display='block'; document.getElementById('importArrow').textContent='▼'; }
+  else { p.style.display='none'; document.getElementById('importArrow').textContent='▶'; }
+}
+
+function loadAndRenderImport(){
+  _importTracked=[]; _importQueued=[];
+  try{ var s=localStorage.getItem('propdesk_user_plays'); if(s) _importTracked=JSON.parse(s)||[]; }catch(e){}
+  try{ var s2=localStorage.getItem('propdesk_official_queue'); if(s2) _importQueued=JSON.parse(s2)||[]; }catch(e){}
+  // Merge, dedupe within source by player+market+date
+  var seen={};
+  _importCandidates=[];
+  [_importTracked,_importQueued].forEach(function(arr,si){
+    (arr||[]).forEach(function(p){
+      var k=(p.player||'')+'|'+(p.market||'')+'|'+(p.date||'');
+      if(!seen[k]){ seen[k]=1; _importCandidates.push(Object.assign({},p,{_src:si===0?'track':'queue'})); }
+    });
+  });
+  renderImportTable();
+}
+
+function _isAdminDupe(p){
+  return plays.some(function(ex){ return ex.player===p.player&&ex.market===p.market&&ex.date===p.date; });
+}
+
+function renderImportTable(){
+  var el=document.getElementById('importContent'); if(!el) return;
+  if(!_importCandidates.length){
+    el.innerHTML='<div style="color:#555;font-size:13px;padding:8px 0">No plays found in app localStorage.'
+      +'<br><small style="color:#333;margin-top:4px;display:block">Use the + Track button in the main app to log plays first.</small></div>';
+    return;
+  }
+  var dupeCount=_importCandidates.filter(_isAdminDupe).length;
+  var trackCount=_importCandidates.filter(function(p){return p._src==='track';}).length;
+  var queueCount=_importCandidates.filter(function(p){return p._src==='queue';}).length;
+  var html='<div style="font-size:12px;color:#888;margin-bottom:4px">'
+    +'Found <strong style="color:#e8e8e8">'+_importCandidates.length+'</strong> play'+((_importCandidates.length!==1)?'s':'')
+    +(trackCount?' &nbsp;·&nbsp; <span style="color:#22c55e">'+trackCount+' from + Track</span>':'')
+    +(queueCount?' &nbsp;·&nbsp; <span style="color:#3b82f6">'+queueCount+' from auto-queue</span>':'')
+    +'</div>';
+  if(dupeCount) html+='<div style="font-size:11px;color:#555;margin-bottom:6px">'+dupeCount+' already exist in propdesk-stats.json (will be skipped as duplicates)</div>';
+  html+='<div class="imp-tbl">';
+  _importCandidates.forEach(function(p,i){
+    var dupe=_isAdminDupe(p);
+    var conf=Number(p.confidence)||0;
+    var tier=p.tier||tierOf(conf);
+    var resCol={hit:'#22c55e',miss:'#ef4444',void:'#555',pending:'#888'}[p.result]||'#888';
+    html+='<div class="imp-row'+(dupe?' dupe':' sel')+'" id="impr-'+i+'">'
+      +'<input type="checkbox" class="import-cb" data-imp-idx="'+i+'" '+(dupe?'disabled':'checked')+' onchange="onImpCheck('+i+')" style="flex-shrink:0;accent-color:#22c55e">'
+      +'<span style="font-size:11px;color:#555;min-width:62px;flex-shrink:0">'+esc(p.date||'—')+'</span>'
+      +'<span style="font-weight:600;font-size:12px;color:#e8e8e8;min-width:120px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px">'+esc(p.player||'—')+'</span>'
+      +'<span style="font-size:11px;color:#555;min-width:72px;flex-shrink:0">'+esc(p.marketDisplay||MKT_DISPLAY[p.market]||p.market||'—')+'</span>'
+      +'<span style="font-family:monospace;font-size:11px;color:#aaa;min-width:70px;flex-shrink:0">'+esc(p.line||'—')+'</span>'
+      +'<span style="font-size:11px;font-weight:700;color:'+confColor(conf)+';min-width:34px;flex-shrink:0">'+conf+'%</span>'
+      +'<span class="badge '+esc(tier)+'">'+esc(tier)+'</span>'
+      +'<span style="font-size:11px;color:'+resCol+';margin-left:auto;flex-shrink:0">'+esc(p.result||'pending')+'</span>'
+      +(dupe?'<span style="font-size:10px;color:#333;flex-shrink:0">dupe</span>':'')
+      +'</div>';
+  });
+  html+='</div>';
+  var selCount=_importCandidates.filter(function(p,i){ return !_isAdminDupe(p); }).length;
+  html+='<div style="display:flex;align-items:center;gap:14px;margin-top:12px;flex-wrap:wrap">'
+    +'<button onclick="doImport()" id="importBtn" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;white-space:nowrap">Import '+selCount+' Selected Plays</button>'
+    +'<label style="font-size:11px;color:#555;display:flex;align-items:center;gap:6px;cursor:pointer">'
+    +'<input type="checkbox" id="clearAfterImport" style="accent-color:#22c55e"> Clear imported plays from app localStorage after import</label>'
+    +'</div>'
+    +'<div id="importResult" style="font-size:12px;color:#22c55e;margin-top:8px;min-height:18px"></div>';
+  el.innerHTML=html;
+}
+
+function onImpCheck(i){
+  var row=document.getElementById('impr-'+i);
+  var cb=document.querySelector('.import-cb[data-imp-idx="'+i+'"]');
+  if(row) row.className='imp-row'+(cb&&cb.checked?' sel':'');
+  updateImportBtn();
+}
+
+function updateImportBtn(){
+  var n=document.querySelectorAll('.import-cb:checked:not(:disabled)').length;
+  var btn=document.getElementById('importBtn');
+  if(btn) btn.textContent='Import '+n+' Selected Plays';
+}
+
+function doImport(){
+  var checked=document.querySelectorAll('.import-cb:checked:not(:disabled)');
+  var toImport=[], skipped=0;
+  checked.forEach(function(cb){
+    var p=_importCandidates[parseInt(cb.getAttribute('data-imp-idx'))];
+    if(!p) return;
+    if(_isAdminDupe(p)){skipped++;return;}
+    toImport.push(p);
+  });
+  toImport.forEach(function(p){
+    plays.push({
+      date:p.date||new Date().toISOString().slice(0,10),
+      player:p.player||'Unknown',
+      market:p.market||'batter_hits',
+      marketDisplay:p.marketDisplay||MKT_DISPLAY[p.market]||p.market||'—',
+      sport:p.sport||'MLB',
+      line:p.line||'—',
+      confidence:Number(p.confidence)||0,
+      tier:p.tier||tierOf(Number(p.confidence)||0),
+      result:p.result||'pending',
+      _idx:plays.length
+    });
+  });
+  // Optionally clear imported entries from propdesk_user_plays
+  if(toImport.length&&document.getElementById('clearAfterImport').checked){
+    try{
+      var impKeys={};
+      toImport.forEach(function(p){impKeys[p.player+'|'+p.market+'|'+p.date]=1;});
+      var rem=_importTracked.filter(function(p){return !impKeys[(p.player||'')+'|'+(p.market||'')+'|'+(p.date||'')];});
+      if(rem.length) localStorage.setItem('propdesk_user_plays',JSON.stringify(rem));
+      else localStorage.removeItem('propdesk_user_plays');
+      _importTracked=rem;
+    }catch(e){}
+  }
+  var resEl=document.getElementById('importResult');
+  if(resEl) resEl.innerHTML='Imported <strong>'+toImport.length+'</strong> play'+(toImport.length!==1?'s':'')+'. '+skipped+' duplicate'+(skipped!==1?'s':'')+' skipped.';
+  if(toImport.length){
+    // Expand the most recent imported day
+    var latest=toImport.reduce(function(m,p){return p.date>m?p.date:m;},'');
+    if(latest) expandedDays[latest]=true;
+    markDirty();
+    render();
+    // Refresh import table so dupe counts update
+    renderImportTable();
+    // Re-show result message (renderImportTable cleared it)
+    var resEl2=document.getElementById('importResult');
+    if(resEl2) resEl2.innerHTML='Imported <strong>'+toImport.length+'</strong> play'+(toImport.length!==1?'s':'')+'. '+skipped+' duplicate'+(skipped!==1?'s':'')+' skipped.';
+  }
 }
 
 function exportJSON(){
