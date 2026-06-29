@@ -918,7 +918,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
             </div>
           </div>
         </div>
-        <div class="hiw-callout">Every number you see is calculated from real game data — never estimated or made up.</div>
+        <div class="hiw-callout">Every number you see is sourced from official game records and live market data — not projections, estimates, or third-party summaries.</div>
       </div>
 
       <!-- 3. PLAYER PROPS -->
@@ -930,30 +930,30 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We require real data before we'll rate anything.</strong> Thin samples get flagged or excluded automatically. If we don't have enough games to be confident, we say so — or we say nothing at all.</div></div>
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>The line matters as much as the average.</strong> A player averaging 22 points doesn't make the Over on a 24.5 line a good bet. We measure actual hit rate at the specific line being offered today.</div></div>
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We weight recent games more than season totals.</strong> The model blends L5 (60%), L10 (25%), and full-season (15%) hit rates so that recent form dominates without completely ignoring longer-term patterns.</div></div>
-          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>For MLB, we factor in true talent signals.</strong> PropDesk also weights season batting average, opposing pitcher quality (ERA/WHIP), and lineup position — giving elite hitters like Ohtani or Freeman an appropriate edge over replacement-level bats at the same line.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>For MLB, the model also weights pitcher quality and batter profile.</strong> Season batting average, opposing pitcher ERA/WHIP, and lineup position all factor in — giving a true .300 hitter facing a 5.40 ERA starter more credit than a .240 hitter at the same line.</div></div>
         </div>
         <div class="hiw-tiers">
           <div class="hiw-tiers-label">Confidence Tiers</div>
           <div class="hiw-tier-grid">
             <div class="hiw-tier hiw-tier-lock">
-              <div class="hiw-tier-name">🏆 ELITE</div>
-              <div class="hiw-tier-desc">90%+ confidence. Strongest signal — the player has hit this mark in the overwhelming majority of recent games. Multiple data points align across L5, L10, and season. Top-tier bet.</div>
+              <div class="hiw-tier-name">🔒 ELITE</div>
+              <div class="hiw-tier-desc">90%+ confidence. The player has hit this line in the overwhelming majority of recent games. L5, L10, and season hit rates all align.</div>
             </div>
             <div class="hiw-tier hiw-tier-elite">
-              <div class="hiw-tier-name">⭐ GREAT</div>
-              <div class="hiw-tier-desc">75–89% confidence. High confidence across recent form, mid-term trend, and season data. The primary target for most plays — solid edge with real data behind it.</div>
+              <div class="hiw-tier-name">✅ GREAT</div>
+              <div class="hiw-tier-desc">75–89% confidence. Strong agreement across recent form, mid-term trend, and season data. The primary target range for most plays.</div>
             </div>
             <div class="hiw-tier hiw-tier-strong">
-              <div class="hiw-tier-name">👍 GOOD</div>
-              <div class="hiw-tier-desc">60–74% confidence. A clear positive lean at the posted line. Worth including in a parlay or as a supporting leg — the edge is real, just not overwhelming.</div>
+              <div class="hiw-tier-name">📊 GOOD</div>
+              <div class="hiw-tier-desc">60–74% confidence. A clear positive lean at the posted line. Reasonable as a parlay leg — edge is present, but not dominant.</div>
             </div>
             <div class="hiw-tier hiw-tier-good">
-              <div class="hiw-tier-name">📊 VALUE</div>
-              <div class="hiw-tier-desc">45–59% confidence. Slight lean with limited historical data or a tight spread. Use as context — not as a primary bet. Still better than a coin flip.</div>
+              <div class="hiw-tier-name">VALUE</div>
+              <div class="hiw-tier-desc">45–59% confidence. Slight lean with limited sample or a tight historical spread. Use as supporting context — not as a standalone bet.</div>
             </div>
             <div class="hiw-tier hiw-tier-poor">
               <div class="hiw-tier-name">⬜ POOR</div>
-              <div class="hiw-tier-desc">Below 45% confidence. The model sees little to no edge here. Hidden by default in the prop table — shown only when filtering is removed.</div>
+              <div class="hiw-tier-desc">Below 45% confidence. The model finds little to no edge here. Hidden by default in the prop table — visible only when filtering is removed.</div>
             </div>
           </div>
         </div>
