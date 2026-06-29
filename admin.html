@@ -27,6 +27,22 @@ button{cursor:pointer}
 .imp-row:last-child{border-bottom:none}
 .imp-row.sel{border-left-color:#22c55e44}
 .imp-row.dupe{opacity:.32}
+.tab-pill{border-radius:20px;padding:6px 16px;font-size:13px;font-weight:600;border:1px solid #252525;background:transparent;color:#555;transition:.12s}
+.tab-pill.active{background:#1e1e1e;color:#e8e8e8;border-color:#444}
+.soc-card{background:#1a1a1a;border:1px solid #252525;border-radius:10px;padding:11px 14px;flex:1;min-width:120px}
+.soc-type-pill{border-radius:16px;padding:5px 12px;font-size:12px;font-weight:600;border:1px solid #252525;background:transparent;color:#555;white-space:nowrap;transition:.12s}
+.soc-type-pill.active{background:#1c2a1c;color:#22c55e;border-color:#22c55e44}
+.soc-output{background:#111;border:1px solid #22c55e33;border-radius:8px;padding:12px;color:#e8e8e8;font-size:14px;line-height:1.6;width:100%;resize:vertical;outline:none;font-family:inherit}
+.soc-output:focus{border-color:#22c55e66}
+.soc-act-btn{border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;border:1px solid #252525;background:#1a1a1a;color:#888;white-space:nowrap;transition:.12s}
+.soc-act-btn:hover{color:#e8e8e8;border-color:#444}
+.soc-act-btn.green{background:#22c55e;color:#000;border-color:transparent}
+.hist-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #1c1c1c}
+.hist-row:last-child{border-bottom:none}
+.hist-filter-pill{border-radius:14px;padding:4px 10px;font-size:11px;font-weight:600;border:1px solid #252525;background:transparent;color:#555}
+.hist-filter-pill.active{background:#252525;color:#e8e8e8;border-color:#444}
+.tmpl-area{background:#111;border:1px solid #252525;border-radius:8px;padding:10px;color:#888;font-size:12px;width:100%;resize:vertical;outline:none;font-family:inherit;line-height:1.5}
+.tmpl-area:focus{border-color:#333}
 .day-hdr{width:100%;background:#1a1a1a;border:none;padding:11px 14px;text-align:left;display:flex;align-items:center;gap:8px;min-height:44px}
 .day-hdr:hover{background:#1e1e1e}
 .day-body{background:#161616;padding:12px 16px}
@@ -78,6 +94,14 @@ label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transfor
   <div id="exportReminder" style="display:none;background:#1c2a1c;border:1px solid #22c55e33;border-radius:8px;padding:9px 14px;font-size:12px;color:#22c55e;margin-bottom:14px">
     Unsaved changes. <strong>Export JSON</strong> and upload to GitHub to update the live site.
   </div>
+
+  <!-- Tab nav -->
+  <div style="display:flex;gap:8px;margin-bottom:20px">
+    <button class="tab-pill active" data-tab="plays" onclick="switchTab('plays')">Plays</button>
+    <button class="tab-pill" data-tab="social" onclick="switchTab('social')">Social</button>
+  </div>
+
+  <div id="playsTab">
 
   <!-- Import from app panel -->
   <div style="background:#1a1a1a;border:1px solid #252525;border-radius:10px;margin-bottom:18px;overflow:hidden">
@@ -135,6 +159,127 @@ label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transfor
 
   <!-- Days -->
   <div id="days"></div>
+
+  </div><!-- /playsTab -->
+
+  <!-- Social Tab -->
+  <div id="socialTab" style="display:none">
+
+    <!-- Data snapshot cards -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Live Data Snapshot</div>
+      <div id="socialDataCards" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+
+    <!-- Content Generator -->
+    <div style="background:#1a1a1a;border:1px solid #252525;border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:#e8e8e8;margin-bottom:14px">Content Generator</div>
+
+      <!-- Post type selector -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        <button class="soc-type-pill active" data-type="morning" onclick="setSocialType('morning')">Morning Picks</button>
+        <button class="soc-type-pill" data-type="recap" onclick="setSocialType('recap')">Evening Recap</button>
+        <button class="soc-type-pill" data-type="spotlight" onclick="setSocialType('spotlight')">Player Spotlight</button>
+        <button class="soc-type-pill" data-type="weekly" onclick="setSocialType('weekly')">Weekly Summary</button>
+        <button class="soc-type-pill" data-type="instagram" onclick="setSocialType('instagram')">Instagram Caption</button>
+        <button class="soc-type-pill" data-type="custom" onclick="setSocialType('custom')">Custom</button>
+      </div>
+
+      <!-- Dynamic inputs -->
+      <div id="socialInputArea" style="margin-bottom:14px"></div>
+
+      <!-- Generate -->
+      <button id="genBtn" onclick="socialGenerate()" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:10px 22px;font-size:14px;font-weight:700">✦ Generate Post</button>
+      <div id="genStatus" style="display:none;font-size:12px;color:#22c55e;margin-top:8px">PropDesk AI is writing your post…</div>
+
+      <!-- Output -->
+      <div style="margin-top:14px">
+        <textarea id="socialOutput" class="soc-output" rows="9" placeholder="Generated post will appear here…" oninput="updateCharCounter(this.value)"></textarea>
+        <div id="charCounter" style="text-align:right;font-size:11px;color:#444;margin-top:4px"></div>
+      </div>
+
+      <!-- Post actions -->
+      <div id="socialActions" style="display:none;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button id="copyTwBtn" class="soc-act-btn" onclick="socialCopyTwitter()">𝕏 Copy for Twitter</button>
+        <button id="copyIgBtn" class="soc-act-btn" onclick="socialCopyInstagram()">◎ Copy for Instagram</button>
+        <button class="soc-act-btn" onclick="socialRegenerate()">↺ Regenerate</button>
+        <button id="saveHistBtn" class="soc-act-btn green" onclick="socialSaveHistory()">↓ Save to History</button>
+      </div>
+    </div>
+
+    <!-- Post History -->
+    <div style="background:#1a1a1a;border:1px solid #252525;border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:700;color:#e8e8e8">Post History</div>
+        <div id="histMeta" style="font-size:11px;color:#444"></div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="hist-filter-pill active" data-hf="all" onclick="setHistFilter('all')">All</button>
+        <button class="hist-filter-pill" data-hf="twitter" onclick="setHistFilter('twitter')">Twitter</button>
+        <button class="hist-filter-pill" data-hf="instagram" onclick="setHistFilter('instagram')">Instagram</button>
+        <button class="hist-filter-pill" data-hf="today" onclick="setHistFilter('today')">Today</button>
+        <button class="hist-filter-pill" data-hf="week" onclick="setHistFilter('week')">This Week</button>
+      </div>
+      <div id="histList"></div>
+    </div>
+
+    <!-- Quick Templates -->
+    <div style="background:#1a1a1a;border:1px solid #252525;border-radius:10px;padding:16px">
+      <div style="font-size:14px;font-weight:700;color:#e8e8e8;margin-bottom:14px">Quick Templates</div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Morning Picks</span>
+            <button onclick="copyTemplate('tmpl0')" style="background:transparent;border:1px solid #252525;color:#555;border-radius:5px;padding:3px 10px;font-size:11px">Copy</button>
+          </div>
+          <textarea id="tmpl0" class="tmpl-area" rows="5">🎯 PropDesk Picks — [DATE]
+
+🔒 [PLAYER] — [LINE] ([CONFIDENCE]% confidence)
+✅ [PLAYER] — [LINE] ([CONFIDENCE]% confidence)
+📊 [PLAYER] — [LINE] ([CONFIDENCE]% confidence)
+
+[1-2 sentence data-driven comment on today's slate]
+
+Record: [RECORD] all-time | [L7] L7
+#PropDesk #PropBetting</textarea>
+        </div>
+
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Evening Recap</span>
+            <button onclick="copyTemplate('tmpl1')" style="background:transparent;border:1px solid #252525;color:#555;border-radius:5px;padding:3px 10px;font-size:11px">Copy</button>
+          </div>
+          <textarea id="tmpl1" class="tmpl-area" rows="6">📊 PropDesk Recap — [DATE]
+[X]-[X] today ([X]%)
+
+✅ [HIT PLAYER] — [MARKET]
+❌ [MISS PLAYER] — [MARKET]
+
+[1-2 sentence honest assessment]
+
+Season: [RECORD] | L7: [L7]
+#PropDesk #PropBetting</textarea>
+        </div>
+
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:.5px">Player Spotlight</span>
+            <button onclick="copyTemplate('tmpl2')" style="background:transparent;border:1px solid #252525;color:#555;border-radius:5px;padding:3px 10px;font-size:11px">Copy</button>
+          </div>
+          <textarea id="tmpl2" class="tmpl-area" rows="5">🔎 [PLAYER] — [LINE] ([CONFIDENCE]% | [TIER])
+
+[2-3 sentence analytical breakdown. Key stats: [STAT1], [STAT2]. Facing [ERA/OPPONENT context].]
+
+Full model breakdown at thepropdesk.org
+#PropDesk #PropBetting</textarea>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /socialTab -->
+
 </div>
 
 <div id="lsToast" style="position:fixed;bottom:20px;right:20px;background:#1a2a1a;border:1px solid #22c55e44;border-radius:8px;padding:8px 14px;font-size:12px;color:#22c55e;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100">Changes saved locally</div>
@@ -561,6 +706,404 @@ function doImport(){
     var resEl2=document.getElementById('importResult');
     if(resEl2) resEl2.innerHTML='Imported <strong>'+toImport.length+'</strong> play'+(toImport.length!==1?'s':'')+'. '+skipped+' duplicate'+(skipped!==1?'s':'')+' skipped.';
   }
+}
+
+/* ── Social Tab ────────────────────────────────────────────── */
+var _socialType='morning', _histFilter='all';
+
+function switchTab(tab){
+  document.getElementById('playsTab').style.display=tab==='plays'?'block':'none';
+  document.getElementById('socialTab').style.display=tab==='social'?'block':'none';
+  document.querySelectorAll('.tab-pill').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-tab')===tab);});
+  if(tab==='social'){renderSocialDataCards();renderSocialInputs();renderSocialHistory();}
+}
+
+/* ─ Data cards ─ */
+function renderSocialDataCards(){
+  var el=document.getElementById('socialDataCards'); if(!el) return;
+  var today=new Date().toISOString().slice(0,10);
+  var settled=plays.filter(function(p){return p.result==='hit'||p.result==='miss';});
+  var hits=settled.filter(function(p){return p.result==='hit';}).length;
+  var wr=settled.length?Math.round(hits/settled.length*100):0;
+  var d7=new Date(); d7.setDate(d7.getDate()-7); var d7s=d7.toISOString().slice(0,10);
+  var recent=settled.filter(function(p){return p.date>=d7s;});
+  var rH=recent.filter(function(p){return p.result==='hit';}).length;
+  var rWr=recent.length?Math.round(rH/recent.length*100):0;
+  var trackedToday=[];
+  try{var ts=localStorage.getItem('propdesk_user_plays');if(ts)trackedToday=(JSON.parse(ts)||[]).filter(function(p){return p.date===today;});}catch(e){}
+  // Best market L7
+  var mktMap={};
+  settled.filter(function(p){return p.date>=d7s;}).forEach(function(p){
+    var m=p.marketDisplay||MKT_DISPLAY[p.market]||p.market;
+    if(!mktMap[m])mktMap[m]={h:0,t:0};
+    mktMap[m].t++;if(p.result==='hit')mktMap[m].h++;
+  });
+  var bestMkt='—';var bestRate=0;
+  Object.keys(mktMap).forEach(function(m){if(mktMap[m].t>=2){var r=mktMap[m].h/mktMap[m].t;if(r>bestRate){bestRate=r;bestMkt=m+' ('+Math.round(r*100)+'%)';}}});
+  // Streak
+  var srtd=settled.slice().sort(function(a,b){return b.date.localeCompare(a.date);});
+  var stType=srtd.length?srtd[0].result:null;var stLen=0;
+  for(var i=0;i<srtd.length;i++){if(srtd[i].result===stType)stLen++;else break;}
+  function sdc(label,val,sub){
+    return '<div class="soc-card"><div style="font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+label+'</div>'
+      +'<div style="font-size:13px;font-weight:700;color:#e8e8e8">'+val+'</div>'
+      +(sub?'<div style="font-size:11px;color:#555;margin-top:2px">'+sub+'</div>':'')+'</div>';
+  }
+  el.innerHTML=
+    sdc('All-Time',hits+'-'+(settled.length-hits),wr+'% hit rate')
+    +sdc('Last 7 Days',rH+'-'+(recent.length-rH),rWr+'%')
+    +sdc('Today\'s Tracked',trackedToday.length+' plays',today)
+    +sdc('Best Market L7',bestMkt)
+    +sdc('Streak',stType?stLen+' '+stType+(stLen!==1?'s':''):'—');
+}
+
+/* ─ Input area ─ */
+function setSocialType(t){
+  _socialType=t;
+  document.querySelectorAll('.soc-type-pill').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-type')===t);});
+  renderSocialInputs();
+  document.getElementById('socialOutput').value='';
+  document.getElementById('socialActions').style.display='none';
+  updateCharCounter('');
+}
+
+function renderSocialInputs(){
+  var el=document.getElementById('socialInputArea'); if(!el) return;
+  var today=new Date().toISOString().slice(0,10);
+  var trackedToday=[];
+  try{var ts=localStorage.getItem('propdesk_user_plays');if(ts)trackedToday=(JSON.parse(ts)||[]).filter(function(p){return p.date===today;});}catch(e){}
+  var mktOpts=Object.keys(MKT_DISPLAY).map(function(m){return '<option value="'+m+'">'+MKT_DISPLAY[m]+'</option>';}).join('');
+  var html='';
+
+  if(_socialType==='morning'||_socialType==='instagram'){
+    html+='<div style="font-size:12px;color:#555;margin-bottom:8px">Today\'s plays '+(trackedToday.length?'(auto-pulled from + Track)':'(enter manually — up to 5):')+'</div>';
+    html+='<div style="display:grid;grid-template-columns:60px 1.8fr 1fr 1fr 54px;gap:5px;margin-bottom:4px;font-size:10px;color:#444;text-transform:uppercase;letter-spacing:.4px">'
+      +'<span></span><span>Player</span><span>Market</span><span>Line</span><span>Conf%</span></div>';
+    for(var i=0;i<5;i++){
+      var p=trackedToday[i]||{};
+      html+='<div style="display:grid;grid-template-columns:60px 1.8fr 1fr 1fr 54px;gap:5px;margin-bottom:5px">'
+        +'<span style="font-size:11px;color:#444;padding-top:8px">Play '+(i+1)+'</span>'
+        +'<input class="infield pick-player" style="font-size:12px;padding:5px 8px" placeholder="Player name" value="'+esc(p.player||'')+'">'
+        +'<select class="infield pick-mkt" style="font-size:12px;padding:5px 8px">'+mktOpts+'</select>'
+        +'<input class="infield pick-line" style="font-size:12px;padding:5px 8px" placeholder="Over 1.5" value="'+esc(p.line||'')+'">'
+        +'<input class="infield pick-conf" type="number" min="0" max="100" style="font-size:12px;padding:5px 8px" placeholder="%" value="'+(p.confidence||'')+'">'
+        +'</div>';
+    }
+    // Set correct market selection after render
+    if(trackedToday.length){
+      setTimeout(function(){
+        var selects=document.querySelectorAll('.pick-mkt');
+        trackedToday.slice(0,5).forEach(function(p,idx){
+          if(selects[idx]&&p.market) selects[idx].value=p.market;
+        });
+      },0);
+    }
+    html+='<div style="display:flex;gap:8px;margin-top:8px">'
+      +'<select id="pickTone" class="infield" style="width:auto;font-size:12px;padding:5px 10px">'
+      +'<option value="standard">Standard tone</option>'
+      +'<option value="confident">Confident tone</option>'
+      +'<option value="conservative">Conservative tone</option>'
+      +'</select></div>';
+
+  }else if(_socialType==='recap'){
+    var resolvedToday=plays.filter(function(p){return p.date===today&&(p.result==='hit'||p.result==='miss');});
+    var rH2=resolvedToday.filter(function(p){return p.result==='hit';}).length;
+    var rM2=resolvedToday.filter(function(p){return p.result==='miss';}).length;
+    if(resolvedToday.length){
+      html+='<div style="background:#111;border:1px solid #1a1a1a;border-radius:8px;padding:10px 12px;margin-bottom:10px">'
+        +'<div style="font-size:12px;color:#888;margin-bottom:6px">Auto-detected for today: '
+        +'<strong style="color:#22c55e">'+rH2+' hits</strong>, <strong style="color:#ef4444">'+rM2+' misses</strong></div>';
+      resolvedToday.forEach(function(p){
+        html+='<div style="font-size:12px;color:'+(p.result==='hit'?'#22c55e':'#ef4444')+'">'
+          +(p.result==='hit'?'✓':'✕')+' '+esc(p.player)+' — '+esc(p.marketDisplay||MKT_DISPLAY[p.market]||p.market)+'</div>';
+      });
+      html+='</div>';
+    }else{
+      html+='<div style="font-size:12px;color:#444;margin-bottom:8px">No resolved plays found for today in admin data. Results will be pulled from manual input below.</div>';
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+        +'<div><label class="fl">Hits</label><input id="recapHits" class="infield" type="number" min="0" value="0" style="font-size:12px;padding:5px 8px"></div>'
+        +'<div><label class="fl">Misses</label><input id="recapMisses" class="infield" type="number" min="0" value="0" style="font-size:12px;padding:5px 8px"></div>'
+        +'<div><label class="fl">Voids</label><input id="recapVoids" class="infield" type="number" min="0" value="0" style="font-size:12px;padding:5px 8px"></div>'
+        +'</div>';
+    }
+    html+='<input id="recapHighlight" class="infield" placeholder="Notable play to highlight (optional, e.g. Michael Harris II hit at 97%)" style="font-size:12px">';
+
+  }else if(_socialType==='spotlight'){
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+      +'<div><label class="fl">Player</label><input id="spotPlayer" class="infield" placeholder="Player name" style="font-size:12px;padding:6px 8px"></div>'
+      +'<div><label class="fl">Market</label><select id="spotMkt" class="infield" style="font-size:12px;padding:6px 8px">'+mktOpts+'</select></div>'
+      +'<div><label class="fl">Line</label><input id="spotLine" class="infield" placeholder="Over 1.5" style="font-size:12px;padding:6px 8px"></div>'
+      +'<div><label class="fl">Confidence %</label><input id="spotConf" class="infield" type="number" min="0" max="100" placeholder="82" style="font-size:12px;padding:6px 8px"></div>'
+      +'</div>'
+      +'<label class="fl">Key stats</label>'
+      +'<textarea id="spotStats" class="infield" rows="2" placeholder="e.g. 5-of-5 L5, .310 BA, facing 5.40 ERA starter" style="font-size:12px;resize:vertical"></textarea>';
+
+  }else if(_socialType==='weekly'){
+    var d7b=new Date(); d7b.setDate(d7b.getDate()-7); var d7s=d7b.toISOString().slice(0,10);
+    html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:#555;margin-bottom:6px">'
+      +'<span>Date range:</span>'
+      +'<input id="wkStart" class="infield" type="date" value="'+d7s+'" style="width:150px;font-size:12px;padding:5px 8px">'
+      +'<span>to</span>'
+      +'<input id="wkEnd" class="infield" type="date" value="'+today+'" style="width:150px;font-size:12px;padding:5px 8px">'
+      +'</div>'
+      +'<div style="font-size:11px;color:#444">Stats auto-computed from propdesk-stats.json for this range.</div>';
+
+  }else if(_socialType==='custom'){
+    html+='<label class="fl">Describe what you want to post about</label>'
+      +'<textarea id="customPrompt" class="infield" rows="3" placeholder="e.g. PropDesk hit 4 straight ELITE picks this week on MLB hits markets…" style="font-size:12px;resize:vertical"></textarea>';
+  }
+  el.innerHTML=html;
+}
+
+/* ─ Prompt builder ─ */
+function socialBuildPrompt(){
+  var today=new Date().toISOString().slice(0,10);
+  var todayFmt=new Date(today+'T12:00:00').toLocaleDateString([],{month:'long',day:'numeric',year:'numeric'});
+  var settled=plays.filter(function(p){return p.result==='hit'||p.result==='miss';});
+  var hits=settled.filter(function(p){return p.result==='hit';}).length;
+  var misses=settled.length-hits;
+  var wr=settled.length?Math.round(hits/settled.length*100):0;
+  var allRec=hits+'-'+misses+' ('+wr+'%)';
+  var d7=new Date(); d7.setDate(d7.getDate()-7); var d7s=d7.toISOString().slice(0,10);
+  var recent=settled.filter(function(p){return p.date>=d7s;});
+  var rH=recent.filter(function(p){return p.result==='hit';}).length;
+  var rWr=recent.length?Math.round(rH/recent.length*100):0;
+  var l7=rH+'-'+(recent.length-rH)+' ('+rWr+'%)';
+  var voice='You are the social media voice for PropDesk (@PropDeskHQ), a data-first sports prop betting analytics platform. Voice: confident, analytical, no fluff, no tout energy. Never guarantee wins. Never name specific sportsbooks. Always frame picks as probability and edge, not certainty.';
+
+  if(_socialType==='morning'||_socialType==='instagram'){
+    var players=document.querySelectorAll('.pick-player');
+    var markets=document.querySelectorAll('.pick-mkt');
+    var lines=document.querySelectorAll('.pick-line');
+    var confs=document.querySelectorAll('.pick-conf');
+    var picks=[];
+    for(var i=0;i<players.length;i++){
+      var pl=players[i].value.trim(); if(!pl) continue;
+      var c=parseInt(confs[i].value)||0;
+      picks.push(pl+' — '+(MKT_DISPLAY[markets[i].value]||markets[i].value)+' '+lines[i].value+' ('+c+'%, '+tierOf(c)+')');
+    }
+    if(!picks.length) return null;
+    var isInsta=_socialType==='instagram';
+    var toneNote=({standard:'',confident:' Write with extra confidence — emphasize the edge and data conviction.',conservative:' Use cautious, measured language — acknowledge variance.'}[(document.getElementById('pickTone')||{}).value]||'');
+    return voice+' '+(isInsta?'Up to 15 hashtags.':'Max 3 hashtags for Twitter.')+toneNote
+      +'\n\nGenerate a '+(isInsta?'Instagram caption':'Twitter/X morning picks post')+' for today ('+todayFmt+') using these plays:\n'
+      +picks.join('\n')
+      +'\n\nPropDesk all-time record: '+allRec+'. Last 7 days: '+l7+'.'
+      +'\n\nFormat:\n🎯 PropDesk Picks — '+todayFmt
+      +'\n\n[TIER EMOJI] [Player] — [Line] ([X]% confidence)\n[repeat for each play]'
+      +'\n\n[1-2 sentence analytical comment on today\'s slate — specific to these matchups, no hype]'
+      +'\n\nRecord: '+hits+'-'+misses+' all-time | '+rH+'-'+(recent.length-rH)+' L7'
+      +'\n'+(isInsta
+        ?'#PropDesk #PropBetting #SportsBetting #Props #BettingPicks #DataDriven #SportsPicks #MLB #Analytics #EdgeBetting #SharpMoney #BettingAnalysis\n\nSuggested graphic: [describe what the pick card image should show]'
+        :'#PropDesk #[SportProp] #PropBetting\n\nTier emojis: ELITE=🔒 GREAT=✅ GOOD=📊. No hype, no guarantees.');
+  }
+
+  if(_socialType==='recap'){
+    var resolvedToday=plays.filter(function(p){return p.date===today&&(p.result==='hit'||p.result==='miss');});
+    var rH2=resolvedToday.filter(function(p){return p.result==='hit';}).length;
+    var rM2=resolvedToday.filter(function(p){return p.result==='miss';}).length;
+    if(!resolvedToday.length){
+      rH2=parseInt((document.getElementById('recapHits')||{}).value)||0;
+      rM2=parseInt((document.getElementById('recapMisses')||{}).value)||0;
+    }
+    var total2=rH2+rM2;
+    var todayPct=total2?Math.round(rH2/total2*100):0;
+    var hitStr=resolvedToday.filter(function(p){return p.result==='hit';}).map(function(p){return p.player+' ('+esc(p.marketDisplay||MKT_DISPLAY[p.market]||p.market)+')';}).join(', ')||'—';
+    var missStr=resolvedToday.filter(function(p){return p.result==='miss';}).map(function(p){return p.player+' ('+esc(p.marketDisplay||MKT_DISPLAY[p.market]||p.market)+')';}).join(', ')||'—';
+    var hl=(document.getElementById('recapHighlight')||{}).value||'';
+    return 'Generate a PropDesk evening recap post for Twitter/X for '+todayFmt+'.'
+      +'\nToday\'s record: '+rH2+'-'+rM2+(total2?' ('+todayPct+'%)':'')
+      +'\nHits: '+hitStr+'\nMisses: '+missStr+(hl?'\nNotable: '+hl:'')
+      +'\n\nPropDesk voice: honest about losses, never make excuses, data-forward. If it was a bad day, own it. If it was a good day, let the numbers speak.'
+      +'\n\nFormat:\n📊 PropDesk Recap — '+todayFmt+'\n[X]-[X] today ([X]%)\n\n✅ [hits]\n❌ [misses]\n\n[1-2 sentence honest comment]\n\nSeason: '+allRec+' | L7: '+l7+'\n#PropDesk #PropBetting';
+  }
+
+  if(_socialType==='spotlight'){
+    var sp=(document.getElementById('spotPlayer')||{}).value||'';
+    if(!sp.trim()) return null;
+    var sm=(document.getElementById('spotMkt')||{}).value||'';
+    var sl=(document.getElementById('spotLine')||{}).value||'';
+    var sc=parseInt((document.getElementById('spotConf')||{}).value)||0;
+    var ss=(document.getElementById('spotStats')||{}).value||'';
+    return 'Generate a PropDesk player spotlight post for Twitter/X.'
+      +'\nPlayer: '+sp+'\nProp: '+sl+' '+(MKT_DISPLAY[sm]||sm)+' — '+sc+'% ('+tierOf(sc)+')'
+      +'\nKey data: '+ss+'\nPropDesk all-time record: '+allRec
+      +'\n\nWrite a 2-3 sentence analytical breakdown of why this prop stands out. Data-first, no hype. End with the confidence tier and a call to check thepropdesk.org for the full model breakdown. Max 3 hashtags.';
+  }
+
+  if(_socialType==='weekly'){
+    var ws=(document.getElementById('wkStart')||{}).value||d7s;
+    var we=(document.getElementById('wkEnd')||{}).value||today;
+    var wkP=settled.filter(function(p){return p.date>=ws&&p.date<=we;});
+    var wH=wkP.filter(function(p){return p.result==='hit';}).length;
+    var wWr=wkP.length?Math.round(wH/wkP.length*100):0;
+    // Market breakdown
+    var wm={};
+    wkP.forEach(function(p){var m=p.marketDisplay||MKT_DISPLAY[p.market]||p.market;if(!wm[m])wm[m]={h:0,t:0};wm[m].t++;if(p.result==='hit')wm[m].h++;});
+    var wmArr=Object.keys(wm).filter(function(m){return wm[m].t>=2;}).map(function(m){return{n:m,h:wm[m].h,t:wm[m].t,r:wm[m].h/wm[m].t};}).sort(function(a,b){return b.r-a.r;});
+    var bMkt=wmArr.length?wmArr[0].n+' ('+wmArr[0].h+'-'+(wmArr[0].t-wmArr[0].h)+', '+Math.round(wmArr[0].r*100)+'%)':'—';
+    var wMkt=wmArr.length>1?wmArr[wmArr.length-1].n+' ('+wmArr[wmArr.length-1].h+'-'+(wmArr[wmArr.length-1].t-wmArr[wmArr.length-1].h)+', '+Math.round(wmArr[wmArr.length-1].r*100)+'%)':'—';
+    // Day breakdown
+    var dm={};
+    wkP.forEach(function(p){if(!dm[p.date])dm[p.date]={h:0,t:0};dm[p.date].t++;if(p.result==='hit')dm[p.date].h++;});
+    var da=Object.keys(dm).sort();
+    var bd=da.reduce(function(b,d){return(!b||dm[d].h/dm[d].t>dm[b].h/dm[b].t)?d:b;},null);
+    var wd2=da.reduce(function(b,d){return(!b||dm[d].h/dm[d].t<dm[b].h/dm[b].t)?d:b;},null);
+    // Streak
+    var ss2=settled.slice().sort(function(a,b){return b.date.localeCompare(a.date);});
+    var stT=ss2.length?ss2[0].result:null;var stL=0;
+    for(var i2=0;i2<ss2.length;i2++){if(ss2[i2].result===stT)stL++;else break;}
+    return 'Generate a PropDesk weekly summary post for Twitter/X.'
+      +'\nWeek of '+ws+' to '+we+':'
+      +'\nTotal plays: '+wkP.length+'\nRecord: '+wH+'-'+(wkP.length-wH)+' ('+wWr+'%)'
+      +'\nBest market: '+bMkt+'\nWorst market: '+wMkt
+      +(bd?'\nBest day: '+bd+' ('+dm[bd].h+'-'+(dm[bd].t-dm[bd].h)+')':'')
+      +(wd2&&wd2!==bd?'\nWorst day: '+wd2+' ('+dm[wd2].h+'-'+(dm[wd2].t-dm[wd2].h)+')':'')
+      +'\nCurrent streak: '+(stT?stL+' '+stT+(stL!==1?'s':''):'—')
+      +'\n\nWrite an honest weekly recap. Acknowledge what worked and what didn\'t. PropDesk voice: transparent, data-first, no spin. End with a forward-looking line about the week ahead. Max 3 hashtags.';
+  }
+
+  if(_socialType==='custom'){
+    var cp=(document.getElementById('customPrompt')||{}).value||'';
+    if(!cp.trim()) return null;
+    return voice+'\n\nPropDesk record: '+allRec+'. L7: '+l7+'.\n\n'+cp;
+  }
+  return null;
+}
+
+/* ─ API call ─ */
+async function socialGenerate(){
+  var prompt=socialBuildPrompt();
+  if(!prompt){alert('Please fill in the required fields.');return;}
+  var apiKey=localStorage.getItem('pe_key');
+  if(!apiKey){alert('No API key found. Enter your Anthropic API key in the main app first (thepropdesk.org → Settings → API Key).');return;}
+  var btn=document.getElementById('genBtn');
+  var status=document.getElementById('genStatus');
+  var out=document.getElementById('socialOutput');
+  var acts=document.getElementById('socialActions');
+  btn.disabled=true;btn.textContent='Generating…';
+  status.style.display='block';out.value='';acts.style.display='none';updateCharCounter('');
+  try{
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    if(!resp.ok){var err=await resp.json().catch(function(){return{};});throw new Error((err.error&&err.error.message)||'API error '+resp.status);}
+    var data=await resp.json();
+    var text=(data.content&&data.content[0]&&data.content[0].text)||'';
+    out.value=text;updateCharCounter(text);acts.style.display='flex';
+  }catch(e){
+    status.textContent='Error: '+e.message;
+    setTimeout(function(){status.style.display='none';},5000);
+  }finally{
+    btn.disabled=false;btn.textContent='✦ Generate Post';
+    if(document.getElementById('socialActions').style.display==='flex') status.style.display='none';
+  }
+}
+
+function updateCharCounter(text){
+  var len=text.length;
+  var el=document.getElementById('charCounter'); if(!el) return;
+  var col=len<=260?'#22c55e':len<=280?'#f59e0b':'#ef4444';
+  el.innerHTML='<span style="color:'+col+'">'+len+'</span> / 280'+(len>280?' <span style="color:#ef4444;font-size:10px">— over Twitter limit</span>':'');
+}
+
+function socialCopyTwitter(){
+  var text=document.getElementById('socialOutput').value;
+  navigator.clipboard.writeText(text).then(function(){
+    var b=document.getElementById('copyTwBtn');b.textContent='✓ Copied!';
+    setTimeout(function(){b.textContent='𝕏 Copy for Twitter';},2000);
+  });
+}
+
+function socialCopyInstagram(){
+  var text=document.getElementById('socialOutput').value;
+  if(_socialType!=='instagram') text+='\n\n#PropDesk #PropBetting #SportsBetting #Props #BettingPicks #DataDriven #SportsPicks #MLB #Analytics #EdgeBetting #SharpMoney #BettingAnalysis';
+  navigator.clipboard.writeText(text).then(function(){
+    var b=document.getElementById('copyIgBtn');b.textContent='✓ Copied!';
+    setTimeout(function(){b.textContent='◎ Copy for Instagram';},2000);
+  });
+}
+
+function socialRegenerate(){document.getElementById('socialActions').style.display='none';socialGenerate();}
+
+function socialSaveHistory(){
+  var text=document.getElementById('socialOutput').value; if(!text.trim()) return;
+  var entry={id:Date.now(),date:new Date().toISOString().slice(0,10),type:_socialType,
+    platform:_socialType==='instagram'?'instagram':'twitter',text:text,chars:text.length};
+  var hist=[];
+  try{var s=localStorage.getItem('propdesk_social_history');if(s)hist=JSON.parse(s)||[];}catch(e){}
+  hist.unshift(entry);
+  try{localStorage.setItem('propdesk_social_history',JSON.stringify(hist));}catch(e){}
+  renderSocialHistory();
+  var b=document.getElementById('saveHistBtn');b.textContent='✓ Saved!';
+  setTimeout(function(){b.textContent='↓ Save to History';},2000);
+}
+
+function setHistFilter(f){
+  _histFilter=f;
+  document.querySelectorAll('.hist-filter-pill').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-hf')===f);});
+  renderSocialHistory();
+}
+
+function renderSocialHistory(){
+  var el=document.getElementById('histList'); if(!el) return;
+  var hist=[];
+  try{var s=localStorage.getItem('propdesk_social_history');if(s)hist=JSON.parse(s)||[];}catch(e){}
+  var typeNames={morning:'Morning Picks',recap:'Recap',spotlight:'Spotlight',weekly:'Weekly',instagram:'Instagram',custom:'Custom'};
+  var now=new Date();var nowStr=now.toISOString().slice(0,10);
+  var d7f=new Date();d7f.setDate(d7f.getDate()-7);var d7fStr=d7f.toISOString().slice(0,10);
+  var filtered=hist.filter(function(h){
+    if(_histFilter==='twitter') return h.platform==='twitter';
+    if(_histFilter==='instagram') return h.platform==='instagram';
+    if(_histFilter==='today') return h.date===nowStr;
+    if(_histFilter==='week') return h.date>=d7fStr;
+    return true;
+  });
+  var meta=document.getElementById('histMeta');
+  if(meta) meta.textContent=hist.length+' saved · last: '+(hist.length?hist[0].date:'—');
+  if(!filtered.length){
+    el.innerHTML='<div style="color:#444;font-size:13px;padding:20px;text-align:center">No posts saved yet. Generate a post and click Save to History.</div>';
+    return;
+  }
+  el.innerHTML=filtered.map(function(h){
+    var plat=h.platform==='instagram'?'◎':'𝕏';
+    var preview=h.text.slice(0,60)+(h.text.length>60?'…':'');
+    return '<div class="hist-row" data-hist-id="'+h.id+'">'
+      +'<span style="font-size:11px;color:#444;min-width:72px;flex-shrink:0">'+esc(h.date)+'</span>'
+      +'<span style="font-size:11px;color:#555;min-width:88px;flex-shrink:0">'+esc(typeNames[h.type]||h.type)+'</span>'
+      +'<span style="font-size:13px;min-width:18px;flex-shrink:0">'+plat+'</span>'
+      +'<span style="font-size:12px;color:#888;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(preview)+'</span>'
+      +'<span style="font-size:10px;color:#444;flex-shrink:0;margin-left:4px">'+h.chars+'c</span>'
+      +'<button class="hist-copy-btn" data-hist-id="'+h.id+'" style="background:transparent;border:1px solid #252525;color:#555;border-radius:5px;padding:3px 8px;font-size:11px;flex-shrink:0">Copy</button>'
+      +'<button class="hist-del-btn" data-hist-id="'+h.id+'" style="background:transparent;border:none;color:#333;font-size:13px;flex-shrink:0;line-height:1;padding:0 4px">✕</button>'
+      +'</div>';
+  }).join('');
+  document.querySelectorAll('.hist-copy-btn').forEach(function(b){
+    var id=+b.getAttribute('data-hist-id');
+    b.addEventListener('click',function(){
+      var h=hist.find(function(x){return x.id===id;});
+      if(h) navigator.clipboard.writeText(h.text).then(function(){b.textContent='✓';setTimeout(function(){b.textContent='Copy';},2000);});
+    });
+  });
+  document.querySelectorAll('.hist-del-btn').forEach(function(b){
+    var id=+b.getAttribute('data-hist-id');
+    b.addEventListener('click',function(){
+      hist=hist.filter(function(x){return x.id!==id;});
+      try{localStorage.setItem('propdesk_social_history',JSON.stringify(hist));}catch(e){}
+      renderSocialHistory();
+    });
+  });
+}
+
+function copyTemplate(id){
+  var el=document.getElementById(id); if(!el) return;
+  navigator.clipboard.writeText(el.value).then(function(){
+    var btns=el.previousElementSibling&&el.previousElementSibling.querySelector('button');
+    var btn=el.parentElement.querySelector('button');
+    if(btn){btn.textContent='✓ Copied!';setTimeout(function(){btn.textContent='Copy';},2000);}
+  });
 }
 
 function exportJSON(){
