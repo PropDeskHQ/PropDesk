@@ -8719,7 +8719,22 @@ function updateBestPlaysDisplay(eventId,remaining){
       if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) q.push(p);
     });
   });
-  q.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
+  q.sort(function(a,b){
+    var ca=getEffectiveConf(a),cb=getEffectiveConf(b);
+    if(cb!==ca) return cb-ca;
+    // Tiebreaker: prefer simpler/more liquid market when confidence is equal
+    var MKT_RANK={batter_hits:0,batter_hits_runs_rbis:1};
+    var ra=MKT_RANK[a._market],rb=MKT_RANK[b._market];
+    if(ra!=null&&rb!=null) return ra-rb;
+    return 0;
+  });
+  // One prop per player per game — highest-confidence (simpler market on tie) wins
+  var _seenBP={};
+  q=q.filter(function(p){
+    var k=p.player.toLowerCase().trim();
+    if(_seenBP[k]) return false;
+    _seenBP[k]=true; return true;
+  });
   renderGameTop5(q,remaining>0);
   if(q.length&&remaining>0){
     var s=document.createElement("div");
