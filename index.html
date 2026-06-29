@@ -212,6 +212,9 @@ thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4){text-align:cen
 .mini{font-size:10px;font-weight:600;padding:4px 8px;border-radius:6px;background:var(--surf2);border:1px solid var(--bd2);color:var(--mut);width:fit-content;transition:.12s}
 .mini:hover{color:var(--text);border-color:#3a3a3a}
 .mini.act{color:var(--accent);border-color:rgba(0,255,135,.4)}
+.row-more-menu{position:fixed;z-index:9000;background:var(--card);border:1px solid var(--bd2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.5);min-width:120px;overflow:hidden}
+.row-more-menu button{display:block;width:100%;text-align:left;padding:8px 14px;font-size:12px;color:var(--text);background:none;border:none;cursor:pointer;white-space:nowrap}
+.row-more-menu button:hover{background:var(--surf2);color:var(--accent)}
 .bb{font-weight:900;font-size:36px;line-height:1}
 .bb.over{color:var(--accent)}
 .bb.under{color:var(--blue)}
@@ -3352,10 +3355,9 @@ function rowHtml(p,cols,idx,silent){
       '<div class="pl-flags" id="flags-'+p._id+'"></div>'+
       '<div class="pl-acts">'+
         '<button class="mini" data-act="analyze" data-pid="'+p._id+'">Analyze</button>'+
-        '<button class="mini" data-act="stats" data-pid="'+p._id+'">More Stats</button>'+
-        '<button class="mini" data-act="share" data-pid="'+p._id+'">Share</button>'+
         (function(){ var inCart=ST.parlayCart&&ST.parlayCart.find(function(c){return c._id===p._id;}); return '<button class="mini mpb-add'+(inCart?' in-cart':'')+'" data-act="parlay" data-pid="'+p._id+'">'+(inCart?'✓ Added':'＋ Parlay')+'</button>'; })()+
         (function(){ var isTrk=_trackedThisSession[p._id]; return '<button class="mini trk-btn'+(isTrk?' trk-done':'')+'" data-act="track" data-pid="'+p._id+'"'+(isTrk?' disabled':'')+'>'+( isTrk?'✓ Tracked':'+ Track')+'</button>'; })()+
+        '<button class="mini" data-act="more" data-pid="'+p._id+'">⋯</button>'+
       '</div>'+
     '</td>'+
     '<td><div class="col-val-center"><span class="bb '+bbcls+'">'+esc(bb)+'</span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'</div>':'')+'</div></td>'+
@@ -3411,6 +3413,7 @@ function bindRowActions(){
       if(act==="stats") return toggleExpand(p,"stats",b);
       if(act==="parlay") return toggleParlayCart(p,b);
       if(act==="track") return handleTrackClick(p,b);
+      if(act==="more") return handleMoreMenu(p,b);
     };
   });
   document.querySelectorAll('.why-btn[data-pid]').forEach(function(b){
@@ -3431,6 +3434,29 @@ function handleWhyClick(p,btn){
 }
 
 /* ============ MANUAL TRACK ============ */
+var _moreMenuActive=null;
+function handleMoreMenu(p,btn){
+  var existing=document.getElementById('rowMoreMenu');
+  if(existing){ existing.remove(); if(_moreMenuActive===p._id){_moreMenuActive=null;return;} }
+  _moreMenuActive=p._id;
+  var menu=document.createElement('div');
+  menu.id='rowMoreMenu';
+  menu.className='row-more-menu';
+  menu.innerHTML='<button id="rmStats">More Stats</button><button id="rmShare">Share</button>';
+  document.body.appendChild(menu);
+  var rect=btn.getBoundingClientRect(), mh=menu.offsetHeight||60, mw=menu.offsetWidth||130;
+  var left=Math.min(rect.left,window.innerWidth-mw-8);
+  var top=rect.top-mh-4;
+  if(top<8) top=rect.bottom+4;
+  menu.style.left=left+'px';
+  menu.style.top=top+'px';
+  menu.querySelector('#rmStats').onclick=function(){ menu.remove(); _moreMenuActive=null; toggleExpand(p,'stats',btn); };
+  menu.querySelector('#rmShare').onclick=function(){ menu.remove(); _moreMenuActive=null; sharePick(p); };
+  setTimeout(function(){
+    function _outside(e){ if(!menu.contains(e.target)&&e.target!==btn){ menu.remove(); _moreMenuActive=null; document.removeEventListener('click',_outside); } }
+    document.addEventListener('click',_outside);
+  },0);
+}
 var _trackPopoverActive=null;
 function handleTrackClick(p,btn){
   var existing=document.getElementById('trackPopover');
@@ -3577,7 +3603,7 @@ function toggleExpand(p,mode,btn){
   if(mode==="analyze") renderAnalyze(p); else renderStats(p);
 }
 function clearActiveBtns(tr){
-  tr.querySelectorAll('.mini[data-act="analyze"],.mini[data-act="stats"]').forEach(function(b){ b.classList.remove("act"); });
+  tr.querySelectorAll('.mini[data-act="analyze"],.mini[data-act="stats"],.mini[data-act="more"]').forEach(function(b){ b.classList.remove("act"); });
 }
 
 /* ANALYZE expand */
