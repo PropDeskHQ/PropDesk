@@ -490,7 +490,7 @@ function renderRow(p){
     +'<span style="font-family:monospace;color:#aaa;font-size:12px;min-width:110px;flex-shrink:0">'+esc(line)+'</span>'
     +'<span style="font-size:12px;font-weight:600;min-width:40px;flex-shrink:0;color:'+confColor(p.confidence)+'">'+p.confidence+'%</span>'
     +'<span class="badge '+esc(p.tier)+'">'+esc(p.tier)+'</span>'
-    +'<span style="font-size:11px;color:#444;min-width:180px;line-height:1.45;word-break:break-word">'+esc(gameLabel)+'</span>'
+    +'<span style="font-size:11px;color:#444;flex:1;line-height:1.45;word-break:break-word">'+esc(gameLabel)+'</span>'
     +'<div style="display:flex;gap:3px;margin-left:auto;flex-shrink:0">';
   ['hit','miss','void','pending'].forEach(function(r){
     var active=p.result===r;
