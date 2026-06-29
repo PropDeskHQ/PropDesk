@@ -286,7 +286,7 @@ Full model breakdown at thepropdesk.org
 
 <script>
 var plays=[], rawData={}, filter='pending', searchQ='', expandedDays={}, dirty=false;
-var MKT_DISPLAY={batter_hits:'Hits',batter_total_bases:'Total Bases',pitcher_strikeouts:'Strikeouts',
+var MKT_DISPLAY={batter_hits:'Hits',batter_hits_runs_rbis:'H+R+RBI',batter_total_bases:'Total Bases',pitcher_strikeouts:'Strikeouts',
   batter_home_runs:'Home Runs',batter_rbis:'RBIs',batter_runs_scored:'Runs',pitcher_walks:'Walks'};
 var LS_KEY='propdesk_admin_changes';
 
@@ -311,7 +311,14 @@ function loadData(){
       rawData=d;
       var saved=null;
       try{var s=localStorage.getItem(LS_KEY);if(s)saved=JSON.parse(s);}catch(e){}
-      plays=(saved||d.plays||[]).map(function(p,i){return Object.assign({},p,{_idx:i});});
+      var raw=saved||d.plays||[];
+      var dedupSeen={};
+      raw=raw.filter(function(p){
+        var k=(p.player||'')+'|'+(p.market||'')+'|'+(p.date||'');
+        if(dedupSeen[k]) return false;
+        dedupSeen[k]=true; return true;
+      });
+      plays=raw.map(function(p,i){return Object.assign({},p,{_idx:i});});
       var pDays=uniq(plays.filter(function(p){return p.result==='pending';}).map(function(p){return p.date;})).sort();
       if(pDays.length) expandedDays[pDays[0]]=true;
       if(saved) document.getElementById('exportReminder').style.display='block';
@@ -563,6 +570,9 @@ function addPlay(){
   var conf=parseInt(document.getElementById('f_conf').value)||0;
   var result=document.getElementById('f_result').value;
   if(!date||!player||!conf){alert('Date, player, and confidence are required.');return;}
+  if(plays.some(function(ex){return ex.player===player&&ex.market===mkt&&ex.date===date;})){
+    alert('A '+( MKT_DISPLAY[mkt]||mkt)+' play for '+player+' on '+date+' already exists.');return;
+  }
   plays.push({date:date,player:player,market:mkt,marketDisplay:MKT_DISPLAY[mkt]||mkt,
     sport:'MLB',line:line||'—',confidence:conf,tier:tierOf(conf),result:result,_idx:plays.length});
   markDirty();
