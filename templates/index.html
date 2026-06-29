@@ -6364,13 +6364,123 @@ async function _phAutoResolveAll(){
   try{
     var today=new Date().toISOString().slice(0,10);
     var h=loadPlayHist();
-    var toResolve=h.filter(function(e){ return e.result==="pending"&&e.sport==="MLB"&&e.date<today&&!e.autoResolveLocked; });
-    for(var i=0;i<toResolve.length;i++){
-      var resolved=await resolvePlayAutomatically(toResolve[i]);
+    var propPend=h.filter(function(e){ return e.result==="pending"&&e.sport==="MLB"&&e.type!=="moneyline"&&e.date<today&&!e.autoResolveLocked; });
+    var mlPend=h.filter(function(e){ return e.result==="pending"&&e.type==="moneyline"&&e.date<today&&!e.autoResolveLocked; });
+    for(var i=0;i<propPend.length;i++){
+      var resolved=await resolvePlayAutomatically(propPend[i]);
+      if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
+    }
+    for(var i=0;i<mlPend.length;i++){
+      var resolved=await resolveMoneylinePick(mlPend[i]);
       if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
     }
   }catch(e){}
   _arRunning=false;
+}
+
+/* ============ AUTO-RESOLUTION (Moneyline) ============ */
+function _mlArNick(name){ return(name||"").trim().split(/\s+/).pop().toLowerCase(); }
+function _mlArNorm(name){ return(name||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+function _mlArTeamMatch(apiName,ref){
+  if(!apiName||!ref) return false;
+  if(_mlArNick(apiName)===_mlArNick(ref)) return true;
+  var n1=_mlArNorm(apiName),n2=_mlArNorm(ref);
+  return n1&&n2&&(n1===n2||n1.includes(n2)||n2.includes(n1));
+}
+function _mlArGameMatch(apiAway,apiHome,awayHint,homeHint){
+  return(!awayHint||_mlArTeamMatch(apiAway,awayHint))&&(!homeHint||_mlArTeamMatch(apiHome,homeHint));
+}
+
+async function _mlArResolveMlb(date,teamName,awayHint,homeHint){
+  var r=await fetch("https://statsapi.mlb.com/api/v1/schedule?date="+date+"&sportId=1&hydrate=linescore",{signal:AbortSignal.timeout(8000)});
+  if(!r.ok) return null;
+  var d=await r.json();
+  var games=[];
+  (d.dates||[]).forEach(function(dt){(dt.games||[]).forEach(function(g){games.push(g);});});
+  for(var i=0;i<games.length;i++){
+    var g=games[i];
+    var state=(g.status&&g.status.detailedState)||"";
+    if(state.toLowerCase().indexOf("final")<0&&state.toLowerCase().indexOf("over")<0) continue;
+    var hName=(g.teams&&g.teams.home&&g.teams.home.team&&g.teams.home.team.name)||"";
+    var aName=(g.teams&&g.teams.away&&g.teams.away.team&&g.teams.away.team.name)||"";
+    var hScore=Number((g.teams&&g.teams.home&&g.teams.home.score)||0);
+    var aScore=Number((g.teams&&g.teams.away&&g.teams.away.score)||0);
+    if(!_mlArGameMatch(aName,hName,awayHint,homeHint)) continue;
+    var isHome=_mlArTeamMatch(hName,teamName),isAway=_mlArTeamMatch(aName,teamName);
+    if(!isHome&&!isAway) continue;
+    return(isHome?hScore>aScore:aScore>hScore)?"hit":"miss";
+  }
+  return null;
+}
+
+async function _mlArResolveEspn(date,teamName,awayHint,homeHint,espnSport){
+  var ds=date.replace(/-/g,"");
+  var r=await fetch("https://site.api.espn.com/apis/site/v2/sports/"+espnSport+"/scoreboard?dates="+ds,{signal:AbortSignal.timeout(8000)});
+  if(!r.ok) return null;
+  var d=await r.json();
+  for(var ei=0;ei<(d.events||[]).length;ei++){
+    var ev=d.events[ei];
+    for(var ci=0;ci<(ev.competitions||[]).length;ci++){
+      var comp=ev.competitions[ci];
+      if(!comp.status||!comp.status.type||!comp.status.type.completed) continue;
+      var home=null,away=null;
+      (comp.competitors||[]).forEach(function(c){ if(c.homeAway==="home")home=c;else if(c.homeAway==="away")away=c; });
+      if(!home||!away) continue;
+      var hName=(home.team&&home.team.displayName)||"";
+      var aName=(away.team&&away.team.displayName)||"";
+      if(!_mlArGameMatch(aName,hName,awayHint,homeHint)) continue;
+      var hScore=Number(home.score)||0,aScore=Number(away.score)||0;
+      var isHome=_mlArTeamMatch(hName,teamName),isAway=_mlArTeamMatch(aName,teamName);
+      if(!isHome&&!isAway) continue;
+      return(isHome?hScore>aScore:aScore>hScore)?"hit":"miss";
+    }
+  }
+  return null;
+}
+
+async function _mlArResolveNhl(date,teamName,awayHint,homeHint){
+  var r=await fetch("https://api-web.nhle.com/v1/schedule/"+date,{signal:AbortSignal.timeout(8000)});
+  if(!r.ok) return null;
+  var d=await r.json();
+  var games=[];
+  (d.gameWeek||[]).forEach(function(w){(w.games||[]).forEach(function(g){games.push(g);});});
+  for(var i=0;i<games.length;i++){
+    var g=games[i];
+    if(g.gameState!=="FINAL"&&g.gameState!=="OFF") continue;
+    var ht=g.homeTeam||{},at=g.awayTeam||{};
+    var hName=(ht.placeName&&ht.placeName.default||"")+" "+(ht.commonName&&ht.commonName.default||"");
+    var aName=(at.placeName&&at.placeName.default||"")+" "+(at.commonName&&at.commonName.default||"");
+    hName=hName.trim(); aName=aName.trim();
+    if(!_mlArGameMatch(aName,hName,awayHint,homeHint)) continue;
+    var hScore=Number(ht.score)||0,aScore=Number(at.score)||0;
+    var isHome=_mlArTeamMatch(hName,teamName),isAway=_mlArTeamMatch(aName,teamName);
+    if(!isHome&&!isAway) continue;
+    return(isHome?hScore>aScore:aScore>hScore)?"hit":"miss";
+  }
+  return null;
+}
+
+async function resolveMoneylinePick(play){
+  try{
+    if(!play||play.type!=="moneyline"||play.result!=="pending"||play.autoResolveLocked) return false;
+    var today=new Date().toISOString().slice(0,10);
+    if(play.date>=today) return false;
+    var parts=(play.game||"").split(" @ ");
+    var awayHint=(parts[0]||"").trim(),homeHint=(parts[1]||"").trim();
+    var teamName=play.player||"";
+    var sport=play.sport||"MLB";
+    var result=null;
+    if(sport==="MLB") result=await _mlArResolveMlb(play.date,teamName,awayHint,homeHint);
+    else if(sport==="NBA") result=await _mlArResolveEspn(play.date,teamName,awayHint,homeHint,"basketball/nba");
+    else if(sport==="NHL") result=await _mlArResolveNhl(play.date,teamName,awayHint,homeHint);
+    else if(sport==="NFL") result=await _mlArResolveEspn(play.date,teamName,awayHint,homeHint,"football/nfl");
+    if(result!=="hit"&&result!=="miss") return false;
+    var h=loadPlayHist(),updated=false;
+    h.forEach(function(e){ if(e.loggedAt===play.loggedAt&&e.player===play.player&&e.market===play.market){ e.result=result;e.autoResolved=true;updated=true; } });
+    if(!updated) return false;
+    savePlayHist(h);
+    return result;
+  }catch(e){ return false; }
 }
 
 function _phDownloadCSV(csv,filename){
