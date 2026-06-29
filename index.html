@@ -1982,7 +1982,7 @@ function compositeConf(vals, line, isOver, seasonBA){
   var r5=vals.length>=3?sliceHR(5):null;   // L5 recent form  (60%)
   var r10=vals.length>=7?sliceHR(10):null; // L10 trend       (25%)
   var rAll=sliceHR(vals.length);           // 15-game hit rate (variance check + season fallback)
-  var rSzn=(seasonBA!=null&&seasonBA>0)?seasonBA:rAll; // true season signal when available
+  var rSzn=rAll; // game-log hit rate — same scale as r5/r10 (seasonBA is BA, not hit rate)
   var w5=r5!=null?0.60:0, w10=r10!=null?0.25:0, wA=0.15;
   var tot=w5+w10+wA;
   if(!tot) return null;
@@ -2290,13 +2290,13 @@ async function enrichWithConfidence(p){
                 if(_myKey){
                   var _slot=_bctx[_myKey].orderMap[_pid];
                   p.todayOrderSlot=_slot;
-                  _lineupAdj=_slot<=3?0.02:_slot<=6?0:-0.02;
+                  _lineupAdj=_slot<=3?0.01:_slot<=6?0:-0.01;
                   var _oppKey=_myKey==='home'?'away':'home';
                   var _oppStarter=_bctx[_oppKey]&&_bctx[_oppKey].starterId;
                   if(_oppStarter){
                     var _era=await mlbPitcherERA(_oppStarter,new Date().getFullYear());
                     p.opposingPitcherERA=_era;
-                    if(_era!=null) _eraAdj=_era>=5.00?0.05:_era>=4.00?0.025:_era>=3.50?0:_era>=2.75?-0.03:-0.05;
+                    if(_era!=null) _eraAdj=_era>=5.00?0.025:_era>=4.00?0.012:_era>=3.50?0:_era>=2.75?-0.015:-0.025;
                   }
                 }
               }
@@ -2319,7 +2319,7 @@ async function enrichWithConfidence(p){
     // Batting average talent adjustment (MLB batter markets, min 5 games)
     var _baAdj=0;
     if(p.seasonBA!=null&&vals.length>=5){
-      _baAdj=p.seasonBA>=0.300?0.04:p.seasonBA>=0.280?0.02:p.seasonBA>=0.260?0:p.seasonBA>=0.240?-0.01:-0.02;
+      _baAdj=p.seasonBA>=0.300?0.02:p.seasonBA>=0.280?0.01:p.seasonBA>=0.260?0:p.seasonBA>=0.240?-0.005:-0.01;
     }
     // Apply all adjustments to pdConfidence (clamp 0.01–0.97)
     if(p.pdConfidence!=null){
@@ -4189,6 +4189,7 @@ async function mlbPitcherERA(pitcherId,year){
     var era=st&&st.era!=null?parseFloat(st.era):null;
     _pitcherERACache[ckey]=era;
   }catch(e){ _pitcherERACache[ckey]=null; }
+  if(_pitcherERACache[ckey]===null) console.warn('[ERA] fetch returned null for pitcherId:',pitcherId,'— eraAdj defaulting to 0');
   return _pitcherERACache[ckey];
 }
 
