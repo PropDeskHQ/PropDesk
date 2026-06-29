@@ -227,6 +227,10 @@ thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4){text-align:cen
 .vs b{font-size:36px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap}
 .vs .vt{font-size:10px;font-weight:700;letter-spacing:.5px;line-height:1;text-transform:uppercase}
 .t-lock{color:#ffd700} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:var(--yellow)} .t-poor{color:var(--mut)} .t-pass{color:var(--mut2)}
+.ph-rm-btn{font-size:10px;font-weight:600;color:var(--mut);background:none;border:1px solid transparent;border-radius:4px;padding:2px 7px;cursor:pointer;opacity:0;transition:opacity .15s,border-color .15s}
+tr:hover .ph-rm-btn{opacity:1;border-color:var(--bd2)}
+.ph-rm-btn:hover{color:var(--red)!important;border-color:var(--red)!important}
+@media(max-width:700px){.ph-rm-btn{opacity:1;border-color:var(--bd2)}}
 /* PropDesk Line display */
 .pd-cell{display:flex;flex-direction:column;gap:3px;align-items:center}
 .pd-book-strike{font-size:11px;color:var(--mut2);text-decoration:line-through;line-height:1}
@@ -6008,7 +6012,7 @@ function renderPlayHistory(){
     dateOrder.sort(function(a,b){ return a<b?1:a>b?-1:0; });
     dateOrder.forEach(function(d){ dateGroups[d].sort(function(a,b){ return (b.e.confidence||0)-(a.e.confidence||0); }); });
 
-    var colSpan=showTrendCols?9:7;
+    var colSpan=showTrendCols?10:8;
     var _months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     function fmtDHdr(d){ var p=d.split('-'); return _months[parseInt(p[1])-1]+' '+parseInt(p[2]); }
 
@@ -6020,7 +6024,7 @@ function renderPlayHistory(){
     html+='<div style="overflow:clip"><table style="width:100%;border-collapse:collapse;font-size:12px">';
     html+='<thead><tr>'+sh("date","Date")+sh("player","Player")+'<th style="'+TH_S+'">Market</th><th style="'+TH_S+'">Line</th>'+sh("confidence","Conf");
     if(showTrendCols) html+='<th style="'+TH_S+'">Trend</th><th style="'+TH_S+'">Days Since</th>';
-    html+='<th style="'+TH_S+'">Game</th>'+sh("result","Result")+'</tr></thead><tbody>';
+    html+='<th style="'+TH_S+'">Game</th>'+sh("result","Result")+'<th style="'+TH_S+'"></th></tr></thead><tbody>';
 
     dateOrder.forEach(function(d){
       var grp=dateGroups[d];
@@ -6093,6 +6097,7 @@ function renderPlayHistory(){
           }
           html+='<td style="padding:9px 10px;color:var(--mut)">'+esc(e.game||"")+'</td>';
           html+='<td style="padding:9px 10px;white-space:nowrap">'+res+'</td>';
+          html+='<td style="padding:9px 10px;white-space:nowrap"><button class="btn ph-rm-btn" data-i="'+i+'">✕ Remove</button></td>';
           html+='</tr>';
         });
       }
@@ -6143,6 +6148,33 @@ function renderPlayHistory(){
       var h=loadPlayHist();
       h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market) e.result="void"; });
       savePlayHist(h); renderPlayHistory();
+    };
+  });
+  mount.querySelectorAll('.ph-rm-btn').forEach(function(b){
+    b.onclick=function(ev){
+      ev.stopPropagation();
+      var idx=parseInt(b.getAttribute('data-i')), entry=filtered[idx]; if(!entry) return;
+      var td=b.parentElement;
+      td.innerHTML=
+        '<span style="font-size:11px;color:var(--mut);margin-right:6px">Remove this play?</span>'+
+        '<button class="ph-rm-yes" style="font-size:11px;font-weight:700;color:var(--red);background:none;border:1px solid var(--red);border-radius:4px;padding:2px 8px;cursor:pointer;margin-right:4px">Yes</button>'+
+        '<button class="ph-rm-no" style="font-size:11px;color:var(--mut);background:none;border:1px solid var(--bd2);border-radius:4px;padding:2px 8px;cursor:pointer">No</button>';
+      td.querySelector('.ph-rm-yes').onclick=function(ev){
+        ev.stopPropagation();
+        var tr=td.closest('tr');
+        tr.style.transition='opacity .25s';
+        tr.style.opacity='0';
+        setTimeout(function(){
+          var h=loadPlayHist();
+          h=h.filter(function(e){ return !(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market); });
+          savePlayHist(h);
+          renderPlayHistory();
+        },260);
+      };
+      td.querySelector('.ph-rm-no').onclick=function(ev){
+        ev.stopPropagation();
+        renderPlayHistory();
+      };
     };
   });
   mount.querySelectorAll('.ph-date-hdr').forEach(function(row){
