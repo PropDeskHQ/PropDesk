@@ -3535,6 +3535,58 @@ function _toastTrack(msg){
   t._tm=setTimeout(function(){t.style.opacity='0';},2000);
 }
 
+function handleMlTrackClick(side,btn){
+  var c=_mlCardData; if(!c) return;
+  var h=side==="home";
+  var name=h?c.home:c.away;
+  var prob=h?Math.round(c.homeProb*100):Math.round((1-c.homeProb)*100);
+  var sideEdge=Math.round((h?c.edge:-c.edge)*100);
+  var tier=confTierOf(prob);
+  var gameLabel=c.away+' @ '+c.home;
+  var today=new Date().toISOString().slice(0,10);
+  var line=mlNick(name)+' ML';
+  var spLabel={baseball_mlb:'MLB',americanfootball_nfl:'NFL',basketball_nba:'NBA',icehockey_nhl:'NHL'}[ST.sport]||ST.sport;
+  var entry={date:today,player:name,market:'moneyline',marketDisplay:'Moneyline',sport:spLabel,
+    line:line,confidence:prob,tier:tier.t,game:gameLabel,edge:sideEdge,
+    result:'pending',loggedAt:Date.now(),source:'manual',type:'moneyline'};
+  var sk=name+'|moneyline|'+today;
+  var existing=document.getElementById('mlTrackPopover');
+  if(existing){existing.remove();if(_trackPopoverActive===sk){_trackPopoverActive=null;return;}}
+  _trackPopoverActive=sk;
+  var pop=document.createElement('div');
+  pop.id='mlTrackPopover';
+  pop.innerHTML=
+    '<div style="font-weight:700;font-size:13px;margin-bottom:2px">'+esc(name)+'</div>'+
+    '<div style="font-size:11px;color:var(--mut2);margin-bottom:6px">'+esc(gameLabel)+'</div>'+
+    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'+
+      '<span style="font-size:13px;font-weight:700;color:var(--accent)">'+prob+'%</span>'+
+      '<span class="'+tier.c+'" style="font-size:10px;font-weight:800;padding:2px 6px;border-radius:4px;background:var(--bd)">'+tier.t+'</span>'+
+      (sideEdge>0?'<span style="font-size:11px;color:var(--accent)">+'+sideEdge+'% edge</span>':'')+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--mut);margin-bottom:10px">'+esc(line)+' · '+esc(today)+'</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button id="mlTrkConfirm" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Confirm Track</button>'+
+      '<button id="mlTrkCancel" style="background:transparent;color:var(--mut);border:1px solid var(--bd);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer">Cancel</button>'+
+    '</div>';
+  var rect=btn.getBoundingClientRect();
+  pop.style.cssText='position:fixed;z-index:9999;background:var(--card);border:1px solid var(--bd2);border-radius:10px;padding:12px 14px;width:240px;box-shadow:0 8px 24px #0006';
+  pop.style.left=Math.min(rect.left,window.innerWidth-260)+'px';
+  pop.style.top=(rect.top-8)+'px';
+  pop.style.transform='translateY(-100%)';
+  document.body.appendChild(pop);
+  pop.querySelector('#mlTrkConfirm').onclick=function(){
+    _saveManualTrack(entry,sk,btn);
+    pop.remove();_trackPopoverActive=null;
+  };
+  pop.querySelector('#mlTrkCancel').onclick=function(){
+    pop.remove();_trackPopoverActive=null;
+  };
+  setTimeout(function(){
+    function _outside(e){if(!pop.contains(e.target)&&e.target!==btn){pop.remove();_trackPopoverActive=null;document.removeEventListener('click',_outside);}}
+    document.addEventListener('click',_outside);
+  },0);
+}
+
 function handleAdj(e,dir,pid){
   e.stopPropagation();
   var p=findProp(pid);
@@ -5192,6 +5244,7 @@ var _phAnalyticsMkt="all";
 var _histView="my";
 var _pdStatsCache=null;
 var _trackedThisSession={};
+var _mlCardData=null;
 
 function loadPlayHist(){ try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]"); }catch(e){ return []; } }
 function savePlayHist(h){ try{ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h)); }catch(e){ console.warn("[History] storage full",e); } }
@@ -6031,7 +6084,7 @@ function renderPlayHistory(){
           html+='<tr style="'+rowStyle+'">';
           html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
           html+='<td style="padding:9px 10px;font-weight:700">'+esc(e.player||"")+'</td>';
-          html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.marketDisplay||e.market||"")+'</td>';
+          html+='<td style="padding:9px 10px;white-space:nowrap">'+(e.type==='moneyline'?'<span style="background:rgba(99,102,241,.15);color:#818cf8;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:.03em">ML</span>':'<span style="color:var(--mut)">'+esc(e.marketDisplay||e.market||"")+'</span>')+'</td>';
           html+='<td style="padding:9px 10px">'+esc(e.line||"")+'</td>';
           html+='<td style="padding:9px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span></td>';
           if(showTrendCols){
@@ -8474,11 +8527,17 @@ function renderMoneylineCard(c){
     var prob=h?hp:ap;
     var isFav=h?c.edge>0:c.edge<0;
     var probCol=isFav?"color:var(--accent)":"color:var(--text)";
+    var _sk=name+'|moneyline|'+new Date().toISOString().slice(0,10);
+    var _isTrk=!!_trackedThisSession[_sk];
+    var trackHtml=isFav&&!c.noOdds
+      ?'<button onclick="handleMlTrackClick(\''+( h?'home':'away')+'\',this)" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px;border:1px solid rgba(0,255,135,.4);background:rgba(0,255,135,.07);color:var(--accent);cursor:pointer;margin-top:2px;width:fit-content"'+(  _isTrk?' disabled':'')+'>'+(_isTrk?'✓ Tracked':'+ Track')+'</button>'
+      :'';
     return '<div class="ml-c3-row">'+
       '<div class="ml-c3-left">'+
         '<span class="ml-c3-pill '+(h?"ml-c3-pill-h":"ml-c3-pill-a")+'">'+(h?"Home":"Away")+'</span>'+
         '<span class="ml-c3-name">'+esc(name)+'</span>'+
         (rec?'<span class="ml-c3-rec">'+esc(rec)+'</span>':'')+
+        trackHtml+
       '</div>'+
       '<div class="ml-c3-center">'+
         '<span class="ml-c3-prob" style="'+probCol+'">'+prob+'%</span>'+
@@ -8630,6 +8689,7 @@ async function loadMoneylineBoard(){
     if(ST.sport==="basketball_nba") extraData.b2b=await mlDetectB2B();
     var c=mlComputeGame(ev,oddsData,standings,extraData,ST.sport);
     if(!c){ mlMount.innerHTML='<div class="empty">Could not compute ratings for this game.</div>'; return; }
+    _mlCardData=c;
     mlMount.innerHTML=renderMoneylineCard(c);
     if(giMount){
       var _series=null,_weather=null;

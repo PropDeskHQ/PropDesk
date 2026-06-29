@@ -121,11 +121,12 @@ label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transfor
     <div id="addPanel" style="display:none;padding:0 16px 16px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
         <div><label class="fl">Date</label><input id="f_date" type="date" class="infield"></div>
-        <div><label class="fl">Player</label><input id="f_player" type="text" placeholder="Player name" class="infield"></div>
+        <div><label class="fl" id="f_player_lbl">Player</label><input id="f_player" type="text" placeholder="Player name" class="infield" oninput="onPlayerInput()"></div>
         <div>
           <label class="fl">Market</label>
-          <select id="f_market" class="infield">
-            <option value="batter_hits">Hits</option>
+          <select id="f_market" class="infield" onchange="onMktChange()">
+            <option value="moneyline">Moneyline</option>
+            <option value="batter_hits" selected>Hits</option>
             <option value="batter_total_bases">Total Bases</option>
             <option value="pitcher_strikeouts">Strikeouts</option>
             <option value="batter_home_runs">Home Runs</option>
@@ -134,7 +135,7 @@ label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transfor
             <option value="pitcher_walks">Pitcher Walks</option>
           </select>
         </div>
-        <div><label class="fl">Line (e.g. Over 1.5)</label><input id="f_line" type="text" placeholder="Over 1.5" class="infield"></div>
+        <div><label class="fl" id="f_line_lbl">Line (e.g. Over 1.5)</label><input id="f_line" type="text" placeholder="Over 1.5" class="infield"></div>
         <div><label class="fl">Confidence %</label><input id="f_conf" type="number" min="45" max="100" placeholder="75" class="infield"></div>
         <div>
           <label class="fl">Result</label>
@@ -286,7 +287,7 @@ Full model breakdown at thepropdesk.org
 
 <script>
 var plays=[], rawData={}, filter='pending', searchQ='', expandedDays={}, dirty=false;
-var MKT_DISPLAY={batter_hits:'Hits',batter_hits_runs_rbis:'H+R+RBI',batter_total_bases:'Total Bases',pitcher_strikeouts:'Strikeouts',
+var MKT_DISPLAY={moneyline:'Moneyline',batter_hits:'Hits',batter_hits_runs_rbis:'H+R+RBI',batter_total_bases:'Total Bases',pitcher_strikeouts:'Strikeouts',
   batter_home_runs:'Home Runs',batter_rbis:'RBIs',batter_runs_scored:'Runs',pitcher_walks:'Walks'};
 var LS_KEY='propdesk_admin_changes';
 
@@ -562,6 +563,33 @@ function toggleAdd(){
   document.getElementById('addArrow').textContent=open?'▶':'▼';
 }
 
+function onMktChange(){
+  var mkt=document.getElementById('f_market').value;
+  var lbl=document.getElementById('f_player_lbl');
+  var fp=document.getElementById('f_player');
+  var fl=document.getElementById('f_line');
+  var fll=document.getElementById('f_line_lbl');
+  var isML=mkt==='moneyline';
+  if(lbl) lbl.textContent=isML?'Team':'Player';
+  if(fp) fp.placeholder=isML?'Team name (e.g. Atlanta Braves)':'Player name';
+  if(fll) fll.textContent=isML?'Line (auto-filled)':'Line (e.g. Over 1.5)';
+  if(fl) fl.placeholder=isML?'[Team] ML':'Over 1.5';
+  onPlayerInput();
+}
+function onPlayerInput(){
+  var mkt=document.getElementById('f_market').value;
+  var fp=document.getElementById('f_player');
+  var fl=document.getElementById('f_line');
+  if(mkt==='moneyline'&&fp&&fl){
+    var team=(fp.value||'').trim();
+    if(team){
+      var words=team.split(' ');
+      fl.value=words[words.length-1]+' ML';
+    } else {
+      fl.value='';
+    }
+  }
+}
 function addPlay(){
   var date=document.getElementById('f_date').value;
   var player=document.getElementById('f_player').value.trim();
@@ -573,8 +601,10 @@ function addPlay(){
   if(plays.some(function(ex){return ex.player===player&&ex.market===mkt&&ex.date===date;})){
     alert('A '+( MKT_DISPLAY[mkt]||mkt)+' play for '+player+' on '+date+' already exists.');return;
   }
-  plays.push({date:date,player:player,market:mkt,marketDisplay:MKT_DISPLAY[mkt]||mkt,
-    sport:'MLB',line:line||'—',confidence:conf,tier:tierOf(conf),result:result,_idx:plays.length});
+  var entry={date:date,player:player,market:mkt,marketDisplay:MKT_DISPLAY[mkt]||mkt,
+    sport:'MLB',line:line||'—',confidence:conf,tier:tierOf(conf),result:result,_idx:plays.length};
+  if(mkt==='moneyline') entry.type='moneyline';
+  plays.push(entry);
   markDirty();
   document.getElementById('f_player').value='';
   document.getElementById('f_line').value='';
@@ -894,12 +924,17 @@ function socialBuildPrompt(){
       var c=parseInt(confs[i].value)||0;
       picks.push(pl+' — '+(MKT_DISPLAY[markets[i].value]||markets[i].value)+' '+lines[i].value+' ('+c+'%, '+tierOf(c)+')');
     }
-    if(!picks.length) return null;
+    var mlToday=plays.filter(function(p){return p.market==='moneyline'&&p.date===today;});
+    var mlSection=mlToday.length
+      ?'\n\nMoneylines:\n'+mlToday.map(function(p){return '🏆 '+p.player+' ML — '+p.confidence+'% win probability'+(p.edge?(' (+'+p.edge+'% edge)'):'')+' ('+tierOf(p.confidence)+')';}).join('\n')
+      :'';
+    if(!picks.length&&!mlToday.length) return null;
     var isInsta=_socialType==='instagram';
     var toneNote=({standard:'',confident:' Write with extra confidence — emphasize the edge and data conviction.',conservative:' Use cautious, measured language — acknowledge variance.'}[(document.getElementById('pickTone')||{}).value]||'');
     return voice+' '+(isInsta?'Up to 15 hashtags.':'Max 3 hashtags for Twitter.')+toneNote
       +'\n\nGenerate a '+(isInsta?'Instagram caption':'Twitter/X morning picks post')+' for today ('+todayFmt+') using these plays:\n'
-      +picks.join('\n')
+      +(picks.length?picks.join('\n'):'(no prop picks today)')
+      +mlSection
       +'\n\nPropDesk all-time record: '+allRec+'. Last 7 days: '+l7+'.'
       +'\n\nFormat:\n🎯 PropDesk Picks — '+todayFmt
       +'\n\n[TIER EMOJI] [Player] — [Line] ([X]% confidence)\n[repeat for each play]'
