@@ -476,12 +476,14 @@ function renderDays(){
 
 function renderRow(p){
   var line=fmtLine(p.line,p.marketDisplay||MKT_DISPLAY[p.market]||p.market);
+  var gameLabel=(p.game||'').replace(' vs ',' @ ')||'—';
   var html='<div class="play-row">'
     +'<span style="font-weight:600;color:#e8e8e8;font-size:13px;min-width:130px;flex-shrink:0">'+esc(p.player)+'</span>'
-    +'<span style="color:#555;font-size:12px;min-width:90px">'+esc(p.marketDisplay||MKT_DISPLAY[p.market]||p.market)+'</span>'
-    +'<span style="font-family:monospace;color:#aaa;font-size:12px;min-width:110px">'+esc(line)+'</span>'
-    +'<span style="font-size:12px;font-weight:600;min-width:40px;color:'+confColor(p.confidence)+'">'+p.confidence+'%</span>'
+    +'<span style="color:#555;font-size:12px;min-width:90px;flex-shrink:0">'+esc(p.marketDisplay||MKT_DISPLAY[p.market]||p.market)+'</span>'
+    +'<span style="font-family:monospace;color:#aaa;font-size:12px;min-width:110px;flex-shrink:0">'+esc(line)+'</span>'
+    +'<span style="font-size:12px;font-weight:600;min-width:40px;flex-shrink:0;color:'+confColor(p.confidence)+'">'+p.confidence+'%</span>'
     +'<span class="badge '+esc(p.tier)+'">'+esc(p.tier)+'</span>'
+    +'<span style="font-size:11px;color:#444;min-width:180px;line-height:1.45;word-break:break-word">'+esc(gameLabel)+'</span>'
     +'<div style="display:flex;gap:3px;margin-left:auto;flex-shrink:0">';
   ['hit','miss','void','pending'].forEach(function(r){
     var active=p.result===r;
