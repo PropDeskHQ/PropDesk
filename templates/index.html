@@ -7259,6 +7259,83 @@ function calcPlayerStreakTrends(){
   return trends;
 }
 
+/* --- TYPE 1b: Player Home/Away Split Trends ----------------------- */
+function calcPlayerHomeAwaySplitTrends(){
+  var trends=[];
+  ST.props.forEach(function(p){
+    var vals=p._vals;
+    var isHomeArr=p._isHomeArr;
+    if(!vals||!isHomeArr||!isHomeArr.length) return;
+    var line=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:null);
+    if(line==null) return;
+    var isOver=(p.pdSide||"Over")==="Over";
+    function hit(v){ return isOver?v>line:v<line; }
+    var homeVals=[],awayVals=[];
+    var n=Math.min(vals.length,isHomeArr.length,15);
+    for(var i=0;i<n;i++){
+      if(isHomeArr[i]!==false) homeVals.push(vals[i]);
+      else awayVals.push(vals[i]);
+    }
+    if(homeVals.length<3||awayVals.length<3) return;
+    var homeHits=homeVals.filter(hit).length;
+    var awayHits=awayVals.filter(hit).length;
+    var homeRate=homeHits/homeVals.length;
+    var awayRate=awayHits/awayVals.length;
+    var diff=Math.abs(homeRate-awayRate);
+    // Require ≥15pp split differential and better side ≥55%
+    if(diff<0.15) return;
+    var betterRate=Math.max(homeRate,awayRate);
+    if(betterRate<0.55) return;
+    var atHome=homeRate>=awayRate;
+    var betterHits=atHome?homeHits:awayHits;
+    var betterN=atHome?homeVals.length:awayVals.length;
+    var worseRate=atHome?awayRate:homeRate;
+    var worseHits=atHome?awayHits:homeHits;
+    var worseN=atHome?awayVals.length:homeVals.length;
+    var direction=atHome?"at home":"on the road";
+    var oppDir=atHome?"on the road":"at home";
+    var mktLbl=marketName(p._market||ST.market);
+    var isThresh=isThreshProp(p);
+    var lineLabel=isThresh?threshLabel(line,p._market):fmtLine(line,p.pdSide||"Over");
+    var headline;
+    if(isThresh){
+      headline=p.player+" has recorded "+lineLabel+" in "+betterHits+"/"+betterN+" games "+direction+
+        " ("+Math.round(betterRate*100)+"%) vs "+worseHits+"/"+worseN+" "+oppDir+
+        " ("+Math.round(worseRate*100)+"%)";
+    } else {
+      headline=p.player+" goes "+(p.pdSide||"Over")+" "+line+" "+mktLbl+" in "+betterHits+"/"+betterN+
+        " games "+direction+" ("+Math.round(betterRate*100)+"%) vs "+worseHits+"/"+worseN+
+        " "+oppDir+" ("+Math.round(worseRate*100)+"%)";
+    }
+    var minN=Math.min(betterN,worseN);
+    var conf=Math.round(Math.min(88,50+betterRate*25+diff*30+Math.min(minN,8)));
+    var record=homeHits+"-"+(homeVals.length-homeHits)+" home · "+awayHits+"-"+(awayVals.length-awayHits)+" away";
+    trends.push({
+      type:"homeway",
+      conf:conf,
+      player:p.player,
+      headline:headline,
+      title:p.player+" "+lineLabel,
+      record:record,
+      hitRate:Math.round(betterRate*100),
+      recordCls:isOver?"":"under",
+      detail:"L"+n+" games — "+homeHits+"-"+(homeVals.length-homeHits)+" ("+Math.round(homeRate*100)+"%) at home, "+
+        awayHits+"-"+(awayVals.length-awayHits)+" ("+Math.round(awayRate*100)+"%) away. "+
+        Math.round(diff*100)+"pp split.",
+      source:"MLB Stats API — Game Log",
+      shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" | "+Math.round(homeRate*100)+"% home / "+
+        Math.round(awayRate*100)+"% away (L"+n+") | "+mktLbl+" | propdeskhq.netlify.app",
+      _rawVals:vals.slice(0,n),
+      _rawLine:line,
+      _rawIsOver:isOver,
+      _rawMarket:mktLbl,
+      _rawN:n,
+      _game:p._game||"", _market:p._market||""
+    });
+  });
+  return trends;
+}
+
 /* --- TYPE 2: Line Value Trends ------------------------------------ */
 function calcLineValueTrends(){
   var trends=[];
@@ -7700,6 +7777,7 @@ function _trendCardTitle(t){
     var side=t.recordCls==="under"?"Under":"Over";
     return t.player+" — "+side+" has the pricing edge";
   }
+  if(t.type==="homeway") return t.player+" — Home/away split";
   if(t.type==="matchup") return t.player+" — Situational matchup edge";
   if(t.type==="teamsit") return t.player+" — Team situational system";
   return t.title||t.player;
@@ -7722,6 +7800,10 @@ function _trendActionLine(t){
     var totside=t.recordCls==="under"?"Under":"Over";
     return "Game total may be mispriced — "+totside+" has the pricing edge";
   }
+  if(t.type==="homeway"){
+    var hwside=t.recordCls==="under"?"Under":"Over";
+    return "Home/away split favors the "+hwside+" on "+t.player+" today";
+  }
   if(t.type==="matchup"){
     var mside=t.recordCls==="under"?"Under":"Over";
     return "Favorable matchup for "+t.player+" — historical splits back the "+mside;
@@ -7733,7 +7815,8 @@ function _trendActionLine(t){
 }
 function renderTrendCard(t, sigCls, sigLabel){
   var sigCls=sigCls||"tc-weak";
-  var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
+  var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":
+    t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
     t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":"GAME TOTAL";
   var title=_trendCardTitle(t);
   var action=_trendActionLine(t);
@@ -7764,8 +7847,8 @@ function renderTrends(trends){
     return _trendsFilter==="all"||t.type===_trendsFilter;
   });
   // Sort
-  var TYPE_RECENT={movement:0,totals:1,streak:2,linevalue:3,matchup:4,teamsit:5};
-  var TYPE_ALPHA={linevalue:0,matchup:1,movement:2,streak:3,teamsit:4,totals:5};
+  var TYPE_RECENT={movement:0,totals:1,streak:2,homeway:3,linevalue:4,matchup:5,teamsit:6};
+  var TYPE_ALPHA={homeway:0,linevalue:1,matchup:2,movement:3,streak:4,teamsit:5,totals:6};
   if(_trendsSort==="strength"){
     visible=visible.slice().sort(function(a,b){return b.conf-a.conf;});
   } else if(_trendsSort==="recent"){
@@ -7790,9 +7873,9 @@ function renderTrends(trends){
   }
   // Sort/filter controls HTML
   var FILTER_OPTS=[
-    {k:"all",lbl:"All"},{k:"streak",lbl:"Streaks"},{k:"linevalue",lbl:"Line Value"},
-    {k:"movement",lbl:"Sharp Money"},{k:"totals",lbl:"Game Totals"},
-    {k:"matchup",lbl:"Matchups"},{k:"teamsit",lbl:"Situational"}
+    {k:"all",lbl:"All"},{k:"streak",lbl:"Streaks"},{k:"homeway",lbl:"Home/Away"},
+    {k:"linevalue",lbl:"Line Value"},{k:"movement",lbl:"Sharp Money"},
+    {k:"totals",lbl:"Game Totals"},{k:"matchup",lbl:"Matchups"},{k:"teamsit",lbl:"Situational"}
   ];
   var SORT_OPTS=[{k:"strength",lbl:"Strongest First"},{k:"recent",lbl:"Most Recent"},{k:"type",lbl:"By Type"}];
   var ctrlHtml='<div class="trends-controls">'+
@@ -7806,8 +7889,8 @@ function renderTrends(trends){
     '</div></div>';
   // Empty state for filtered view
   if(!visible.length){
-    var FILTER_NAMES={streak:"Streak",linevalue:"Line Value",movement:"Sharp Money",
-      totals:"Game Total",matchup:"Matchup",teamsit:"Situational"};
+    var FILTER_NAMES={streak:"Streak",homeway:"Home/Away Split",linevalue:"Line Value",
+      movement:"Sharp Money",totals:"Game Total",matchup:"Matchup",teamsit:"Situational"};
     var emptyMsg=_trendsFilter==="all"
       ?"No trends found — check back as lines post closer to game time"
       :"No "+( FILTER_NAMES[_trendsFilter]||_trendsFilter)+" trends detected today — check back as lines move closer to game time";
@@ -7921,6 +8004,7 @@ async function trendsFetchAndLoad(){
     try{
       ST.eventId=_trendsEvents[0]?_trendsEvents[0].id:null;
       trends=trends.concat(calcPlayerStreakTrends());
+      trends=trends.concat(calcPlayerHomeAwaySplitTrends());
       trends=trends.concat(calcLineValueTrends());
       trends=trends.concat(calcOddsMovementTrends());
       trends.sort(function(a,b){ return b.conf-a.conf; });
