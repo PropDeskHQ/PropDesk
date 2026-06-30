@@ -5285,7 +5285,7 @@ function logPlaysToHistory(){ /* auto-logging removed — use + Track button */ 
 
 /* ── stats helpers ── */
 function _phRate(hits,total){ return total>0?Math.round(hits/total*100):null; }
-function _phRateColor(r){ return r===null?"var(--mut)":r>=75?"var(--accent)":r>=65?"var(--yellow)":"var(--red)"; }
+function _phRateColor(r){ return r===null?"var(--mut)":r>=55?"var(--accent)":r>=40?"var(--yellow)":"var(--red)"; }
 function _phRateStr(r){ return r===null?"–":r+"%"; }
 function _phSectionHdr(t){ return '<div style="font-size:10px;font-weight:800;color:var(--mut);letter-spacing:.08em;text-transform:uppercase;margin:20px 0 10px">'+t+'</div>'; }
 function _phTbl(hdrs,rows,compact){
