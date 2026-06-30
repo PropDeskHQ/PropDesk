@@ -3476,7 +3476,9 @@ function handleTrackClick(p,btn){
   var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
   var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
   var today=new Date().toISOString().slice(0,10);
-  var entry={date:today,player:p.player,market:mkt,marketDisplay:mktDisplay,sport:spLabel,line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"};
+  var _evG=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
+  var game=p._game||(_evG?((_evG.home_team||"")+" vs "+(_evG.away_team||"")):"");
+  var entry={date:today,player:p.player,market:mkt,marketDisplay:mktDisplay,sport:spLabel,game:game,line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"};
   var pop=document.createElement('div');
   pop.id='trackPopover';
   pop.innerHTML=
@@ -5247,6 +5249,8 @@ var _phAnalyticsSport="all";
 var _phAnalyticsMkt="all";
 var _histView="my";
 var _pdStatsCache=null;
+var _pdStatsSubView='props';
+var _mlPickFilter='all';
 var _trackedThisSession={};
 var _mlCardData=null;
 
@@ -5603,7 +5607,18 @@ function _renderPdStatsData(mount,data){
   }
   function ph(msg){ return '<div style="font-size:11px;color:#555;text-align:center;padding:16px 0;font-style:italic">'+msg+'</div>'; }
 
-  var html='<div style="padding:16px">';
+  /* merge moneyline picks: JSON source + localStorage */
+  var _lsML=(function(){try{return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||'[]');}catch(e){return[];}}()).filter(function(e){return e.type==='moneyline';});
+  var _jsonML=plays.filter(function(e){return e.type==='moneyline'||e.market==='moneyline';});
+  var _mlSeen={},_mlAll=[];
+  _jsonML.forEach(function(e){var k=(e.player||'')+'|'+(e.date||'')+'|'+(e.game||'');if(!_mlSeen[k]){_mlSeen[k]=true;_mlAll.push(e);}});
+  _lsML.forEach(function(e){var k=(e.player||'')+'|'+(e.date||'')+'|'+(e.game||'');if(!_mlSeen[k]){_mlSeen[k]=true;_mlAll.push(e);}});
+  var html='<div style="padding:16px">'+
+    '<div style="display:flex;gap:6px;margin-bottom:16px">'+
+    '<button class="pill'+(_pdStatsSubView==='props'?' active':'')+'" onclick="_pdStatsSubView=\'props\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">Props</button>'+
+    '<button class="pill'+(_pdStatsSubView==='moneyline'?' active':'')+'" onclick="_pdStatsSubView=\'moneyline\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">Moneyline</button>'+
+    '</div>';
+  if(_pdStatsSubView==='props'){
   /* header banner */
   html+='<div style="background:#111;border:1px solid #1e1e1e;border-left:3px solid #00e87a;border-radius:8px;padding:14px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
   html+='<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-weight:800;font-size:15px;letter-spacing:-.3px">Prop<b style="color:#00e87a">Desk</b></span>';
@@ -5706,6 +5721,166 @@ function _renderPdStatsData(mount,data){
     html+=chartCard("Top Performers","Players PropDesk has the strongest track record on (min 3 resolved plays).",s3);
   }
   html+='<div style="margin-top:16px;padding-bottom:8px;font-size:10px;color:var(--mut2)">'+plays.length+' tracked plays · data updated weekly</div>';
+  } else {
+  /* ===== MONEYLINE VIEW ===== */
+  var _mlRes=_mlAll.filter(function(e){return e.result==='hit'||e.result==='miss';});
+  var _mlHits=_mlRes.filter(function(e){return e.result==='hit';}).length;
+  var _mlRateColor=function(r){return r===null?'var(--mut)':r>=55?'var(--accent)':r>=45?'var(--yellow)':'var(--red)';};
+  var _mlRateStr=function(r){return r===null?'–':r+'%';};
+  if(!_mlRes.length){
+    html+='<div style="padding:40px 0;text-align:center">'+
+      '<div style="font-size:14px;font-weight:700;color:var(--mut);margin-bottom:8px">No resolved moneyline picks yet.</div>'+
+      '<div style="font-size:12px;color:var(--mut2);line-height:1.6">Track moneyline picks using the + Track button on any game\'s moneyline card. Results auto-resolve after each game.</div>'+
+      '</div>';
+  } else {
+    var _mlTot=_mlRes.length,_mlRate=Math.round(_mlHits/_mlTot*100);
+    var _mlRateC=_mlRateColor(_mlRate);
+    var _md7=new Date();_md7.setDate(_md7.getDate()-7);
+    var _md30=new Date();_md30.setDate(_md30.getDate()-30);
+    var _mr7=_mlRes.filter(function(e){return new Date(e.date)>=_md7;});
+    var _mr30=_mlRes.filter(function(e){return new Date(e.date)>=_md30;});
+    var _mr7rate=_mr7.length?Math.round(_mr7.filter(function(e){return e.result==='hit';}).length/_mr7.length*100):null;
+    var _mr30rate=_mr30.length?Math.round(_mr30.filter(function(e){return e.result==='hit';}).length/_mr30.length*100):null;
+    html+=_phSectionHdr("Overall Moneyline Record");
+    html+='<div style="margin-bottom:24px">'+
+      '<div style="font-size:28px;font-weight:800;color:'+_mlRateC+';margin-bottom:2px">'+_mlRate+'%</div>'+
+      '<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+_mlHits+' wins / '+_mlTot+' resolved</div>'+
+      '<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:8px"><div style="background:'+_mlRateC+';width:'+_mlRate+'%;height:100%;border-radius:4px"></div></div>'+
+      '<div style="font-size:10px;color:var(--mut2);margin-bottom:12px;font-style:italic">A 55%+ win rate on picks with 55%+ predicted probability indicates positive model calibration.</div>'+
+      '<div style="display:flex;gap:24px">'+
+        '<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 7 DAYS</div>'+
+        '<div style="font-size:16px;font-weight:800;color:'+_mlRateColor(_mr7rate)+'">'+_mlRateStr(_mr7rate)+'</div>'+
+        '<div style="font-size:9px;color:var(--mut)">'+_mr7.length+' resolved</div></div>'+
+        '<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30 DAYS</div>'+
+        '<div style="font-size:16px;font-weight:800;color:'+_mlRateColor(_mr30rate)+'">'+_mlRateStr(_mr30rate)+'</div>'+
+        '<div style="font-size:9px;color:var(--mut)">'+_mr30.length+' resolved</div></div>'+
+      '</div></div>';
+    /* calibration table */
+    var _mlBkts=[{label:'45–49%',min:45,max:49,mid:47},{label:'50–54%',min:50,max:54,mid:52},{label:'55–59%',min:55,max:59,mid:57},{label:'60–64%',min:60,max:64,mid:62},{label:'65%+',min:65,max:100,mid:67}];
+    html+=_phSectionHdr("Calibration by Win Probability");
+    html+='<div style="overflow:auto;margin-bottom:16px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>';
+    ['Predicted Prob','Picks','Wins','Win Rate','Expected','Gap','Calibration'].forEach(function(h){html+='<th style="padding:6px 8px;text-align:left;font-size:9px;font-weight:700;color:var(--mut);letter-spacing:.04em;border-bottom:1px solid var(--bd)">'+h+'</th>';});
+    html+='</tr></thead><tbody>';
+    _mlBkts.forEach(function(bk){
+      var inBk=_mlRes.filter(function(e){var c=e.confidence||0;return c>=bk.min&&c<=bk.max;});
+      var bkH=inBk.filter(function(e){return e.result==='hit';}).length,bkN=inBk.length;
+      var bkR=bkN>=3?Math.round(bkH/bkN*100):null;
+      var gap=bkR!==null?bkR-bk.mid:null;
+      var ico,gc,rbg;
+      if(bkR===null){ico='';gc='var(--mut)';rbg='transparent';}
+      else if(Math.abs(gap)<=5){ico='✅';gc='var(--accent)';rbg='rgba(0,232,122,.04)';}
+      else if(Math.abs(gap)<=10){ico='⚠️';gc='var(--yellow)';rbg='rgba(255,200,0,.04)';}
+      else{ico='❌';gc='var(--red)';rbg='rgba(255,79,79,.04)';}
+      html+='<tr style="border-bottom:1px solid var(--bd2);background:'+rbg+'">'+
+        '<td style="padding:7px 8px;font-weight:700">'+bk.label+'</td>'+
+        '<td style="padding:7px 8px">'+bkN+'</td>'+
+        '<td style="padding:7px 8px">'+(bkR!==null?bkH:'–')+'</td>'+
+        '<td style="padding:7px 8px;font-weight:800;color:'+_mlRateColor(bkR)+'">'+_mlRateStr(bkR)+'</td>'+
+        '<td style="padding:7px 8px;color:var(--mut)">'+bk.mid+'%</td>'+
+        '<td style="padding:7px 8px;font-weight:700;color:'+gc+'">'+(gap!==null?(gap>=0?'+':'')+gap+'%':'–')+'</td>'+
+        '<td style="padding:7px 8px">'+(bkR!==null?ico:(bkN<3?'<span style="font-size:10px;color:var(--mut)">Need '+(3-bkN)+' more</span>':''))+'</td>'+
+        '</tr>';
+    });
+    html+='</tbody></table></div>';
+    /* by sport breakdown */
+    var _mlSportMap={};
+    _mlRes.forEach(function(e){var s=e.sport||'Unknown';if(!_mlSportMap[s])_mlSportMap[s]={n:0,w:0,confSum:0};var m=_mlSportMap[s];m.n++;m.confSum+=(e.confidence||50);if(e.result==='hit')m.w++;});
+    var _mlSports=Object.keys(_mlSportMap);
+    if(_mlSports.length>1){
+      html+=_phSectionHdr("By Sport");
+      html+='<div style="overflow:auto;margin-bottom:16px"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>';
+      ['Sport','Picks','Wins','Win Rate','Avg Predicted','Edge'].forEach(function(h){html+='<th style="padding:6px 8px;text-align:left;font-size:9px;font-weight:700;color:var(--mut);letter-spacing:.04em;border-bottom:1px solid var(--bd)">'+h+'</th>';});
+      html+='</tr></thead><tbody>';
+      _mlSports.forEach(function(s){
+        var m=_mlSportMap[s],wr=Math.round(m.w/m.n*100),avg=Math.round(m.confSum/m.n),edg=wr-avg;
+        html+='<tr style="border-bottom:1px solid var(--bd2)">'+
+          '<td style="padding:7px 8px;font-weight:700">'+esc(s)+'</td>'+
+          '<td style="padding:7px 8px">'+m.n+'</td>'+
+          '<td style="padding:7px 8px;color:var(--accent)">'+m.w+'</td>'+
+          '<td style="padding:7px 8px;font-weight:800;color:'+_mlRateColor(wr)+'">'+wr+'%</td>'+
+          '<td style="padding:7px 8px;color:var(--mut)">'+avg+'%</td>'+
+          '<td style="padding:7px 8px;font-weight:700;color:'+(edg>0?'var(--accent)':edg<0?'var(--red)':'var(--mut)')+'">'+( edg>=0?'+':'')+edg+'%</td>'+
+          '</tr>';
+      });
+      html+='</tbody></table></div>';
+    }
+    /* CLV note */
+    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:20px">'+
+      '<div style="font-size:9px;font-weight:700;color:var(--mut);letter-spacing:.05em;margin-bottom:4px">CALIBRATION NOTE</div>'+
+      '<div style="font-size:11px;color:var(--mut);line-height:1.6">PropDesk tracks win probability at the time of pick. A well-calibrated model shows win rates close to predicted probabilities over large samples. Current sample: <b style="color:var(--text)">'+_mlTot+'</b> resolved picks. Meaningful calibration requires 50+ picks per probability bucket.</div>'+
+      '</div>';
+    /* weekly win rate chart */
+    html+=_phSectionHdr("Weekly Win Rate");
+    var _mlWeeks=[],_nowMs=Date.now();
+    for(var _wi=7;_wi>=0;_wi--){
+      var _ws=new Date(_nowMs-(_wi*7+6)*86400000).toISOString().slice(0,10);
+      var _we=new Date(_nowMs-_wi*86400000).toISOString().slice(0,10);
+      var _wpArr=_mlRes.filter(function(e){return e.date>=_ws&&e.date<=_we;});
+      var _wh2=_wpArr.filter(function(e){return e.result==='hit';}).length;
+      _mlWeeks.push({start:_ws,n:_wpArr.length,rate:_wpArr.length?Math.round(_wh2/_wpArr.length*100):null});
+    }
+    if(_mlWeeks.filter(function(w){return w.n>0;}).length<3){
+      html+=chartCard("Weekly Moneyline Win Rate","Win rate by week. 52.4% = break-even at ‑110. 55% = model target.",ph("Accumulating data — check back after more picks are resolved"));
+    } else {
+      var _svgStr='<svg viewBox="0 0 560 145" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:145px">';
+      var _yMn=30,_yMx=100,_cH2=100,_cY2=10;
+      var _ySvg=function(p){return _cY2+_cH2-Math.max(0,Math.min(1,(p-_yMn)/(_yMx-_yMn)))*_cH2;};
+      _svgStr+='<line x1="0" y1="'+_ySvg(52.4)+'" x2="560" y2="'+_ySvg(52.4)+'" stroke="#444" stroke-dasharray="4,3" stroke-width="1"/>';
+      _svgStr+='<text x="5" y="'+(_ySvg(52.4)-3)+'" fill="#555" font-size="8">52.4%</text>';
+      _svgStr+='<line x1="0" y1="'+_ySvg(55)+'" x2="560" y2="'+_ySvg(55)+'" stroke="#00e87a55" stroke-dasharray="4,3" stroke-width="1"/>';
+      _svgStr+='<text x="5" y="'+(_ySvg(55)-3)+'" fill="#00e87a88" font-size="8">55%</text>';
+      var _bW2=560/8,_bGap2=4;
+      _mlWeeks.forEach(function(wk,i){
+        var _bx=i*_bW2+_bGap2/2,_bw=_bW2-_bGap2;
+        if(wk.rate!==null){
+          var _bTop=_ySvg(wk.rate),_bHt=(_cY2+_cH2)-_bTop;
+          var _bc=wk.rate>=55?'#00e87a':wk.rate>=45?'#ffcc00':'#ff4f4f';
+          _svgStr+='<rect x="'+_bx+'" y="'+_bTop+'" width="'+_bw+'" height="'+Math.max(_bHt,2)+'" fill="'+_bc+'33" stroke="'+_bc+'" stroke-width="1" rx="2"/>';
+          _svgStr+='<text x="'+(_bx+_bw/2)+'" y="'+(_bTop-3)+'" text-anchor="middle" fill="'+_bc+'" font-size="9" font-weight="700">'+wk.rate+'%</text>';
+        } else {
+          _svgStr+='<rect x="'+_bx+'" y="'+(_cY2+_cH2-2)+'" width="'+_bw+'" height="2" fill="#2a2a2a" rx="1"/>';
+        }
+        _svgStr+='<text x="'+(_bx+_bw/2)+'" y="'+(_cY2+_cH2+12)+'" text-anchor="middle" fill="#555" font-size="8">'+wk.start.slice(5).replace('-','/')+'</text>';
+      });
+      _svgStr+='</svg>';
+      html+=chartCard("Weekly Moneyline Win Rate","Win rate by week. 52.4% = break-even at ‑110. 55% = model target.",_svgStr);
+    }
+    /* picks table */
+    html+=_phSectionHdr("Moneyline Pick History");
+    var _mlFlt=_mlPickFilter||'all';
+    html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">';
+    ['all','hit','miss','pending'].forEach(function(f){
+      html+='<button class="pill'+((_mlFlt===f)?' active':'')+'" onclick="_mlPickFilter=\''+f+'\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">'+f.charAt(0).toUpperCase()+f.slice(1)+'</button>';
+    });
+    html+='</div>';
+    var _mlSorted=_mlAll.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;});
+    var _mlShown=_mlFlt==='all'?_mlSorted:_mlSorted.filter(function(e){return e.result===_mlFlt;});
+    if(!_mlShown.length){
+      html+='<div style="font-size:11px;color:var(--mut);padding:12px 0">No '+esc(_mlFlt)+' picks.</div>';
+    } else {
+      html+='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>';
+      ['Date','Game','Team Picked','Predicted %','Line','Result'].forEach(function(h){html+='<th style="padding:6px 8px;text-align:left;font-size:9px;font-weight:700;color:var(--mut);letter-spacing:.04em;border-bottom:1px solid var(--bd)">'+h+'</th>';});
+      html+='</tr></thead><tbody>';
+      _mlShown.forEach(function(e){
+        var rhtml;
+        if(e.result==='hit') rhtml='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px">HIT</span>';
+        else if(e.result==='miss') rhtml='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px">MISS</span>';
+        else rhtml='<span style="color:var(--mut);font-size:10px">PENDING</span>';
+        if(e.autoResolved) rhtml+='<span style="font-size:8px;color:var(--mut2);font-weight:700;letter-spacing:.04em;margin-left:5px;vertical-align:middle">AUTO</span>';
+        html+='<tr style="border-bottom:1px solid var(--bd2)">'+
+          '<td style="padding:7px 8px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>'+
+          '<td style="padding:7px 8px;color:var(--mut);font-size:10px">'+esc(e.game||'–')+'</td>'+
+          '<td style="padding:7px 8px;font-weight:700">'+esc(e.player||'–')+'</td>'+
+          '<td style="padding:7px 8px"><span style="font-weight:800;color:var(--accent)">'+(e.confidence||'–')+'%</span></td>'+
+          '<td style="padding:7px 8px;color:var(--mut);font-size:10px">'+esc(e.line||'–')+'</td>'+
+          '<td style="padding:7px 8px;white-space:nowrap">'+rhtml+'</td>'+
+          '</tr>';
+      });
+      html+='</tbody></table></div>';
+    }
+    html+='<div style="margin-top:16px;padding-bottom:8px;font-size:10px;color:var(--mut2)">'+_mlAll.length+' tracked moneyline picks</div>';
+  }
+  }
   html+='</div>';
   mount.innerHTML=html;
 }
@@ -6295,11 +6470,19 @@ async function _arGetMlbPlayerId(name){
   }catch(e){ return null; }
 }
 
+/* Returns true once it is past 2am Eastern on the day after playDate.
+   Uses next-day midnight UTC + 7h (= 2am EST / 3am EDT), so all US
+   time zones and late West Coast games are safely past before resolution runs. */
+function _arPastGate(playDate){
+  var p=playDate.split('-');
+  var gateMs=Date.UTC(+p[0],+p[1]-1,+p[2]+1)+7*3600000;
+  return Date.now()>=gateMs;
+}
+
 async function resolvePlayAutomatically(play){
   try{
     if(!play||play.sport!=="MLB"||play.result!=="pending"||play.autoResolveLocked) return false;
-    var today=new Date().toISOString().slice(0,10);
-    if(play.date>=today) return false;
+    if(!_arPastGate(play.date)) return false;
 
     var playerId=await _arGetMlbPlayerId(play.player);
     if(!playerId) return false;
@@ -6362,10 +6545,9 @@ async function _phAutoResolveAll(){
   if(_arRunning) return;
   _arRunning=true;
   try{
-    var today=new Date().toISOString().slice(0,10);
     var h=loadPlayHist();
-    var propPend=h.filter(function(e){ return e.result==="pending"&&e.sport==="MLB"&&e.type!=="moneyline"&&e.date<today&&!e.autoResolveLocked; });
-    var mlPend=h.filter(function(e){ return e.result==="pending"&&e.type==="moneyline"&&e.date<today&&!e.autoResolveLocked; });
+    var propPend=h.filter(function(e){ return e.result==="pending"&&e.sport==="MLB"&&e.type!=="moneyline"&&_arPastGate(e.date)&&!e.autoResolveLocked; });
+    var mlPend=h.filter(function(e){ return e.result==="pending"&&e.type==="moneyline"&&_arPastGate(e.date)&&!e.autoResolveLocked; });
     for(var i=0;i<propPend.length;i++){
       var resolved=await resolvePlayAutomatically(propPend[i]);
       if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
@@ -6463,8 +6645,7 @@ async function _mlArResolveNhl(date,teamName,awayHint,homeHint){
 async function resolveMoneylinePick(play){
   try{
     if(!play||play.type!=="moneyline"||play.result!=="pending"||play.autoResolveLocked) return false;
-    var today=new Date().toISOString().slice(0,10);
-    if(play.date>=today) return false;
+    if(!_arPastGate(play.date)) return false;
     var parts=(play.game||"").split(" @ ");
     var awayHint=(parts[0]||"").trim(),homeHint=(parts[1]||"").trim();
     var teamName=play.player||"";
@@ -9160,7 +9341,7 @@ function renderGameTop5(picks,isScanning){
         var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
         var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
         if(!h.some(function(e){return e.player===p.player&&e.market===mkt&&e.date===today;})){
-          h.unshift({date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"});
+          h.unshift({date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,game:p._game||"",line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"});
           added++;
         }
       });
