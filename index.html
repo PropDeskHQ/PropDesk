@@ -268,6 +268,7 @@ tr:hover .ph-rm-btn{opacity:1;border-color:var(--bd2)}
 .pl-qstats .qs{flex:1 1 76px;min-width:68px;background:rgba(255,255,255,.04);border:1px solid var(--bd2);border-radius:8px;padding:7px 10px 8px;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px}
 .pl-qstats .qs-l{color:var(--mut2);font-weight:700;font-size:10px;letter-spacing:.7px;text-transform:uppercase;line-height:1.1}
 .pl-qstats .qs-v{color:var(--text);font-weight:800;font-size:15px;line-height:1.2}
+.qs-toggle{display:none}
 .pl-flags{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 3px}
 .pl-flags .vf{font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:5px;text-transform:uppercase;cursor:default}
 .vf-val{background:rgba(0,255,135,.12);color:#00ff87;border:1px solid rgba(0,255,135,.25)}
@@ -283,19 +284,34 @@ table th:nth-child(2),table td:nth-child(2){min-width:130px}
 table th:nth-child(3),table td:nth-child(3){min-width:140px;padding-left:14px;padding-right:14px}
 table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 @media(max-width:480px){
-  table th:nth-child(1),table td:nth-child(1){min-width:100px}
-  table th:nth-child(2),table td:nth-child(2){min-width:74px}
-  table th:nth-child(3),table td:nth-child(3){min-width:92px;padding-left:6px;padding-right:6px}
-  table th:nth-child(4),table td:nth-child(4){min-width:62px;padding-left:6px}
-  /* Book Line, PropDesk Line stepper, and Confidence all render a 36px display value —
-     that fixed content width fights the column squeeze above unless it shrinks too */
-  .bb{font-size:22px}
-  .adj-val{font-size:22px}
-  .vs b{font-size:22px}
+  /* table-layout:auto let content (e.g. the "STRONG" confidence badge) force columns wider
+     than the min-widths below, pushing later columns off-screen. Fixed layout + explicit
+     widths (summing to ~343px = 375px viewport minus .wrap's 32px padding) makes the four
+     columns deterministic so they always fit without horizontal scroll. Scoped to the props
+     table only — other tables in the app (.glog, etc.) are untouched. */
+  #tableMount table{table-layout:fixed}
+  #tableMount table th:nth-child(1),#tableMount table td:nth-child(1){width:108px;min-width:108px}
+  #tableMount table th:nth-child(2),#tableMount table td:nth-child(2){width:66px;min-width:66px;padding-left:6px;padding-right:6px}
+  #tableMount table th:nth-child(3),#tableMount table td:nth-child(3){width:88px;min-width:88px;padding-left:5px;padding-right:5px}
+  #tableMount table th:nth-child(4),#tableMount table td:nth-child(4){width:81px;min-width:81px;padding-left:4px;padding-right:4px}
+  /* Book Line, PropDesk Line stepper, and Confidence all render a 36px display value — with
+     a fixed column width that can't expand to fit it, the value and the stepper controls
+     have to shrink so they actually fit inside the box instead of spilling out of it */
+  .bb{font-size:20px}
+  .adj-val{font-size:20px}
+  .vs b{font-size:20px}
+  .adj-btn{width:18px;height:18px;font-size:11px}
+  .adj-ctrl{gap:5px}
   /* Player cell stacks 8-9 quick-stat chips in one column and gets very tall — vertical-align:middle
      (set at line 206) then floats Book Line/Stepper/Confidence in the middle of that tall row,
      detached from the player name at top. Align them to the top instead. */
   tbody tr.prow td:nth-child(2),tbody tr.prow td:nth-child(3),tbody tr.prow td:nth-child(4){vertical-align:top;padding-top:11px}
+  /* Quick stats default OFF on mobile so column 1 stays narrow and cols 2-4 (book line,
+     stepper, confidence) always stay on-screen without horizontal scrolling. User opts in via the Stats toggle. */
+  .qs-toggle{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:var(--mut);background:rgba(255,255,255,.04);border:1px solid var(--bd2);border-radius:6px;padding:3px 8px;margin:6px 0 2px;cursor:pointer;width:fit-content}
+  .qs-toggle:active{color:var(--text);border-color:#3a3a3a}
+  .pl-qstats{display:none}
+  .pl-qstats.open{display:flex}
 }
 
 /* SUMMARY BAR */
@@ -3370,6 +3386,7 @@ function rowHtml(p,cols,idx,silent){
     '<td>'+
       '<div class="pl-name">'+esc(p.player)+'</div>'+
       '<div class="pl-meta" id="meta-'+p._id+'">'+meta+'</div>'+
+      '<button class="qs-toggle" data-pid="'+p._id+'">Stats &#9662;</button>'+
       '<div class="pl-qstats" id="qstats-'+p._id+'"></div>'+
       '<div class="pl-flags" id="flags-'+p._id+'"></div>'+
       '<div class="pl-acts">'+
@@ -3440,6 +3457,15 @@ function bindRowActions(){
     if(!p) return;
     b.onclick=function(){ handleWhyClick(p,b); };
   });
+  document.querySelectorAll('.qs-toggle[data-pid]').forEach(function(b){
+    b.onclick=function(){ toggleQuickStats(b); };
+  });
+}
+function toggleQuickStats(btn){
+  var node=document.getElementById("qstats-"+btn.getAttribute("data-pid"));
+  if(!node) return;
+  var isOpen=node.classList.toggle("open");
+  btn.innerHTML="Stats "+(isOpen?"&#9652;":"&#9662;");
 }
 function handleWhyClick(p,btn){
   var row=document.getElementById("whydata-"+p._id);
