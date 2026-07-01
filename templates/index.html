@@ -937,10 +937,15 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
         </div>
         <div id="tierFilterRow" style="display:none"></div>
         <div id="tableMount"></div>
-        <div id="trendsMount" style="display:none">
-          <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game to see trends.</p></div>
-        </div>
       </div>
+    </div>
+  </div>
+
+  <!-- TRENDS PAGE -->
+  <div class="page" id="page-trends">
+    <div class="tabrow" id="trendsSportTabs"></div>
+    <div id="trendsMount">
+      <div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a sport to see trends.</p></div>
     </div>
   </div>
 
@@ -2761,7 +2766,6 @@ function clearBoard(){
   var cm=$("gameContentMount"); if(cm) cm.style.display="none";
   $("filterBar").style.display="none";
   $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
-  var trM=$("trendsMount"); if(trM) trM.style.display="none";
   var sb=$("summaryBar"); if(sb) sb.style.display="none";
   $("gamesRow").innerHTML='<div class="empty" style="padding:18px">Loading games...</div>';
 }
@@ -6996,16 +7000,7 @@ function init(){
       var nav=b.getAttribute("data-nav");
       if(nav==="more"){ openMoreDrawer(); return; }
       if(nav==="trends"){
-        if(!$("page-games").classList.contains("active")) showPage("games");
-        updateBotnavActive("trends");
-        ST.market="__trends__"; renderPropTabs(); showGameContent();
-        var _tTm=$("tableMount"),_tTr=$("trendsMount"),_tFb=$("filterBar"),_tSb=$("summaryBar");
-        if(_tTm) _tTm.style.display="none";
-        if(_tTr) _tTr.style.display="";
-        if(_tFb) _tFb.style.display="none";
-        if(_tSb) _tSb.style.display="none";
-        var _tPo=$("potgMount"),_tLo=$("lotdMount");
-        if(_tPo) _tPo.innerHTML=""; if(_tLo) _tLo.innerHTML="";
+        showPage("trends");
         initTrends();
         return;
       }
@@ -9646,7 +9641,6 @@ function loadGameDetail(){
   var cm=$("gameContentMount"); if(cm) cm.style.display="none";
   $("filterBar").style.display="none";
   $("potgMount").innerHTML=""; $("lotdMount").innerHTML=""; $("tableMount").innerHTML="";
-  var trM=$("trendsMount"); if(trM) trM.style.display="none";
   var sb=$("summaryBar"); if(sb) sb.style.display="none";
   renderPropTabs();
   var giM=$("gameInfoStrip");
