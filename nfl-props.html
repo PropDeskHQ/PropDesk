@@ -7913,15 +7913,18 @@ async function calcCompositeTrends(){
 
     var activeSigs=[];
 
-    // Signal 1: L5 vs Season delta (30%, gate: 10+ games)
-    if(n>=10&&p.l5Avg!=null&&p.seasonAvgEnrich!=null&&p.seasonAvgEnrich>0){
-      var delta=p.l5Avg-p.seasonAvgEnrich;
-      var rel=delta/p.seasonAvgEnrich;
-      var d1=isOver?rel:-rel;
-      var s1=d1>=0.20?88:d1>=0.12?75:d1>=0.05?63:d1>=-0.05?50:d1>=-0.12?37:d1>=-0.20?25:12;
-      var d1lbl=d1>=0.05?"Running hot":d1<=-0.05?"Running cold":"In line with season";
+    // Signal 1: L5 hit rate vs season hit rate (30%, gate: 10+ games)
+    if(n>=10){
+      var l5HitRate=vals.slice(0,5).filter(function(v){return isOver?v>line:v<line;}).length/5;
+      var sznHitRate=vals.filter(function(v){return isOver?v>line:v<line;}).length/n;
+      var s1=l5HitRate>=0.80?88:l5HitRate>=0.65?75:l5HitRate>=0.55?62:
+             l5HitRate>=0.50?44:l5HitRate>=0.40?37:l5HitRate>=0.30?25:12;
+      if(l5HitRate<0.50&&s1>=50) s1=37; // hard gate: missing more than hitting → bearish
+      var l5Hits=Math.round(l5HitRate*5);
+      var d1lbl=l5HitRate>=0.65?"Running hot":l5HitRate<=0.40?"Running cold":"Near baseline";
       activeSigs.push({name:"L5 vs Season",score:s1,weight:30,
-        desc:d1lbl+" — L5 "+p.l5Avg.toFixed(1)+" vs "+p.seasonAvgEnrich.toFixed(1)+" szn"});
+        _l5HR:l5HitRate,_sznHR:sznHitRate,
+        desc:d1lbl+" — "+l5Hits+"/5 L5 ("+Math.round(l5HitRate*100)+"%) vs "+Math.round(sznHitRate*100)+"% szn"});
     }
 
     // Signal 2: Home/Away split (25%, gate: 8+ games each side)
@@ -8003,6 +8006,11 @@ async function calcCompositeTrends(){
     var bearSigs=activeSigs.filter(function(s){return s.score<=44;});
     if(Math.max(bullSigs.length,bearSigs.length)<2) continue;
     if(trendScore<65&&trendScore>35) continue;
+    // Gate: overall hit rate must be ≥55% to surface as BULLISH
+    if(trendScore>=65){
+      var overallHR=vals.filter(function(v){return isOver?v>line:v<line;}).length/n;
+      if(overallHR<0.55) continue;
+    }
 
     // Flags (labels only — not part of scoring)
     var flags=[];
@@ -8072,8 +8080,11 @@ function _ctExplanation(c){
   var s1="",s2="";
   if(top1){
     var d1=top1.desc.replace(/\s+/g,' ').trim();
-    if(top1.name==="L5 vs Season") s1=c.player+" is "+(isBull?"running above":"running below")+" their season baseline: "+d1+".";
-    else if(top1.name==="Home/Away Split") s1=c.player+" shows a notable home/away split — "+d1+".";
+    if(top1.name==="L5 vs Season"){
+      if(top1._l5HR!=null) s1=c.player+" is hitting this prop in "+Math.round(top1._l5HR*5)+" of the last 5 games ("+Math.round(top1._l5HR*100)+"%)"+
+        (top1._sznHR!=null?", vs a "+Math.round(top1._sznHR*100)+"% season rate":"")+".";
+      else s1=c.player+" is "+(isBull?"running above":"running below")+" their season baseline: "+d1+".";
+    } else if(top1.name==="Home/Away Split") s1=c.player+" shows a notable home/away split — "+d1+".";
     else if(top1.name==="Park Factor") s1="Park conditions favor "+(isBull?"hitters":"pitchers")+" today: "+d1+".";
     else if(top1.name==="Platoon") s1="Platoon advantage aligns: "+d1+".";
     else if(top1.name==="Pitcher Trend") s1="The opposing pitcher is "+(isBull?"struggling":"trending well")+" recently: "+d1+".";
@@ -8081,7 +8092,8 @@ function _ctExplanation(c){
   }
   if(top2){
     var d2=top2.desc.replace(/\s+/g,' ').trim();
-    if(top2.name==="L5 vs Season") s2="Recent form corroborates: "+d2+".";
+    if(top2.name==="L5 vs Season")
+      s2=top2._l5HR!=null?"Recent form corroborates: "+Math.round(top2._l5HR*5)+"/5 L5 ("+Math.round(top2._l5HR*100)+"%).":"Recent form corroborates: "+d2+".";
     else if(top2.name==="Home/Away Split") s2="Home/away splits further support the "+keyDir+" case: "+d2+".";
     else if(top2.name==="Park Factor") s2="Park factor adds a "+(isBull?"tailwind":"headwind")+": "+d2+".";
     else if(top2.name==="Platoon") s2="Platoon data reinforces this: "+d2+".";
