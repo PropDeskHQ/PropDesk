@@ -534,6 +534,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tcc-toggle button{background:none;border:none;padding:5px 11px;font-size:10px;font-weight:700;color:var(--mut);cursor:pointer;transition:.15s;letter-spacing:.03em;white-space:nowrap}
 .tcc-toggle button.active{background:#1e1e1e;color:var(--text)}
 .tcc-toggle button:hover:not(.active){color:var(--text)}
+.tcc-cumul-svg{height:180px}
+@media(min-width:561px){.tcc-cumul-svg{height:260px}}
 /* === Composite Trends === */
 .ct-section{margin-bottom:28px}
 .ct-section-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
@@ -8170,17 +8172,17 @@ function _trCumulativeChartSvg(resolved){
   var rng=maxU-minU; if(rng<2) rng=2;
   var pad=Math.max(1,Math.ceil(rng*0.08));
   var lo=minU-pad,hi=maxU+pad,span=hi-lo;
-  var W=300,H=180,XL=38,XR=W-8,YT=12,CH=150,YB=YT+CH;
+  var W=300,H=180,XL=50,XR=W-8,YT=12,CH=150,YB=YT+CH;
   function xP(i){return XL+(i/N)*(XR-XL);}
   function yP(u){return YB-((u-lo)/span)*CH;}
   var finalU=pts[N];
   var clr=finalU>=0?'#00e87a':'#ff4f4f';
-  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:180px;display:block">';
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" class="tcc-cumul-svg" style="width:100%;display:block">';
   var y0=Math.round(yP(0));
   [0,Math.round(maxU/5)*5,Math.round(minU/5)*5].filter(function(u,i,a){return a.indexOf(u)===i&&u>=lo&&u<=hi;}).forEach(function(u){
     var y=Math.round(yP(u)),is0=u===0;
     svg+='<line x1="'+XL+'" y1="'+y+'" x2="'+XR+'" y2="'+y+'" stroke="'+(is0?'#2a2a2a':'#1e1e1e')+'" stroke-width="'+(is0?'1':'0.5')+'"'+(is0?' stroke-dasharray="3 4"':'')+'/>';
-    svg+='<text x="'+(XL-4)+'" y="'+(y+3)+'" text-anchor="end" fill="'+(is0?'#555':'#444')+'" font-size="8">'+(u>0?'+':'')+u+'</text>';
+    svg+='<text x="'+(XL-10)+'" y="'+(y+3)+'" text-anchor="end" fill="'+(is0?'#555':'#444')+'" font-size="8">'+(u>0?'+':'')+u+'</text>';
   });
   var baseY=Math.min(Math.max(y0,YT),YB);
   var fp=[Math.round(xP(0))+','+baseY];
