@@ -542,7 +542,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .ct-section-title{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--text)}
 .ct-section-sub{font-size:11px;color:var(--mut2)}
 .ct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
-.ct-card{background:var(--surf);border:1px solid #1e1e1e;border-radius:14px;padding:16px 18px 14px;display:flex;flex-direction:column;gap:8px}
+.ct-card{background:var(--surf);border:1px solid #1e1e1e;border-radius:14px;padding:16px 18px 14px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
 .ct-bull{border-left:3px solid #00e87a;padding-left:15px}
 .ct-bear{border-left:3px solid #ff4f4f;padding-left:15px}
 .ct-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
@@ -570,6 +570,21 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .ct-flag-bull{background:rgba(0,255,135,.1);color:#00e87a;border:1px solid rgba(0,255,135,.25)}
 .ct-flag-warn{background:rgba(255,180,0,.1);color:#ffcc00;border:1px solid rgba(255,180,0,.2)}
 .ct-flag-mut{background:#1e1e1e;color:#555;border:1px solid #2a2a2a}
+.ct-expand{overflow:hidden;max-height:0;transition:max-height .35s cubic-bezier(.4,0,.2,1)}
+.ct-card.ct-expanded .ct-expand{max-height:600px}
+.ct-expand-inner{padding-top:12px;border-top:1px solid #1e1e1e;margin-top:4px}
+.ct-expand-graph{background:#0a0a0a;border-radius:8px;padding:10px 8px 4px;margin-bottom:10px}
+.ct-expand-lbl{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#3a3a3a;margin-bottom:6px}
+.ct-expand-sig-tbl{width:100%;border-collapse:collapse}
+.ct-expand-sig-tbl tr+tr td{border-top:1px solid #161616}
+.ct-expand-sig-tbl td{padding:4px 5px;font-size:10.5px;vertical-align:middle}
+.ct-expand-sig-nm{color:var(--mut);font-weight:700;white-space:nowrap;width:90px}
+.ct-expand-sig-vl{color:var(--text)}
+.ct-expand-sig-dr{font-weight:800;font-size:11px;white-space:nowrap;width:18px;text-align:center}
+.ct-expand-sig-dr.bull{color:#00e87a}
+.ct-expand-sig-dr.bear{color:#ff4f4f}
+.ct-expand-sig-dr.neu{color:#444}
+.ct-expand-explain{font-size:11px;color:var(--mut2);line-height:1.55;margin-top:10px;padding-top:10px;border-top:1px solid #161616}
 /* Card header row */
 .tc-card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
 .tc-signal-lbl{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}
@@ -8001,7 +8016,9 @@ async function calcCompositeTrends(){
     results.push({
       player:p.player,mkt:p._market,mktLbl:mktLbl,game:p._game,
       trendScore:trendScore,direction:trendScore>=65?"bullish":"bearish",
-      signals:activeSigs,flags:flags
+      signals:activeSigs,flags:flags,
+      _vals:vals.slice(0,15),_dates:p._dates?p._dates.slice(0,15):[],
+      _line:line,_isOver:isOver
     });
   }
 
@@ -8010,6 +8027,70 @@ async function calcCompositeTrends(){
     return Math.max(b.trendScore,100-b.trendScore)-Math.max(a.trendScore,100-a.trendScore);
   });
   return results;
+}
+
+function toggleCompositeCard(card){
+  var wasOpen=card.classList.contains('ct-expanded');
+  document.querySelectorAll('.ct-card').forEach(function(c){c.classList.remove('ct-expanded');});
+  if(!wasOpen) card.classList.add('ct-expanded');
+}
+
+function _ctHitBarChart(c){
+  var vals=c._vals,dates=c._dates,line=c._line,isOver=c._isOver;
+  if(!vals||vals.length<2) return '';
+  var n=Math.min(15,vals.length);
+  var pts=vals.slice(0,n).slice().reverse();
+  var dts=(dates||[]).slice(0,n).slice().reverse();
+  var hits=pts.filter(function(v){return isOver?v>line:v<line;}).length;
+  var seasonHR=hits/n;
+  var W=300,H=72,L=4,R=W-4,T=7,BAR_H=45,LABEL_Y=T+BAR_H+11;
+  var barW=(R-L)/n,effW=Math.max(2,barW-1.5);
+  var parts=[];
+  for(var i=0;i<n;i++){
+    var hit=isOver?pts[i]>line:pts[i]<line;
+    var bx=(L+i*barW+0.75).toFixed(1);
+    parts.push('<rect x="'+bx+'" y="'+T+'" width="'+effW.toFixed(1)+'" height="'+BAR_H+'" fill="'+(hit?'#00e87a':'#ff4f4f')+'" rx="2" opacity=".75"/>');
+    if(dts[i]&&(i===0||i===n-1||(n>4&&i===Math.round((n-1)/2)))){
+      var d=new Date(dts[i]);
+      var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var lbl=MON[d.getMonth()]+' '+d.getDate();
+      var lx=(L+i*barW+0.75+effW/2).toFixed(1);
+      parts.push('<text x="'+lx+'" y="'+LABEL_Y+'" text-anchor="middle" fill="#3a3a3a" font-size="7">'+lbl+'</text>');
+    }
+  }
+  var hrY=(T+BAR_H*(1-seasonHR)).toFixed(1);
+  parts.push('<line x1="'+L+'" y1="'+hrY+'" x2="'+R+'" y2="'+hrY+'" stroke="#555" stroke-width="1" stroke-dasharray="3,3"/>');
+  parts.push('<text x="'+(R-2)+'" y="'+(parseFloat(hrY)-2)+'" text-anchor="end" fill="#555" font-size="7">Szn '+Math.round(seasonHR*100)+'%</text>');
+  return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">'+parts.join('')+'</svg>';
+}
+
+function _ctExplanation(c){
+  var isBull=c.direction==="bullish";
+  var keyDir=isBull?"bullish":"bearish";
+  var aligned=c.signals.filter(function(s){return isBull?s.score>=56:s.score<=44;});
+  var top1=aligned[0],top2=aligned[1];
+  var s1="",s2="";
+  if(top1){
+    var d1=top1.desc.replace(/\s+/g,' ').trim();
+    if(top1.name==="L5 vs Season") s1=c.player+" is "+(isBull?"running above":"running below")+" their season baseline: "+d1+".";
+    else if(top1.name==="Home/Away Split") s1=c.player+" shows a notable home/away split — "+d1+".";
+    else if(top1.name==="Park Factor") s1="Park conditions favor "+(isBull?"hitters":"pitchers")+" today: "+d1+".";
+    else if(top1.name==="Platoon") s1="Platoon advantage aligns: "+d1+".";
+    else if(top1.name==="Pitcher Trend") s1="The opposing pitcher is "+(isBull?"struggling":"trending well")+" recently: "+d1+".";
+    else s1=top1.name+": "+d1+".";
+  }
+  if(top2){
+    var d2=top2.desc.replace(/\s+/g,' ').trim();
+    if(top2.name==="L5 vs Season") s2="Recent form corroborates: "+d2+".";
+    else if(top2.name==="Home/Away Split") s2="Home/away splits further support the "+keyDir+" case: "+d2+".";
+    else if(top2.name==="Park Factor") s2="Park factor adds a "+(isBull?"tailwind":"headwind")+": "+d2+".";
+    else if(top2.name==="Platoon") s2="Platoon data reinforces this: "+d2+".";
+    else if(top2.name==="Pitcher Trend") s2="Opposing pitcher form adds weight: "+d2+".";
+    else s2=top2.name+" corroborates: "+d2+".";
+  }
+  var nA=aligned.length;
+  var s3=(nA>=2?nA+" independent signals align "+keyDir:"One signal aligns "+keyDir)+", producing a composite score of "+c.trendScore+".";
+  return [s1,s2,s3].filter(Boolean).join(" ");
 }
 
 function renderCompositeSection(composite){
@@ -8032,7 +8113,22 @@ function renderCompositeSection(composite){
           return '<span class="ct-flag '+f.cls+'">'+esc(f.lbl)+'</span>';
         }).join("")+'</div>'
       :"";
-    return '<div class="ct-card '+(isBull?"ct-bull":"ct-bear")+'">'
+    var graphHtml=_ctHitBarChart(c);
+    var sigRows=c.signals.map(function(s){
+      var bull=s.score>=56,bear=s.score<=44;
+      var drCls=bull?"bull":bear?"bear":"neu";
+      var arrow=bull?"▲":bear?"▼":"—";
+      return '<tr><td class="ct-expand-sig-nm">'+esc(s.name)+'</td>'
+        +'<td class="ct-expand-sig-vl">'+esc(s.desc)+'</td>'
+        +'<td class="ct-expand-sig-dr '+drCls+'">'+arrow+'</td></tr>';
+    }).join("");
+    var expandHtml='<div class="ct-expand"><div class="ct-expand-inner">'
+      +(graphHtml?'<div class="ct-expand-graph"><div class="ct-expand-lbl">Hit Rate — Last '+Math.min(15,(c._vals||[]).length)+' Games</div>'+graphHtml+'</div>':"")
+      +'<div class="ct-expand-lbl">Signal Breakdown</div>'
+      +'<table class="ct-expand-sig-tbl"><tbody>'+sigRows+'</tbody></table>'
+      +'<div class="ct-expand-explain">'+_ctExplanation(c)+'</div>'
+    +'</div></div>';
+    return '<div class="ct-card '+(isBull?"ct-bull":"ct-bear")+'" onclick="toggleCompositeCard(this)">'
       +'<div class="ct-card-top">'
         +'<div><div class="ct-player">'+esc(c.player)+'</div>'
           +'<div class="ct-mkt">'+esc(c.mktLbl)+'</div></div>'
@@ -8044,7 +8140,7 @@ function renderCompositeSection(composite){
       +'<div class="ct-bar-wrap"><div class="ct-bar-track">'
         +'<div class="ct-bar-fill" style="width:'+barW+'%;background:'+clr+'"></div>'
       +'</div></div>'
-      +sigsHtml+flagsHtml
+      +sigsHtml+flagsHtml+expandHtml
     +'</div>';
   }).join("");
   return '<div class="ct-section">'
@@ -8439,10 +8535,18 @@ async function trendsFetchAndLoad(){
     }
     mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching '+allCandidates.length+' players…</p></div>';
     var savedSport=ST.sport,savedMkt=ST.market,savedProps=ST.props,savedEid=ST.eventId;
-    for(var i=0;i<allCandidates.length;i++){
-      ST.sport=allCandidates[i]._sport||_trendsSport; ST.market=allCandidates[i]._market;
-      try{ await enrichWithConfidence(allCandidates[i]); }catch(e){}
+    var _trendsEnrichFails=0,_trendsEnrichOk=0,_EB=8;
+    for(var bi=0;bi<allCandidates.length;bi+=_EB){
+      var chunk=allCandidates.slice(bi,bi+_EB);
+      await Promise.all(chunk.map(async function(p){
+        ST.sport=p._sport||_trendsSport; ST.market=p._market;
+        try{ await enrichWithConfidence(p); if(p._vals) _trendsEnrichOk++; }
+        catch(e){ _trendsEnrichFails=(_trendsEnrichFails||0)+1; }
+      }));
+      if(bi+_EB<allCandidates.length) await new Promise(function(r){setTimeout(r,300);});
     }
+    console.log("[PropDesk] Enriched "+_trendsEnrichOk+"/"+allCandidates.length+" props successfully");
+    if(_trendsEnrichFails>0) console.warn("[PropDesk] Trend enrichment: "+_trendsEnrichFails+" props failed silently");
     ST.sport=_trendsSport; ST.market=mks[0]||""; ST.props=allCandidates;
     var trends=[],calcErr=null;
     try{
