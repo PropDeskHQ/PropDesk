@@ -2192,6 +2192,7 @@ async function enrichWithConfidence(p){
         }
       }catch(e){}
       var oppKPct=await getTeamKPct(oppTeam);
+      p.opposingTeamKPct=oppKPct; p.opposingTeamName=oppTeam;
       // League average K% ≈ 22.5%; bottom-10 threshold ≈ 19.5%
       var BOTTOM10=0.195;
       if(oppKPct!==null&&oppKPct<BOTTOM10){
@@ -2332,6 +2333,7 @@ async function enrichWithConfidence(p){
                   var _oppKey=_myKey==='home'?'away':'home';
                   var _oppStarter=_bctx[_oppKey]&&_bctx[_oppKey].starterId;
                   if(_oppStarter){
+                    p.opposingPitcherId=_oppStarter;
                     var _era=await mlbPitcherERA(_oppStarter,new Date().getFullYear());
                     p.opposingPitcherERA=_era;
                     if(_era!=null) _eraAdj=_era>=5.00?0.025:_era>=4.00?0.012:_era>=3.50?0:_era>=2.75?-0.015:-0.025;
@@ -5411,22 +5413,27 @@ function _phChartTimelineSvg(resolved){
   resolved.forEach(function(e){ if(dayMap[e.date]){ dayMap[e.date].total++; if(e.result==="hit") dayMap[e.date].hits++; } });
   var dataDays=days.filter(function(d){ return dayMap[d].total>0; });
   if(dataDays.length<3) return null;
-  var W=300,H=180,CH=150,YT=12,YB=YT+CH,XL=8,XR=W-8;
+  var W=300,H=180,CH=150,YT=12,YB=YT+CH,XL=42,XR=W-8;
   function dX(i){ return XL+(i/29)*(XR-XL); }
   function rY(r){ return YB-r*CH; }
   var MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:180px;display:block">';
   svg+='<defs><linearGradient id="pha-fill-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00e87a" stop-opacity="0.15"/><stop offset="100%" stop-color="#00e87a" stop-opacity="0"/></linearGradient></defs>';
+  [0,0.25,0.5,0.75,1].forEach(function(r){
+    var y=Math.round(rY(r));
+    var is75=r===0.75;
+    svg+='<line x1="'+XL+'" y1="'+y+'" x2="'+XR+'" y2="'+y+'" stroke="#1e1e1e" stroke-width="0.5" opacity="0.6"/>';
+    svg+='<text x="'+(XL-4)+'" y="'+(y+3)+'" text-anchor="end" fill="'+(is75?"#00e87a":"#555")+'" font-size="8"'+(is75?' opacity="0.7"':'')+'>'+Math.round(r*100)+'%</text>';
+  });
   var ry=rY(0.75);
   svg+='<line x1="'+XL+'" y1="'+ry+'" x2="'+XR+'" y2="'+ry+'" stroke="#00e87a" stroke-width="1" stroke-dasharray="3 4" opacity="0.35"/>';
-  svg+='<text x="'+(XL+2)+'" y="'+(ry-3)+'" fill="#00e87a" font-size="7" opacity="0.45">75%</text>';
   var run=[], frun=[];
   function flushRun(){
     if(run.length>1){
       var x0=frun[0].x, xN=frun[frun.length-1].x;
       var pts=frun.map(function(p){ return p.x+','+p.y; }).join(' ');
       svg+='<polygon points="'+x0+','+YB+' '+pts+' '+xN+','+YB+'" fill="url(#pha-fill-grad)"/>';
-      svg+='<polyline points="'+run.join(' ')+'" fill="none" stroke="#00e87a" stroke-width="2.5" opacity="0.55"/>';
+      svg+='<polyline points="'+run.join(' ')+'" fill="none" stroke="#00e87a" stroke-width="3" opacity="0.75"/>';
     }
     run=[]; frun=[];
   }
@@ -5438,7 +5445,7 @@ function _phChartTimelineSvg(resolved){
     run.push(x+','+y); frun.push({x:x,y:y});
     var fill=rate>=0.8?"#00e87a":rate>=0.65?"#ffcc00":"#ff4f4f";
     var dp=ds.split('-'), dlbl=MOS[parseInt(dp[1])-1]+' '+parseInt(dp[2]);
-    svg+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="'+fill+'" stroke="#111" stroke-width="2"><title>'+dlbl+' \xb7 '+dm.hits+' of '+dm.total+' \xb7 '+Math.round(rate*100)+'%</title></circle>';
+    svg+='<circle cx="'+x+'" cy="'+y+'" r="4" fill="'+fill+'" stroke="#111" stroke-width="1.5"><title>'+dlbl+' \xb7 '+dm.hits+' of '+dm.total+' \xb7 '+Math.round(rate*100)+'%</title></circle>';
   });
   flushRun();
   svg+='</svg>';
@@ -8848,7 +8855,7 @@ async function mlFetchPitcherStats(pid){
         wER+=er*w; wIP+=ipDec*w;
         wH+=Number(s.hits||0)*w; wBB+=Number(s.baseOnBalls||0)*w;
       });
-      var res={era:wIP>0?Math.round(wER*9/wIP*100)/100:4.5,whip:wIP>0?Math.round((wH+wBB)/wIP*100)/100:1.4,games:n};
+      var res={era:wIP>0?Math.round(wER*9/wIP*100)/100:4.5,whip:wIP>0?Math.round((wH+wBB)/wIP*100)/100:1.4,games:n,splits:last5.map(function(s){return s.stat||{};})};
       _mlPitcherCache[pid]=res; return res;
     }
   }catch(e){}
