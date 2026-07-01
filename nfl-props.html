@@ -6998,7 +6998,15 @@ function init(){
       if(nav==="trends"){
         if(!$("page-games").classList.contains("active")) showPage("games");
         updateBotnavActive("trends");
-        ST.market="__trends__"; renderPropTabs(); showGameContent(); loadGameTrends();
+        ST.market="__trends__"; renderPropTabs(); showGameContent();
+        var _tTm=$("tableMount"),_tTr=$("trendsMount"),_tFb=$("filterBar"),_tSb=$("summaryBar");
+        if(_tTm) _tTm.style.display="none";
+        if(_tTr) _tTr.style.display="";
+        if(_tFb) _tFb.style.display="none";
+        if(_tSb) _tSb.style.display="none";
+        var _tPo=$("potgMount"),_tLo=$("lotdMount");
+        if(_tPo) _tPo.innerHTML=""; if(_tLo) _tLo.innerHTML="";
+        initTrends();
         return;
       }
       closeMoreDrawer();
