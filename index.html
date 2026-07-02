@@ -5319,6 +5319,8 @@ var _mlCardData=null;
 
 function loadPlayHist(){ try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]"); }catch(e){ return []; } }
 function savePlayHist(h){ try{ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h)); }catch(e){ console.warn("[History] storage full",e); } }
+function loadTrendPlayHist(){ try{ return JSON.parse(localStorage.getItem('propdesk_trend_plays')||'[]'); }catch(e){ return []; } }
+function saveTrendPlayHist(h){ try{ localStorage.setItem('propdesk_trend_plays',JSON.stringify(h)); }catch(e){} }
 
 function _buildHistEntry(p){
   if(!p||!p._market||!p.player||!p.enriched||p.thinData||p.pdNoValue||p.pdConfidence==null) return null;
@@ -6015,9 +6017,14 @@ function renderPlayHistory(){
     mount.innerHTML='<div style="padding:16px 16px 0"><div class="tabrow" style="gap:6px;margin-bottom:0">'+
       '<button class="pill" data-hist-view="my">My History</button>'+
       '<button class="pill active" data-hist-view="pd">PropDesk Stats</button>'+
+      '<button class="pill" data-hist-view="trends">Trends</button>'+
       '</div></div><div id="pdStatsMount"></div>';
     mount.querySelectorAll("[data-hist-view]").forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute("data-hist-view"); renderPlayHistory(); }; });
     _renderPdStats($("pdStatsMount"));
+    return;
+  }
+  if(_histView==="trends"){
+    _renderTrendPlayHistory(mount);
     return;
   }
   var all=loadPlayHist();
@@ -6138,6 +6145,7 @@ function renderPlayHistory(){
   html+='<div class="tabrow" style="gap:6px;margin-bottom:16px">';
   html+='<button class="pill active" data-hist-view="my">My History</button>';
   html+='<button class="pill" data-hist-view="pd">PropDesk Stats</button>';
+  html+='<button class="pill" data-hist-view="trends">Trends</button>';
   html+='</div>';
 
   /* title row */
@@ -6527,6 +6535,95 @@ function renderPlayHistory(){
   });
   mount.querySelectorAll('[data-hist-view]').forEach(function(b){
     b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); };
+  });
+}
+
+function _renderTrendPlayHistory(mount){
+  var today=new Date().toISOString().slice(0,10);
+  var all=loadTrendPlayHist();
+  var _tMo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var _tFmt=function(d){ var p=d.split('-'); return _tMo[parseInt(p[1])-1]+' '+parseInt(p[2]); };
+  var tabsHtml='<div class="tabrow" style="gap:6px;margin-bottom:16px">'+
+    '<button class="pill" data-hist-view="my">My History</button>'+
+    '<button class="pill" data-hist-view="pd">PropDesk Stats</button>'+
+    '<button class="pill active" data-hist-view="trends">Trends</button>'+
+    '</div>';
+  var html='<div style="padding:16px">'+tabsHtml+
+    '<div style="font-size:18px;font-weight:800;margin-bottom:16px">Tracked Trends</div>';
+  if(!all.length){
+    html+='<div style="color:var(--mut);font-size:13px;padding:32px 0;text-align:center">No trends tracked yet. Track plays from the Trends tab.</div></div>';
+    mount.innerHTML=html;
+    mount.querySelectorAll('[data-hist-view]').forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); }; });
+    return;
+  }
+  var dateOrder=[],dateGroups={};
+  all.forEach(function(e){ if(!dateGroups[e.date]){ dateGroups[e.date]=[]; dateOrder.push(e.date); } dateGroups[e.date].push(e); });
+  dateOrder.sort(function(a,b){ return a<b?1:-1; });
+  dateOrder.forEach(function(d){
+    var grp=dateGroups[d];
+    var dHits=grp.filter(function(e){return e.result==='hit';}).length;
+    var dMiss=grp.filter(function(e){return e.result==='miss';}).length;
+    var dPend=grp.filter(function(e){return e.result==='pending';}).length;
+    var dVoid=grp.filter(function(e){return e.result==='void';}).length;
+    var parts=[];
+    if(dHits) parts.push(dHits+' hit');
+    if(dMiss) parts.push(dMiss+' miss');
+    if(dPend) parts.push(dPend+' pending');
+    if(dVoid) parts.push(dVoid+' void');
+    var summary=grp.length+' play'+(grp.length!==1?'s':'')+(parts.length?' · '+parts.join(' / '):'');
+    var resolved=grp.filter(function(e){return e.result==='hit'||e.result==='miss';});
+    var dRoiHtml='';
+    if(resolved.length){
+      var dRoi=calcROI(resolved);
+      var dClr=dRoi.units>0?'#00e87a':dRoi.units<0?'#ff4f4f':'#666';
+      dRoiHtml=' · <span style="color:'+dClr+'">'+( dRoi.units>=0?'+':'')+dRoi.units.toFixed(2)+'u '+(dRoi.roi>=0?'+':'')+dRoi.roi+'%</span>';
+    }
+    html+='<div style="background:var(--surf2);border-radius:8px;margin-bottom:10px;overflow:hidden">';
+    html+='<div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)">';
+    html+='<span style="font-size:11px;font-weight:800">'+esc(_tFmt(d))+(d===today?' <span style="font-size:9px;color:var(--mut);font-weight:400">today</span>':'')+'</span>';
+    html+='<span style="font-size:10px;color:var(--mut)">'+esc(summary)+dRoiHtml+'</span>';
+    html+='</div>';
+    grp.forEach(function(e){
+      var resBadge;
+      if(e.result==='hit') resBadge='<span style="background:#00ff8722;color:var(--accent);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">HIT</span>';
+      else if(e.result==='miss') resBadge='<span style="background:rgba(255,79,79,.13);color:var(--red);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">MISS</span>';
+      else if(e.result==='void') resBadge='<span style="background:rgba(136,136,136,.13);color:var(--mut);font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px">VOID</span>';
+      else resBadge=
+        '<button class="btn tph-hit" data-lat="'+e.loggedAt+'" style="min-width:46px;min-height:28px;padding:4px 10px;font-size:11px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:6px;margin-right:5px">✓ Hit</button>'+
+        '<button class="btn tph-miss" data-lat="'+e.loggedAt+'" style="min-width:46px;min-height:28px;padding:4px 10px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>'+
+        '<button class="btn tph-void" data-lat="'+e.loggedAt+'" style="min-width:42px;min-height:28px;padding:4px 8px;font-size:11px;font-weight:700;background:none;color:var(--mut);border:1px solid var(--bd2);border-radius:6px;margin-left:5px">∅ Void</button>';
+      html+='<div style="padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px">';
+      html+='<div style="flex:1;min-width:0">';
+      html+='<div style="font-size:12px;font-weight:700;margin-bottom:3px">'+esc(e.player||'')+'</div>';
+      html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+      if(e.market) html+='<span style="font-size:10px;color:var(--mut)">'+esc(e.market)+'</span>';
+      if(e.trendType) html+='<span style="background:rgba(0,232,122,.12);color:#00e87a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.03em">'+esc(e.trendType)+'</span>';
+      if(e.trendSignal) html+='<span style="font-size:10px;color:var(--mut2)">'+esc(e.trendSignal)+'</span>';
+      html+='</div></div>';
+      html+='<div style="flex-shrink:0">'+resBadge+'</div>';
+      html+='</div>';
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  mount.innerHTML=html;
+  mount.querySelectorAll('[data-hist-view]').forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); }; });
+  mount.querySelectorAll('.tph-hit,.tph-miss').forEach(function(b){
+    b.onclick=function(){
+      var lat=parseInt(b.getAttribute('data-lat'));
+      var res=b.classList.contains('tph-hit')?'hit':'miss';
+      var h=loadTrendPlayHist();
+      h.forEach(function(e){ if(e.loggedAt===lat) e.result=res; });
+      saveTrendPlayHist(h); _renderTrendPlayHistory(mount);
+    };
+  });
+  mount.querySelectorAll('.tph-void').forEach(function(b){
+    b.onclick=function(){
+      var lat=parseInt(b.getAttribute('data-lat'));
+      var h=loadTrendPlayHist();
+      h.forEach(function(e){ if(e.loggedAt===lat) e.result='void'; });
+      saveTrendPlayHist(h); _renderTrendPlayHistory(mount);
+    };
   });
 }
 
@@ -7983,7 +8080,10 @@ function renderTrendCard(t, sigCls, sigLabel){
     '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
     hitBar+
     (action?'<div class="tc-action">'+esc(action)+'</div>':'')+
-    '<div class="tc-footer"><button class="tc-share-sm" data-share="'+esc(t.shareText)+'">Share ↗</button></div>'+
+    '<div class="tc-footer" style="display:flex;justify-content:space-between;align-items:center">'+
+      '<button class="tc-share-sm" data-share="'+esc(t.shareText)+'">Share ↗</button>'+
+      '<button class="mini trk-btn tc-trk" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">+ Track</button>'+
+    '</div>'+
   '</div>';
 }
 
@@ -8185,9 +8285,23 @@ function renderTrends(trends){
   mount.querySelectorAll(".tc-share-sm").forEach(function(btn){
     btn.onclick=function(e){ e.stopPropagation(); copyText(btn.getAttribute("data-share")); toast("Copied!"); };
   });
+  mount.querySelectorAll(".tc-trk").forEach(function(btn){
+    btn.onclick=function(e){
+      e.stopPropagation();
+      if(btn.disabled) return;
+      var idx=parseInt(btn.getAttribute("data-tidx"),10);
+      var t=_trendsData[idx]; if(!t) return;
+      var today=new Date().toISOString().slice(0,10);
+      var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":t.type==="composite"?"COMPOSITE TREND":t.type==="ml"?"MONEYLINE TREND":(t.type||"TREND").toUpperCase();
+      var entry={date:today,player:t.player||t.team||'',market:t._rawMarket||t._market||'',line:t._rawLine!=null?String(t._rawLine):'',confidence:null,result:'pending',source:'trend',trendType:typeLabel,trendSignal:t.headline||'',loggedAt:Date.now(),odds:null};
+      var h=loadTrendPlayHist(); h.push(entry); saveTrendPlayHist(h);
+      btn.textContent='✓ Tracked'; btn.disabled=true; btn.classList.add('trk-done');
+      setTimeout(function(){ btn.textContent='+ Track'; btn.disabled=false; btn.classList.remove('trk-done'); },1500);
+    };
+  });
   mount.querySelectorAll(".tcard").forEach(function(card){
     card.onclick=function(e){
-      if(e.target.classList.contains("tc-share-sm")) return;
+      if(e.target.classList.contains("tc-share-sm")||e.target.classList.contains("tc-trk")) return;
       var idx=parseInt(card.getAttribute("data-tidx"),10);
       var t=_trendsData[idx];
       if(t) openTrendDetail(t);
