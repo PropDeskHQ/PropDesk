@@ -5938,7 +5938,7 @@ function _renderPdStatsData(mount,data){
     var _mlWeeks=[],_nowMs=Date.now();
     for(var _wi=7;_wi>=0;_wi--){
       var _ws=new Date(_nowMs-(_wi*7+6)*86400000).toISOString().slice(0,10);
-      var _we=new Date(_nowMs-_wi*86400000).toISOString().slice(0,10);
+      var _we=new Date(_nowMs-_wi*7*86400000).toISOString().slice(0,10);
       var _wpArr=_mlRes.filter(function(e){return e.date>=_ws&&e.date<=_we;});
       var _wh2=_wpArr.filter(function(e){return e.result==='hit';}).length;
       _mlWeeks.push({start:_ws,n:_wpArr.length,rate:_wpArr.length?Math.round(_wh2/_wpArr.length*100):null});
