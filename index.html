@@ -1197,6 +1197,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 <div class="more-overlay" id="moreOverlay"></div>
 <div class="more-drawer" id="moreDrawer">
   <div class="more-drawer-handle"></div>
+  <div id="drawerAccount" class="drawer-conn-section"></div>
   <div id="drawerConn" class="drawer-conn-section"></div>
   <button class="more-drawer-item" data-more-action="parlay"><span class="more-drawer-ic">+</span>Parlay Builder</button>
   <button class="more-drawer-item" data-more-action="how"><span class="more-drawer-ic">?</span>How It Works</button>
@@ -7122,7 +7123,60 @@ function _updateDrawerConnection(){
   var dkr=$("drawerKeyRow"); if(dkr) dkr.onclick=function(){ navigator.clipboard.writeText(key||"").then(function(){ var kc=$("drawerKeyCopy"); if(kc){kc.textContent="Copied!"; setTimeout(_updateDrawerConnection,1200);} }).catch(function(){ toast("Copy failed"); }); };
   var drb=$("drawerRefreshBtn"); if(drb) drb.onclick=function(){ closeMoreDrawer(); toast("Refreshing…"); silentRefresh(); };
 }
-function openMoreDrawer(){ $("moreOverlay").classList.add("open"); $("moreDrawer").classList.add("open"); _updateDrawerConnection(); }
+async function _updateDrawerAccount(){
+  var el=$('drawerAccount'); if(!el) return;
+  var res=await _supabase.auth.getUser();
+  var user=res&&res.data&&res.data.user;
+  if(!user){ el.innerHTML=''; return; }
+  var email=user.email||'';
+  var meta=user.user_metadata||{};
+  var ts=meta.trial_start;
+  var isAdmin=['coopctaylor10@icloud.com'].indexOf(email)>=0;
+  var daysLeft=null, trialStartFmt='', trialEndFmt='';
+  if(ts){
+    var _sd=new Date(ts), _ed=new Date(_sd.getTime()+90*86400000);
+    daysLeft=90-Math.floor((Date.now()-_sd)/86400000);
+    var _mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    trialStartFmt=_mo[_sd.getMonth()]+' '+_sd.getDate()+', '+_sd.getFullYear();
+    trialEndFmt=_mo[_ed.getMonth()]+' '+_ed.getDate()+', '+_ed.getFullYear();
+  }
+  var statusText,statusColor;
+  if(isAdmin){ statusText='Admin Access'; statusColor='#00ff87'; }
+  else if(daysLeft===null||daysLeft<=0){ statusText='Trial Expired'; statusColor='#ff4f4f'; }
+  else if(daysLeft<=7){ statusText='Free Trial — '+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining'; statusColor='#ffcc00'; }
+  else{ statusText='Free Trial — '+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining'; statusColor='#00e87a'; }
+  var badge=isAdmin?'ADMIN':'FREE TRIAL';
+  var html='<div class="dc-label" style="color:#00e87a">ACCOUNT</div>';
+  html+='<div style="padding:0 22px 10px;font-size:13px;font-weight:500;color:#fff">'+esc(email)+'</div>';
+  html+='<div style="margin:0 14px 12px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;overflow:hidden">';
+  html+='<div style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center">';
+  html+='<div style="font-size:13px;font-weight:600;color:'+statusColor+'">'+esc(statusText)+'</div>';
+  html+='<span style="background:rgba(0,232,122,.12);color:#00e87a;font-size:9px;font-weight:800;letter-spacing:.08em;padding:3px 8px;border-radius:4px">'+badge+'</span>';
+  html+='</div>';
+  if(trialStartFmt&&!isAdmin) html+='<div style="padding:0 14px 10px;font-size:10px;color:#555">Started '+trialStartFmt+' · Expires '+trialEndFmt+'</div>';
+  html+='</div>';
+  html+='<div style="padding:0 14px 14px" id="_daSignOutSection">';
+  html+='<button onclick="_daSignOutPhase1()" style="width:100%;background:none;border:1px solid #2a2a2a;border-radius:8px;padding:10px;font-size:13px;font-weight:600;color:#888;cursor:pointer">Sign Out</button>';
+  html+='</div>';
+  html+='<div style="height:1px;background:#1e1e1e"></div>';
+  el.innerHTML=html;
+}
+function _daSignOutPhase1(){
+  var sec=$('_daSignOutSection'); if(!sec) return;
+  sec.innerHTML='<div style="display:flex;gap:8px">'
+    +'<button onclick="_daSignOutConfirm()" style="flex:1;background:none;border:1px solid #ff4f4f;border-radius:8px;padding:10px;font-size:13px;font-weight:600;color:#ff4f4f;cursor:pointer">Confirm Sign Out</button>'
+    +'<button onclick="_daSignOutCancel()" style="background:none;border:1px solid #2a2a2a;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;color:#666;cursor:pointer">Cancel</button>'
+    +'</div>';
+}
+function _daSignOutCancel(){
+  var sec=$('_daSignOutSection'); if(!sec) return;
+  sec.innerHTML='<button onclick="_daSignOutPhase1()" style="width:100%;background:none;border:1px solid #2a2a2a;border-radius:8px;padding:10px;font-size:13px;font-weight:600;color:#888;cursor:pointer">Sign Out</button>';
+}
+function _daSignOutConfirm(){
+  if(!_supabase) return;
+  _supabase.auth.signOut().then(function(){ location.reload(); });
+}
+function openMoreDrawer(){ $("moreOverlay").classList.add("open"); $("moreDrawer").classList.add("open"); _updateDrawerConnection(); _updateDrawerAccount(); }
 function closeMoreDrawer(){ $("moreOverlay").classList.remove("open"); $("moreDrawer").classList.remove("open"); }
 function _updateGearIcon(){
   var btn=$("settingsBtn"); if(!btn) return;
