@@ -5311,6 +5311,7 @@ var _phCollapsedDates={};
 var _phAnalyticsSport="all";
 var _phAnalyticsMkt="all";
 var _histView="my";
+var _trendsExpanded=false;
 var _pdStatsCache=null;
 var _pdStatsSubView='props';
 var _mlPickFilter='all';
@@ -6014,17 +6015,21 @@ function _renderPdStatsData(mount,data){
 function renderPlayHistory(){
   var mount=$("playHistMount"); if(!mount) return;
   if(_histView==="pd"){
-    mount.innerHTML='<div style="padding:16px 16px 0"><div class="tabrow" style="gap:6px;margin-bottom:0">'+
+    var _pdTrkStyle=_trendsExpanded?'background:rgba(0,232,122,.1);color:#00e87a;border-color:rgba(0,232,122,.3)':'background:var(--surf2);color:var(--mut);border-color:var(--bd)';
+    var _pdInner='<div style="padding:16px 16px 0">'+
+      '<div class="tabrow" style="gap:6px;margin-bottom:0">'+
       '<button class="pill" data-hist-view="my">My History</button>'+
       '<button class="pill active" data-hist-view="pd">PropDesk Stats</button>'+
-      '<button class="pill" data-hist-view="trends">Trends</button>'+
-      '</div></div><div id="pdStatsMount"></div>';
-    mount.querySelectorAll("[data-hist-view]").forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute("data-hist-view"); renderPlayHistory(); }; });
-    _renderPdStats($("pdStatsMount"));
-    return;
-  }
-  if(_histView==="trends"){
-    _renderTrendPlayHistory(mount);
+      '</div>'+
+      '<div style="padding:8px 0 0"><button class="ph-trends-toggle" style="font-size:11px;padding:4px 12px;border-radius:10px;cursor:pointer;border:1px solid;'+_pdTrkStyle+'">Tracked Trends '+(_trendsExpanded?'▴':'▾')+'</button></div>'+
+      '</div>';
+    if(_trendsExpanded) _pdInner+='<div id="trendContentMount"></div>';
+    else _pdInner+='<div id="pdStatsMount"></div>';
+    mount.innerHTML=_pdInner;
+    mount.querySelectorAll("[data-hist-view]").forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute("data-hist-view"); _trendsExpanded=false; renderPlayHistory(); }; });
+    mount.querySelectorAll(".ph-trends-toggle").forEach(function(b){ b.onclick=function(){ _trendsExpanded=!_trendsExpanded; renderPlayHistory(); }; });
+    if(_trendsExpanded) _renderTrendPlayHistory($("trendContentMount"));
+    else _renderPdStats($("pdStatsMount"));
     return;
   }
   var all=loadPlayHist();
@@ -6142,11 +6147,20 @@ function renderPlayHistory(){
   var hasStreak=topMkts.some(function(k){return mktMap[k].bestStreak>0;});
   var html='<div style="padding:16px">';
   /* view pills */
-  html+='<div class="tabrow" style="gap:6px;margin-bottom:16px">';
+  html+='<div class="tabrow" style="gap:6px;margin-bottom:8px">';
   html+='<button class="pill active" data-hist-view="my">My History</button>';
   html+='<button class="pill" data-hist-view="pd">PropDesk Stats</button>';
-  html+='<button class="pill" data-hist-view="trends">Trends</button>';
   html+='</div>';
+  var _myTrkStyle=_trendsExpanded?'background:rgba(0,232,122,.1);color:#00e87a;border-color:rgba(0,232,122,.3)':'background:var(--surf2);color:var(--mut);border-color:var(--bd)';
+  html+='<div style="padding:0 0 12px"><button class="ph-trends-toggle" style="font-size:11px;padding:4px 12px;border-radius:10px;cursor:pointer;border:1px solid;'+_myTrkStyle+'">Tracked Trends '+(_trendsExpanded?'▴':'▾')+'</button></div>';
+  if(_trendsExpanded){
+    html+='<div id="trendContentMount"></div></div>';
+    mount.innerHTML=html;
+    mount.querySelectorAll('[data-hist-view]').forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); _trendsExpanded=false; renderPlayHistory(); }; });
+    mount.querySelectorAll('.ph-trends-toggle').forEach(function(b){ b.onclick=function(){ _trendsExpanded=!_trendsExpanded; renderPlayHistory(); }; });
+    _renderTrendPlayHistory($("trendContentMount"));
+    return;
+  }
 
   /* title row */
   html+='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:20px">';
@@ -6534,26 +6548,22 @@ function renderPlayHistory(){
     };
   });
   mount.querySelectorAll('[data-hist-view]').forEach(function(b){
-    b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); };
+    b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); _trendsExpanded=false; renderPlayHistory(); };
+  });
+  mount.querySelectorAll('.ph-trends-toggle').forEach(function(b){
+    b.onclick=function(){ _trendsExpanded=!_trendsExpanded; renderPlayHistory(); };
   });
 }
 
-function _renderTrendPlayHistory(mount){
+function _renderTrendPlayHistory(contentMount){
   var today=new Date().toISOString().slice(0,10);
   var all=loadTrendPlayHist();
   var _tMo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var _tFmt=function(d){ var p=d.split('-'); return _tMo[parseInt(p[1])-1]+' '+parseInt(p[2]); };
-  var tabsHtml='<div class="tabrow" style="gap:6px;margin-bottom:16px">'+
-    '<button class="pill" data-hist-view="my">My History</button>'+
-    '<button class="pill" data-hist-view="pd">PropDesk Stats</button>'+
-    '<button class="pill active" data-hist-view="trends">Trends</button>'+
-    '</div>';
-  var html='<div style="padding:16px">'+tabsHtml+
-    '<div style="font-size:18px;font-weight:800;margin-bottom:16px">Tracked Trends</div>';
+  var html='<div style="padding:12px 16px 16px">';
   if(!all.length){
-    html+='<div style="color:var(--mut);font-size:13px;padding:32px 0;text-align:center">No trends tracked yet. Track plays from the Trends tab.</div></div>';
-    mount.innerHTML=html;
-    mount.querySelectorAll('[data-hist-view]').forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); }; });
+    html+='<div style="color:var(--mut);font-size:13px;padding:20px 0;text-align:center">No trends tracked yet. Track plays from the Trends tab.</div></div>';
+    contentMount.innerHTML=html;
     return;
   }
   var dateOrder=[],dateGroups={};
@@ -6606,23 +6616,22 @@ function _renderTrendPlayHistory(mount){
     html+='</div>';
   });
   html+='</div>';
-  mount.innerHTML=html;
-  mount.querySelectorAll('[data-hist-view]').forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); }; });
-  mount.querySelectorAll('.tph-hit,.tph-miss').forEach(function(b){
+  contentMount.innerHTML=html;
+  contentMount.querySelectorAll('.tph-hit,.tph-miss').forEach(function(b){
     b.onclick=function(){
       var lat=parseInt(b.getAttribute('data-lat'));
       var res=b.classList.contains('tph-hit')?'hit':'miss';
       var h=loadTrendPlayHist();
       h.forEach(function(e){ if(e.loggedAt===lat) e.result=res; });
-      saveTrendPlayHist(h); _renderTrendPlayHistory(mount);
+      saveTrendPlayHist(h); renderPlayHistory();
     };
   });
-  mount.querySelectorAll('.tph-void').forEach(function(b){
+  contentMount.querySelectorAll('.tph-void').forEach(function(b){
     b.onclick=function(){
       var lat=parseInt(b.getAttribute('data-lat'));
       var h=loadTrendPlayHist();
       h.forEach(function(e){ if(e.loggedAt===lat) e.result='void'; });
-      saveTrendPlayHist(h); _renderTrendPlayHistory(mount);
+      saveTrendPlayHist(h); renderPlayHistory();
     };
   });
 }
