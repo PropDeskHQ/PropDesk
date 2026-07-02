@@ -724,8 +724,14 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .dc-gs-link-drawer:hover{color:var(--accent)}
 .settings-panel{position:fixed;top:52px;right:14px;width:320px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.75);z-index:200;display:none;overflow:hidden}
 .settings-panel.open{display:block}
+/* ACCOUNT AVATAR */
+.acct-btn{display:none;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#1a1a1a;border:1.5px solid #00ff87;font-size:12px;font-weight:800;color:#00ff87;cursor:pointer;flex-shrink:0;transition:background .12s;margin-left:2px}
+.acct-btn:hover{background:#252525}
+.acct-panel{position:fixed;top:52px;right:10px;width:260px;background:#0d0d0d;border:1px solid #1a1a1a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.75);z-index:200;display:none;overflow:hidden}
+.acct-panel.open{display:block}
 @media(min-width:640px){
   .settings-btn{display:flex;align-items:center;justify-content:center}
+  .acct-btn{display:flex}
   #liveBtn{display:none}
   #countdown{display:none!important}
   .keyin{display:none}
@@ -898,9 +904,11 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
     <span class="dot" id="statusDot"></span>
     <span class="quota" id="quota"></span>
     <button id="settingsBtn" class="settings-btn" title="Connection settings">⚙</button>
+    <button id="acctBtn" class="acct-btn" title="Account">?</button>
   </div>
 </header>
 <div id="settingsPanel" class="settings-panel"></div>
+<div id="acctPanel" class="acct-panel"></div>
 <div id="onbBanner" class="onb-banner hidden">
   <span class="onb-banner-text">&#128075; New here? Connect your Odds API key to get started &rarr;</span>
   <button class="onb-connect-btn" id="onbBannerConnBtn">Connect</button>
@@ -7176,6 +7184,67 @@ function _daSignOutConfirm(){
   if(!_supabase) return;
   _supabase.auth.signOut().then(function(){ location.reload(); });
 }
+function _initAcctBtn(user){
+  var btn=$('acctBtn'); if(!btn) return;
+  btn.textContent=(user.email||'?')[0].toUpperCase();
+  btn.onclick=function(e){ e.stopPropagation(); _toggleAcctPanel(); };
+}
+async function _openAcctPanel(){
+  var panel=$('acctPanel'); if(!panel) return;
+  var res=await _supabase.auth.getUser();
+  var user=res&&res.data&&res.data.user;
+  if(!user){ panel.innerHTML=''; return; }
+  var email=user.email||'';
+  var meta=user.user_metadata||{};
+  var ts=meta.trial_start;
+  var isAdmin=['coopctaylor10@icloud.com'].indexOf(email)>=0;
+  var daysLeft=null,trialStartFmt='',trialEndFmt='';
+  if(ts){
+    var _sd=new Date(ts),_ed=new Date(_sd.getTime()+90*86400000);
+    daysLeft=90-Math.floor((Date.now()-_sd)/86400000);
+    var _mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    trialStartFmt=_mo[_sd.getMonth()]+' '+_sd.getDate()+', '+_sd.getFullYear();
+    trialEndFmt=_mo[_ed.getMonth()]+' '+_ed.getDate()+', '+_ed.getFullYear();
+  }
+  var statusText,statusColor;
+  if(isAdmin){ statusText='Admin Access'; statusColor='#00ff87'; }
+  else if(daysLeft===null||daysLeft<=0){ statusText='Trial Expired'; statusColor='#ff4f4f'; }
+  else if(daysLeft<=7){ statusText='Free Trial — '+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining'; statusColor='#ffcc00'; }
+  else{ statusText='Free Trial — '+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining'; statusColor='#00e87a'; }
+  var html='<div style="padding:14px 16px 10px">';
+  html+='<div style="font-size:13px;font-weight:500;color:#fff;margin-bottom:6px">'+esc(email)+'</div>';
+  html+='<div style="font-size:13px;font-weight:600;color:'+statusColor+';margin-bottom:4px">'+esc(statusText)+'</div>';
+  if(trialStartFmt&&!isAdmin) html+='<div style="font-size:10px;color:#555;margin-bottom:2px">Started '+trialStartFmt+' · Expires '+trialEndFmt+'</div>';
+  html+='</div>';
+  html+='<div style="border-top:1px solid #1a1a1a;padding:10px 16px" id="_apSignOutSection">';
+  html+='<button onclick="_apSignOutPhase1()" style="width:100%;background:none;border:1px solid #2a2a2a;border-radius:8px;padding:9px;font-size:13px;font-weight:600;color:#888;cursor:pointer">Sign Out</button>';
+  html+='</div>';
+  panel.innerHTML=html;
+  panel.classList.add('open');
+}
+function _closeAcctPanel(){
+  var panel=$('acctPanel'); if(!panel) return;
+  panel.classList.remove('open');
+}
+function _toggleAcctPanel(){
+  var panel=$('acctPanel'); if(!panel) return;
+  if(panel.classList.contains('open')){ _closeAcctPanel(); } else{ _openAcctPanel(); }
+}
+function _apSignOutPhase1(){
+  var sec=$('_apSignOutSection'); if(!sec) return;
+  sec.innerHTML='<div style="display:flex;gap:8px">'
+    +'<button onclick="_apSignOutConfirm()" style="flex:1;background:none;border:1px solid #ff4f4f;border-radius:8px;padding:9px;font-size:13px;font-weight:600;color:#ff4f4f;cursor:pointer">Confirm Sign Out</button>'
+    +'<button onclick="_apSignOutCancel()" style="background:none;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;font-size:13px;font-weight:600;color:#666;cursor:pointer">Cancel</button>'
+    +'</div>';
+}
+function _apSignOutCancel(){
+  var sec=$('_apSignOutSection'); if(!sec) return;
+  sec.innerHTML='<button onclick="_apSignOutPhase1()" style="width:100%;background:none;border:1px solid #2a2a2a;border-radius:8px;padding:9px;font-size:13px;font-weight:600;color:#888;cursor:pointer">Sign Out</button>';
+}
+function _apSignOutConfirm(){
+  if(!_supabase) return;
+  _supabase.auth.signOut().then(function(){ location.reload(); });
+}
 function openMoreDrawer(){ $("moreOverlay").classList.add("open"); $("moreDrawer").classList.add("open"); _updateDrawerConnection(); _updateDrawerAccount(); }
 function closeMoreDrawer(){ $("moreOverlay").classList.remove("open"); $("moreDrawer").classList.remove("open"); }
 function _updateGearIcon(){
@@ -7338,6 +7407,8 @@ function init(){
   document.addEventListener("click",function(e){
     var p=$("settingsPanel");
     if(p&&p.classList.contains("open")&&!p.contains(e.target)&&e.target!==$("settingsBtn")) closeSettingsPanel();
+    var ap=$("acctPanel");
+    if(ap&&ap.classList.contains("open")&&!ap.contains(e.target)&&e.target!==$("acctBtn")) _closeAcctPanel();
   });
   $("moreOverlay").onclick=closeMoreDrawer;
   $("moreDrawer").querySelectorAll("[data-more-action]").forEach(function(b){
@@ -10274,13 +10345,14 @@ function _initAuth(){
 }
 function _checkTrialAndLaunch(user){
   var ADMIN_EMAILS=['coopctaylor10@icloud.com'];
-  if(ADMIN_EMAILS.indexOf(user.email)>=0){ init(); return; }
+  if(ADMIN_EMAILS.indexOf(user.email)>=0){ init(); _initAcctBtn(user); return; }
   var ts=(user.user_metadata||{}).trial_start;
   if(!ts){ _showTrialExpired(); return; }
   var daysLeft=90-Math.floor((Date.now()-new Date(ts))/86400000);
   if(daysLeft<=0){ _showTrialExpired(); return; }
   _showTrialBanner(daysLeft);
   init();
+  _initAcctBtn(user);
 }
 function _showTrialBanner(daysLeft){
   var b=$('_trialBanner');
