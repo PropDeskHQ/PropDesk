@@ -426,6 +426,11 @@ function renderDays(){
     var expanded=!!expandedDays[date];
 
     var hdSum=allDay.length+' play'+(allDay.length!==1?'s':'')+' · '+hits+' hit / '+miss+' miss'+(pend?' · <span style="color:#f59e0b">'+pend+' pending</span>':'');
+    if(settled){
+      var _aRoiTot=allDay.reduce(function(s,p){if(p.result!=='hit'&&p.result!=='miss')return s;var o=p.odds||-110;return s+(p.result==='hit'?(o>=0?o/100:100/Math.abs(o)):-1);},0);
+      var _aRoiPct=+(_aRoiTot/settled*100).toFixed(1),_aRoiU=+_aRoiTot.toFixed(2),_aRoiClr=_aRoiU>0?'#22c55e':_aRoiU<0?'#ef4444':'#666';
+      hdSum+=' · <span style="color:'+_aRoiClr+'">'+(_aRoiU>=0?'+':'')+_aRoiU.toFixed(2)+'u '+(_aRoiPct>=0?'+':'')+_aRoiPct+'%</span>';
+    }
 
     var html='<div class="day-wrap">'
       +'<button class="day-hdr" data-date="'+date+'">'
