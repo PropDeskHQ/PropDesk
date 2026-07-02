@@ -5705,6 +5705,41 @@ function _renderPdStatsData(mount,data){
     html+='<div style="font-size:28px;font-weight:800;color:'+rateColor+';margin-bottom:2px">'+(allRate!==null?allRate+'%':'–')+'</div>';
     var _pdRoi=calcROI(plays);var _pdRoiClr=_pdRoi.roi>0?'#00e87a':_pdRoi.roi<0?'#ff4f4f':'#777';var _pdUClr=_pdRoi.units>0?'#00e87a':_pdRoi.units<0?'#ff4f4f':'#777';
     html+='<div style="display:flex;gap:16px;align-items:baseline;margin-bottom:2px"><div style="font-size:16px;font-weight:800;color:'+_pdRoiClr+'">'+(_pdRoi.roi>=0?'+':'')+_pdRoi.roi+'% ROI</div><div style="font-size:14px;font-weight:700;color:'+_pdUClr+'">'+(_pdRoi.units>=0?'+':'')+_pdRoi.units.toFixed(2)+'u</div></div>';
+    var _csrt=allRes.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.loggedAt||0)-(b.loggedAt||0);});
+    var _cpts=[],_csum=0;
+    _csrt.forEach(function(e){var o=e.odds||-110;_csum+=(e.result==='hit'?(o>=0?o/100:100/Math.abs(o)):-1);_cpts.push(_csum);});
+    if(_cpts.length>=2){
+      var _cW=400,_cH=80,_cpd=6,_cn=_cpts.length;
+      var _cmn=Math.min.apply(null,_cpts.concat([0])),_cmx=Math.max.apply(null,_cpts.concat([0]));
+      var _crng=_cmx-_cmn||1,_ciW=_cW-_cpd*2,_ciH=_cH-_cpd*2;
+      var _cxf=function(i){return _cpd+(_cn===1?_ciW/2:i*_ciW/(_cn-1));};
+      var _cyf=function(v){return _cpd+_ciH*(1-(v-_cmn)/_crng);};
+      var _cz=_cyf(0),_cpos=_csum>=0,_cclr=_cpos?'#00e87a':'#ff4f4f';
+      var _cln=_cpts.map(function(v,i){return _cxf(i).toFixed(1)+','+_cyf(v).toFixed(1);}).join(' ');
+      var _cfp=_cln+' '+_cxf(_cn-1).toFixed(1)+','+_cz.toFixed(1)+' '+_cxf(0).toFixed(1)+','+_cz.toFixed(1);
+      html+='<div style="margin:8px 0 6px">'
+        +'<svg viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:6px;background:#0a0a0a">'
+        +'<defs><linearGradient id="pdRoiGrd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+_cclr+'" stop-opacity=".18"/><stop offset="100%" stop-color="'+_cclr+'" stop-opacity="0"/></linearGradient></defs>'
+        +'<line x1="'+_cpd+'" y1="'+_cz.toFixed(1)+'" x2="'+(400-_cpd)+'" y2="'+_cz.toFixed(1)+'" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="4,4"/>'
+        +'<polygon points="'+_cfp+'" fill="url(#pdRoiGrd)"/>'
+        +'<polyline points="'+_cln+'" fill="none" stroke="'+_cclr+'" stroke-width="1.5" stroke-linejoin="round"/>'
+        +'<circle cx="'+_cxf(_cn-1).toFixed(1)+'" cy="'+_cyf(_cpts[_cn-1]).toFixed(1)+'" r="3" fill="'+_cclr+'"/>'
+        +'</svg></div>';
+    }
+    var _cDolNet=(_pdRoi.units>=0?'+$':'−$')+Math.abs(Math.round(_pdRoi.units*100));
+    html+='<div style="margin-bottom:8px">'
+      +'<button onclick="(function(b){var e=document.getElementById(\'pdRoiExp\');var o=e.style.maxHeight===\'0px\'||!e.style.maxHeight;e.style.maxHeight=o?\'400px\':\'0px\';b.querySelector(\'span\').textContent=o?\'▲\':\'▼\';})(this)" style="background:none;border:none;padding:0;cursor:pointer;font-size:11px;color:var(--mut);display:flex;align-items:center;gap:4px">'
+        +'How is ROI calculated? <span style="color:#00e87a;font-size:9px">▼</span>'
+      +'</button>'
+      +'<div id="pdRoiExp" style="max-height:0;overflow:hidden;transition:max-height .35s ease">'
+        +'<div style="padding-top:8px;font-size:11px;color:var(--mut);line-height:1.6">'
+          +'<p style="margin:0 0 8px"><b>Return on Investment (ROI%)</b> measures profit per unit risked. A +'+Math.abs(_pdRoi.roi)+'% ROI means earning that percentage back on every dollar wagered — net units divided by total resolved plays.</p>'
+          +'<p style="margin:0 0 8px"><b>How it\'s calculated:</b> Each hit earns units scaled to the odds (−110 hit = +0.91u, +120 hit = +1.20u). Each miss costs −1 unit. Net total ÷ resolved plays × 100 = ROI%.</p>'
+          +'<p style="margin:0 0 8px"><b>Why it matters more than hit rate:</b> Standard −110 juice means you need to win 52.4% of plays just to break even — not 50%. ROI accounts for the vig that hit rate alone ignores.</p>'
+          +'<p style="margin:0"><b>In practice:</b> At $100/unit this record is worth '+_cDolNet+' net over '+allRes.length+' resolved plays. Plays logged before odds tracking was added default to −110.</p>'
+        +'</div>'
+      +'</div>'
+    +'</div>';
     html+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+allHits+' hits / '+allRes.length+' resolved</div>';
     html+='<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px"><div style="background:'+rateColor+';width:'+(allRate||0)+'%;height:100%;border-radius:4px"></div></div>';
     html+='<div style="display:flex;gap:24px">';
