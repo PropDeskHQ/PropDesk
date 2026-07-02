@@ -10210,6 +10210,8 @@ function _initAuth(){
   });
 }
 function _checkTrialAndLaunch(user){
+  var ADMIN_EMAILS=['coopctaylor10@icloud.com'];
+  if(ADMIN_EMAILS.indexOf(user.email)>=0){ init(); return; }
   var ts=(user.user_metadata||{}).trial_start;
   if(!ts){ _showTrialExpired(); return; }
   var daysLeft=90-Math.floor((Date.now()-new Date(ts))/86400000);
