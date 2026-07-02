@@ -1219,6 +1219,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 var SUPABASE_URL='https://xwmvkfhlfntjgouibftt.supabase.co';
 var SUPABASE_KEY='sb_publishable_RKjp7WAmXRR7YXxyu1zHIQ_MEBWPDQw';
 var _supabase;
+var _authUser=null;
 /* ============ CONFIG ============ */
 var ODDS_BASE = "https://api.the-odds-api.com/v4";
 
@@ -3637,6 +3638,7 @@ function _saveManualTrack(entry,pid,btn){
     if(alreadyExists){ _trackedThisSession[pid]=true; btn.textContent="✓ Tracked"; btn.classList.add("trk-done"); btn.disabled=true; return; }
     h.unshift(entry);
     localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h));
+    _sbSavePlay(entry);
     _trackedThisSession[pid]=true;
     btn.textContent="✓ Tracked";
     btn.classList.add("trk-done");
@@ -5372,11 +5374,62 @@ var _pdStatsSubView='props';
 var _mlPickFilter='all';
 var _trackedThisSession={};
 var _mlCardData=null;
+var _histLastSbLoad=0;
 
 function loadPlayHist(){ try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]"); }catch(e){ return []; } }
 function savePlayHist(h){ try{ localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h)); }catch(e){ console.warn("[History] storage full",e); } }
 function loadTrendPlayHist(){ try{ return JSON.parse(localStorage.getItem('propdesk_trend_plays')||'[]'); }catch(e){ return []; } }
 function saveTrendPlayHist(h){ try{ localStorage.setItem('propdesk_trend_plays',JSON.stringify(h)); }catch(e){} }
+
+/* ============ SUPABASE PLAY HELPERS ============ */
+function _sbMapToLocal(r){
+  return {date:r.date,player:r.player||'',market:r.market||'',marketDisplay:r.market_display||null,
+    sport:r.sport||null,line:r.line||null,confidence:r.confidence||null,tier:r.tier||null,
+    result:r.result||'pending',game:r.game||null,type:r.type||null,odds:r.odds||null,
+    edge:r.edge||null,source:r.source||'manual',trendType:r.trend_type||null,
+    trendSignal:r.trend_signal||null,loggedAt:r.logged_at,autoResolved:r.auto_resolved||false};
+}
+function _sbToRow(play,uid){
+  return {user_id:uid,date:play.date,player:play.player||null,market:play.market||null,
+    market_display:play.marketDisplay||null,sport:play.sport||null,line:play.line||null,
+    confidence:play.confidence||null,tier:play.tier||null,result:play.result||'pending',
+    game:play.game||null,type:play.type||(play.source==='trend'?'trend':'prop'),
+    odds:play.odds||null,edge:play.edge||null,source:play.source||'manual',
+    trend_type:play.trendType||null,trend_signal:play.trendSignal||null,
+    logged_at:play.loggedAt,auto_resolved:play.autoResolved||false};
+}
+function _sbSavePlay(play){
+  if(!_supabase||!_authUser) return;
+  _supabase.from('plays').insert(_sbToRow(play,_authUser.id));
+}
+function _sbUpdatePlay(loggedAt,fields){
+  if(!_supabase||!_authUser||!loggedAt) return;
+  _supabase.from('plays').update(fields).eq('logged_at',loggedAt).eq('user_id',_authUser.id);
+}
+function _sbDeletePlay(loggedAt){
+  if(!_supabase||!_authUser||!loggedAt) return;
+  _supabase.from('plays').delete().eq('logged_at',loggedAt).eq('user_id',_authUser.id);
+}
+async function _sbMigrateIfNeeded(user){
+  if(!_supabase||!user) return;
+  try{
+    var chk=await _supabase.from('plays').select('logged_at').eq('user_id',user.id).limit(1);
+    if(chk.error) return;
+    if((chk.data||[]).length>0){
+      var all=await _supabase.from('plays').select('*').eq('user_id',user.id).order('logged_at',{ascending:false});
+      if(all.error||!all.data) return;
+      savePlayHist(all.data.filter(function(r){return r.source!=='trend';}).map(_sbMapToLocal));
+      saveTrendPlayHist(all.data.filter(function(r){return r.source==='trend';}).map(_sbMapToLocal));
+      _histLastSbLoad=Date.now();
+      return;
+    }
+    var local=loadPlayHist(),localT=loadTrendPlayHist();
+    if(!local.length&&!localT.length) return;
+    var inserts=local.concat(localT).map(function(p){return _sbToRow(p,user.id);});
+    await _supabase.from('plays').insert(inserts);
+    _toastTrack('Your history has been synced to your account ✓');
+  }catch(e){}
+}
 
 function _buildHistEntry(p){
   if(!p||!p._market||!p.player||!p.enriched||p.thinData||p.pdNoValue||p.pdConfidence==null) return null;
@@ -6068,7 +6121,7 @@ function _renderPdStatsData(mount,data){
   mount.innerHTML=html;
 }
 
-function renderPlayHistory(){
+async function renderPlayHistory(){
   var mount=$("playHistMount"); if(!mount) return;
   if(_histView==="pd"){
     mount.innerHTML='<div style="padding:16px 16px 0"><div class="tabrow" style="gap:6px;margin-bottom:0">'+
@@ -6078,6 +6131,16 @@ function renderPlayHistory(){
     mount.querySelectorAll("[data-hist-view]").forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute("data-hist-view"); _histSpecial=""; renderPlayHistory(); }; });
     _renderPdStats($("pdStatsMount"));
     return;
+  }
+  if(_authUser&&_supabase&&(Date.now()-_histLastSbLoad)>30000){
+    try{
+      var sbRes=await _supabase.from('plays').select('*').eq('user_id',_authUser.id).order('logged_at',{ascending:false});
+      if(!sbRes.error&&sbRes.data){
+        savePlayHist(sbRes.data.filter(function(r){return r.source!=='trend';}).map(_sbMapToLocal));
+        saveTrendPlayHist(sbRes.data.filter(function(r){return r.source==='trend';}).map(_sbMapToLocal));
+        _histLastSbLoad=Date.now();
+      }
+    }catch(e){}
   }
   var all=loadPlayHist();
   var today=new Date().toISOString().slice(0,10);
@@ -6524,7 +6587,7 @@ function renderPlayHistory(){
       var res=b.classList.contains('ph-hit')?"hit":"miss";
       var h=loadPlayHist();
       h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market) e.result=res; });
-      savePlayHist(h); renderPlayHistory();
+      savePlayHist(h); _sbUpdatePlay(entry.loggedAt,{result:res}); renderPlayHistory();
     };
   });
   mount.querySelectorAll('.ph-undo').forEach(function(b){
@@ -6532,7 +6595,7 @@ function renderPlayHistory(){
       var idx=parseInt(b.getAttribute('data-i')), entry=filtered[idx]; if(!entry) return;
       var h=loadPlayHist();
       h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market){ e.result="pending"; if(e.autoResolved) e.autoResolveLocked=true; } });
-      savePlayHist(h); renderPlayHistory();
+      savePlayHist(h); _sbUpdatePlay(entry.loggedAt,{result:'pending'}); renderPlayHistory();
     };
   });
   mount.querySelectorAll('.ph-void').forEach(function(b){
@@ -6540,7 +6603,7 @@ function renderPlayHistory(){
       var idx=parseInt(b.getAttribute('data-i')), entry=filtered[idx]; if(!entry) return;
       var h=loadPlayHist();
       h.forEach(function(e){ if(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market) e.result="void"; });
-      savePlayHist(h); renderPlayHistory();
+      savePlayHist(h); _sbUpdatePlay(entry.loggedAt,{result:'void'}); renderPlayHistory();
     };
   });
   mount.querySelectorAll('.ph-rm-btn').forEach(function(b){
@@ -6561,6 +6624,7 @@ function renderPlayHistory(){
           var h=loadPlayHist();
           h=h.filter(function(e){ return !(e.loggedAt===entry.loggedAt&&e.player===entry.player&&e.market===entry.market); });
           savePlayHist(h);
+          _sbDeletePlay(entry.loggedAt);
           renderPlayHistory();
         },260);
       };
@@ -6686,7 +6750,7 @@ function _renderTrendPlayHistory(contentMount){
       var res=b.classList.contains('tph-hit')?'hit':'miss';
       var h=loadTrendPlayHist();
       h.forEach(function(e){ if(e.loggedAt===lat) e.result=res; });
-      saveTrendPlayHist(h); renderPlayHistory();
+      saveTrendPlayHist(h); _sbUpdatePlay(lat,{result:res}); renderPlayHistory();
     };
   });
   contentMount.querySelectorAll('.tph-void').forEach(function(b){
@@ -6694,7 +6758,7 @@ function _renderTrendPlayHistory(contentMount){
       var lat=parseInt(b.getAttribute('data-lat'));
       var h=loadTrendPlayHist();
       h.forEach(function(e){ if(e.loggedAt===lat) e.result='void'; });
-      saveTrendPlayHist(h); renderPlayHistory();
+      saveTrendPlayHist(h); _sbUpdatePlay(lat,{result:'void'}); renderPlayHistory();
     };
   });
 }
@@ -6767,7 +6831,7 @@ function _renderMLHistory(contentMount,all,sport){
       var res=b.classList.contains('ml-hit')?'hit':'miss';
       var h=loadPlayHist();
       h.forEach(function(e){ if(e.loggedAt===lat) e.result=res; });
-      savePlayHist(h); renderPlayHistory();
+      savePlayHist(h); _sbUpdatePlay(lat,{result:res}); renderPlayHistory();
     };
   });
   contentMount.querySelectorAll('.ml-void').forEach(function(b){
@@ -6775,7 +6839,7 @@ function _renderMLHistory(contentMount,all,sport){
       var lat=parseInt(b.getAttribute('data-lat'));
       var h=loadPlayHist();
       h.forEach(function(e){ if(e.loggedAt===lat) e.result='void'; });
-      savePlayHist(h); renderPlayHistory();
+      savePlayHist(h); _sbUpdatePlay(lat,{result:'void'}); renderPlayHistory();
     };
   });
 }
@@ -6817,7 +6881,7 @@ function _phBulkResolve(pastPending){
     function resolve(res){
       var h=loadPlayHist();
       h.forEach(function(x){ if(x.loggedAt===e.loggedAt&&x.player===e.player&&x.market===e.market) x.result=res; });
-      savePlayHist(h); idx++; showNext();
+      savePlayHist(h); _sbUpdatePlay(e.loggedAt,{result:res}); idx++; showNext();
     }
     modal.querySelector("#phBulkHit").onclick=function(){ resolve("hit"); };
     modal.querySelector("#phBulkMiss").onclick=function(){ resolve("miss"); };
@@ -6920,6 +6984,7 @@ async function resolvePlayAutomatically(play){
     });
     if(!updated) return false;
     savePlayHist(h);
+    _sbUpdatePlay(play.loggedAt,{result:result,auto_resolved:true});
     return result;
   }catch(e){ return false; }
 }
@@ -7043,6 +7108,7 @@ async function resolveMoneylinePick(play){
     h.forEach(function(e){ if(e.loggedAt===play.loggedAt&&e.player===play.player&&e.market===play.market){ e.result=result;e.autoResolved=true;updated=true; } });
     if(!updated) return false;
     savePlayHist(h);
+    _sbUpdatePlay(play.loggedAt,{result:result,auto_resolved:true});
     return result;
   }catch(e){ return false; }
 }
@@ -8564,6 +8630,7 @@ function renderTrends(trends){
       var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":t.type==="composite"?"COMPOSITE TREND":t.type==="ml"?"MONEYLINE TREND":(t.type||"TREND").toUpperCase();
       var entry={date:today,player:t.player||t.team||'',market:t._rawMarket||t._market||'',line:t._rawLine!=null?String(t._rawLine):'',confidence:null,result:'pending',source:'trend',trendType:typeLabel,trendSignal:t.headline||'',loggedAt:Date.now(),odds:null};
       var h=loadTrendPlayHist(); h.push(entry); saveTrendPlayHist(h);
+      _sbSavePlay(entry);
       btn.textContent='✓ Tracked'; btn.disabled=true; btn.classList.add('trk-done');
       setTimeout(function(){ btn.textContent='+ Track'; btn.disabled=false; btn.classList.remove('trk-done'); },1500);
     };
@@ -10091,7 +10158,9 @@ function renderGameTop5(picks,isScanning){
         var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
         var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
         if(!h.some(function(e){return e.player===p.player&&e.market===mkt&&e.date===today;})){
-          h.unshift({date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,game:p._game||"",line:line,confidence:conf,tier:tier.t,odds:p.bestOdds||null,result:"pending",loggedAt:Date.now(),source:"manual"});
+          var e2={date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,game:p._game||"",line:line,confidence:conf,tier:tier.t,odds:p.bestOdds||null,result:"pending",loggedAt:Date.now(),source:"manual"};
+          h.unshift(e2);
+          _sbSavePlay(e2);
           added++;
         }
       });
@@ -10336,7 +10405,8 @@ function _initAuth(){
 }
 function _checkTrialAndLaunch(user){
   var ADMIN_EMAILS=['coopctaylor10@icloud.com'];
-  if(ADMIN_EMAILS.indexOf(user.email)>=0){ init(); _initAcctBtn(user); return; }
+  _authUser=user;
+  if(ADMIN_EMAILS.indexOf(user.email)>=0){ init(); _initAcctBtn(user); _sbMigrateIfNeeded(user); return; }
   var ts=(user.user_metadata||{}).trial_start;
   if(!ts){ _showTrialExpired(); return; }
   var daysLeft=90-Math.floor((Date.now()-new Date(ts))/86400000);
@@ -10344,6 +10414,7 @@ function _checkTrialAndLaunch(user){
   _showTrialBanner(daysLeft);
   init();
   _initAcctBtn(user);
+  _sbMigrateIfNeeded(user);
 }
 function _showTrialBanner(daysLeft){
   var b=$('_trialBanner');
