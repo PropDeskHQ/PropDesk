@@ -719,6 +719,7 @@ function doImport(){
       line:p.line||'—',
       confidence:Number(p.confidence)||0,
       tier:p.tier||tierOf(Number(p.confidence)||0),
+      odds:Number(p.odds)||null,
       result:p.result||'pending',
       _idx:plays.length
     });

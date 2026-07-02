@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -536,55 +536,6 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tcc-toggle button:hover:not(.active){color:var(--text)}
 .tcc-cumul-svg{height:180px}
 @media(min-width:561px){.tcc-cumul-svg{height:260px}}
-/* === Composite Trends === */
-.ct-section{margin-bottom:28px}
-.ct-section-hdr{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
-.ct-section-title{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--text)}
-.ct-section-sub{font-size:11px;color:var(--mut2)}
-.ct-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
-.ct-card{background:var(--surf);border:1px solid #1e1e1e;border-radius:14px;padding:16px 18px 14px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
-.ct-bull{border-left:3px solid #00e87a;padding-left:15px}
-.ct-bear{border-left:3px solid #ff4f4f;padding-left:15px}
-.ct-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
-.ct-player{font-size:15px;font-weight:800;color:var(--text);line-height:1.3}
-.ct-mkt{font-size:10px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
-.ct-score-block{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
-.ct-dir-badge{font-size:8.5px;font-weight:800;letter-spacing:.7px;padding:2px 6px;border-radius:4px}
-.ct-dir-bull{background:rgba(0,255,135,.1);color:#00e87a;border:1px solid rgba(0,255,135,.25)}
-.ct-dir-bear{background:rgba(255,79,79,.1);color:#ff4f4f;border:1px solid rgba(255,79,79,.25)}
-.ct-score-num{font-size:22px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
-.ct-bar-wrap{margin:2px 0 4px}
-.ct-bar-track{height:4px;background:#1e1e1e;border-radius:2px;overflow:hidden}
-.ct-bar-fill{height:100%;border-radius:2px;transition:width .4s ease}
-.ct-sig-row{display:grid;grid-template-columns:90px 46px 1fr;gap:5px;align-items:center;padding:4px 0;border-bottom:1px solid #161616;font-size:11px}
-.ct-sig-row:last-of-type{border-bottom:none}
-.ct-sig-name{font-weight:700;color:var(--mut)}
-.ct-sig-bull .ct-sig-name,.ct-sig-bear .ct-sig-name{color:var(--text)}
-.ct-sig-arrow{font-weight:800;font-size:10px;text-align:right;white-space:nowrap}
-.ct-sig-bull .ct-sig-arrow{color:#00e87a}
-.ct-sig-bear .ct-sig-arrow{color:#ff4f4f}
-.ct-sig-neu .ct-sig-arrow{color:#555}
-.ct-sig-desc{font-size:10px;color:var(--mut2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ct-flags{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
-.ct-flag{font-size:8.5px;font-weight:800;letter-spacing:.5px;padding:2px 6px;border-radius:4px;text-transform:uppercase}
-.ct-flag-bull{background:rgba(0,255,135,.1);color:#00e87a;border:1px solid rgba(0,255,135,.25)}
-.ct-flag-warn{background:rgba(255,180,0,.1);color:#ffcc00;border:1px solid rgba(255,180,0,.2)}
-.ct-flag-mut{background:#1e1e1e;color:#555;border:1px solid #2a2a2a}
-.ct-expand{overflow:hidden;max-height:0;transition:max-height .35s cubic-bezier(.4,0,.2,1)}
-.ct-card.ct-expanded .ct-expand{max-height:600px}
-.ct-expand-inner{padding-top:12px;border-top:1px solid #1e1e1e;margin-top:4px}
-.ct-expand-graph{background:#0a0a0a;border-radius:8px;padding:10px 8px 4px;margin-bottom:10px}
-.ct-expand-lbl{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#3a3a3a;margin-bottom:6px}
-.ct-expand-sig-tbl{width:100%;border-collapse:collapse}
-.ct-expand-sig-tbl tr+tr td{border-top:1px solid #161616}
-.ct-expand-sig-tbl td{padding:4px 5px;font-size:10.5px;vertical-align:middle}
-.ct-expand-sig-nm{color:var(--mut);font-weight:700;white-space:nowrap;width:90px}
-.ct-expand-sig-vl{color:var(--text)}
-.ct-expand-sig-dr{font-weight:800;font-size:11px;white-space:nowrap;width:18px;text-align:center}
-.ct-expand-sig-dr.bull{color:#00e87a}
-.ct-expand-sig-dr.bear{color:#ff4f4f}
-.ct-expand-sig-dr.neu{color:#444}
-.ct-expand-explain{font-size:11px;color:var(--mut2);line-height:1.55;margin-top:10px;padding-top:10px;border-top:1px solid #161616}
 /* Card header row */
 .tc-card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
 .tc-signal-lbl{font-size:9px;font-weight:800;letter-spacing:.7px;text-transform:uppercase}
@@ -2264,7 +2215,6 @@ async function enrichWithConfidence(p){
         }
       }catch(e){}
       var oppKPct=await getTeamKPct(oppTeam);
-      p.opposingTeamKPct=oppKPct; p.opposingTeamName=oppTeam;
       // League average K% ≈ 22.5%; bottom-10 threshold ≈ 19.5%
       var BOTTOM10=0.195;
       if(oppKPct!==null&&oppKPct<BOTTOM10){
@@ -2405,7 +2355,6 @@ async function enrichWithConfidence(p){
                   var _oppKey=_myKey==='home'?'away':'home';
                   var _oppStarter=_bctx[_oppKey]&&_bctx[_oppKey].starterId;
                   if(_oppStarter){
-                    p.opposingPitcherId=_oppStarter;
                     var _era=await mlbPitcherERA(_oppStarter,new Date().getFullYear());
                     p.opposingPitcherERA=_era;
                     if(_era!=null) _eraAdj=_era>=5.00?0.025:_era>=4.00?0.012:_era>=3.50?0:_era>=2.75?-0.015:-0.025;
@@ -3592,7 +3541,7 @@ function handleTrackClick(p,btn){
   var today=new Date().toISOString().slice(0,10);
   var _evG=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
   var game=p._game||(_evG?((_evG.home_team||"")+" vs "+(_evG.away_team||"")):"");
-  var entry={date:today,player:p.player,market:mkt,marketDisplay:mktDisplay,sport:spLabel,game:game,line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"};
+  var entry={date:today,player:p.player,market:mkt,marketDisplay:mktDisplay,sport:spLabel,game:game,line:line,confidence:conf,tier:tier.t,odds:p.bestOdds||null,result:"pending",loggedAt:Date.now(),source:"manual"};
   var pop=document.createElement('div');
   pop.id='trackPopover';
   pop.innerHTML=
@@ -3668,7 +3617,7 @@ function handleMlTrackClick(side,btn){
   var spLabel={baseball_mlb:'MLB',americanfootball_nfl:'NFL',basketball_nba:'NBA',icehockey_nhl:'NHL'}[ST.sport]||ST.sport;
   var entry={date:today,player:name,market:'moneyline',marketDisplay:'Moneyline',sport:spLabel,
     line:line,confidence:prob,tier:tier.t,game:gameLabel,edge:sideEdge,
-    result:'pending',loggedAt:Date.now(),source:'manual',type:'moneyline'};
+    odds:(h?c.homeOdds:c.awayOdds)||null,result:'pending',loggedAt:Date.now(),source:'manual',type:'moneyline'};
   var sk=name+'|moneyline|'+today;
   var existing=document.getElementById('mlTrackPopover');
   if(existing){existing.remove();if(_trackPopoverActive===sk){_trackPopoverActive=null;return;}}
@@ -5754,6 +5703,8 @@ function _renderPdStatsData(mount,data){
     var rateColor=_phRateColor(allRate);
     html+='<div style="margin-bottom:32px">';
     html+='<div style="font-size:28px;font-weight:800;color:'+rateColor+';margin-bottom:2px">'+(allRate!==null?allRate+'%':'–')+'</div>';
+    var _pdRoi=calcROI(plays);var _pdRoiClr=_pdRoi.roi>0?'#00e87a':_pdRoi.roi<0?'#ff4f4f':'#777';var _pdUClr=_pdRoi.units>0?'#00e87a':_pdRoi.units<0?'#ff4f4f':'#777';
+    html+='<div style="display:flex;gap:16px;align-items:baseline;margin-bottom:2px"><div style="font-size:16px;font-weight:800;color:'+_pdRoiClr+'">'+(_pdRoi.roi>=0?'+':'')+_pdRoi.roi+'% ROI</div><div style="font-size:14px;font-weight:700;color:'+_pdUClr+'">'+(_pdRoi.units>=0?'+':'')+_pdRoi.units.toFixed(2)+'u</div></div>';
     html+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+allHits+' hits / '+allRes.length+' resolved</div>';
     html+='<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px"><div style="background:'+rateColor+';width:'+(allRate||0)+'%;height:100%;border-radius:4px"></div></div>';
     html+='<div style="display:flex;gap:24px">';
@@ -5765,11 +5716,15 @@ function _renderPdStatsData(mount,data){
   var sportKeys=Object.keys(sportMap);
   if(sportKeys.length&&allRes.length){
     html+=_phSectionHdr("By Sport");
-    html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate'],sportKeys.map(function(s){
+    html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate','ROI'],sportKeys.map(function(s){
       var m=sportMap[s], rate=_phRate(m.hits,m.hits+m.misses);
+      var _sr=(m.hits+m.misses)>0?calcROI(plays.filter(function(e){return e.sport===s;})):null;
+      var _srStr=_sr?(_sr.roi>=0?'+':'')+_sr.roi+'%':'–';
+      var _srClr=_sr?(_sr.roi>0?'#00e87a':_sr.roi<0?'#ff4f4f':'var(--mut)'):'var(--mut)';
       return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+esc(s)+'</td><td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
         '<td style="padding:5px 8px;font-size:11px;color:var(--accent)">'+m.hits+'</td><td style="padding:5px 8px;font-size:11px;color:var(--red)">'+m.misses+'</td>'+
-        '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+m.pending+'</td><td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td></tr>';
+        '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+m.pending+'</td><td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td>'+
+        '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_srClr+'">'+_srStr+'</td></tr>';
     }),true);
     html+='<div style="margin-bottom:16px"></div>';
   }
@@ -6161,6 +6116,8 @@ function renderPlayHistory(){
     var rateColor=_phRateColor(allRate), rateBarW=allRate!==null?allRate:0;
     html+='<div style="margin-bottom:32px">';
     html+='<div style="font-size:28px;font-weight:800;color:'+rateColor+';margin-bottom:2px">'+(allRate!==null?allRate+'%':'–')+'</div>';
+    var _roiR=calcROI(statData);var _roiClr=_roiR.roi>0?'#00e87a':_roiR.roi<0?'#ff4f4f':'#777';var _unitsClr=_roiR.units>0?'#00e87a':_roiR.units<0?'#ff4f4f':'#777';
+    html+='<div style="display:flex;gap:16px;align-items:baseline;margin-bottom:4px"><div style="font-size:16px;font-weight:800;color:'+_roiClr+'">'+(_roiR.roi>=0?'+':'')+_roiR.roi+'% ROI</div><div style="font-size:14px;font-weight:700;color:'+_unitsClr+'">'+(_roiR.units>=0?'+':'')+_roiR.units.toFixed(2)+'u</div></div>';
     html+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+allHits+' hits / '+allRes.length+' resolved · '+allPending+' pending</div>';
     html+='<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px">';
     html+='<div style="background:'+rateColor+';width:'+rateBarW+'%;height:100%;border-radius:4px"></div></div>';
@@ -7866,303 +7823,6 @@ var MLB_PARK_FACTOR={
   "Los Angeles Dodgers":0.96,"Tampa Bay Rays":0.96,"Miami Marlins":0.95,
   "Seattle Mariners":0.94,"San Francisco Giants":0.92,"San Diego Padres":0.92
 };
-var _compositeTrendsData=[];
-
-async function calcCompositeTrends(){
-  var results=[];
-  if(_trendsSport!=="baseball_mlb") return results;
-  var BATTER_MKT=["batter_hits","batter_total_bases","batter_rbis","batter_home_runs","batter_runs_scored"];
-  var candidates=(ST.props||[]).filter(function(p){
-    return p.enriched&&!p.pdNoValue&&p._market&&BATTER_MKT.indexOf(p._market)>=0&&
-      p._vals&&p._vals.length>=5&&p.pdConfidence!=null;
-  });
-  if(!candidates.length) return results;
-
-  // Batch-fetch today's opposing pitcher hands (single API call for uncached pitchers)
-  var pids=candidates.map(function(p){return p.opposingPitcherId;})
-    .filter(function(id,i,a){return id!=null&&a.indexOf(id)===i;});
-  if(pids.length) await mlbPitcherHands(pids);
-
-  for(var ci=0;ci<candidates.length;ci++){
-    var p=candidates[ci];
-    var line=p.pdLine!=null?p.pdLine:p.bestLine;
-    if(line==null) continue;
-    var isOver=(p.pdSide||"Over")==="Over";
-    var vals=p._vals, n=vals.length;
-    var isHomeArr=p._isHomeArr||[];
-    var mktLbl=marketName(p._market);
-
-    // Resolve today's home/away from cached data (no new fetches)
-    var matchEv=null;
-    for(var ei=0;ei<_trendsEvents.length;ei++){
-      var ev2=_trendsEvents[ei];
-      if(((ev2.away_team||"")+" vs "+(ev2.home_team||""))===p._game){matchEv=ev2;break;}
-    }
-    var homeTeamName=matchEv?(matchEv.home_team||""):"";
-    var todayIsHome=null;
-    if(matchEv&&p._playerId&&_playerTeamCache[p._playerId]){
-      var ptid=_playerTeamCache[p._playerId];
-      var ptObj=(_mlbTeamsCache||[]).filter(function(t){return t.id===ptid;})[0];
-      var ptName=ptObj?ptObj.name:"";
-      if(ptName){
-        var nrm=function(s){return s.toLowerCase().trim();};
-        var nick2=function(s){return s.split(" ").slice(-1)[0].toLowerCase();};
-        todayIsHome=nrm(ptName)===nrm(homeTeamName)||nick2(ptName)===nick2(homeTeamName);
-      }
-    }
-
-    var activeSigs=[];
-
-    // Signal 1: L5 hit rate vs season hit rate (30%, gate: 10+ games)
-    if(n>=10){
-      var l5HitRate=vals.slice(0,5).filter(function(v){return isOver?v>line:v<line;}).length/5;
-      var sznHitRate=vals.filter(function(v){return isOver?v>line:v<line;}).length/n;
-      var s1=l5HitRate>=0.80?88:l5HitRate>=0.65?75:l5HitRate>=0.55?62:
-             l5HitRate>=0.50?44:l5HitRate>=0.40?37:l5HitRate>=0.30?25:12;
-      if(l5HitRate<0.50&&s1>=50) s1=37; // hard gate: missing more than hitting → bearish
-      var l5Hits=Math.round(l5HitRate*5);
-      var d1lbl=l5HitRate>=0.65?"Running hot":l5HitRate<=0.40?"Running cold":"Near baseline";
-      activeSigs.push({name:"L5 vs Season",score:s1,weight:30,
-        _l5HR:l5HitRate,_sznHR:sznHitRate,
-        desc:d1lbl+" — "+l5Hits+"/5 L5 ("+Math.round(l5HitRate*100)+"%) vs "+Math.round(sznHitRate*100)+"% szn"});
-    }
-
-    // Signal 2: Home/Away split (25%, gate: 8+ games each side)
-    var hVals=vals.filter(function(v,i){return isHomeArr[i]===true;});
-    var aVals=vals.filter(function(v,i){return isHomeArr[i]===false;});
-    if(hVals.length>=8&&aVals.length>=8){
-      var hHR=hVals.filter(function(v){return isOver?v>line:v<line;}).length/hVals.length;
-      var aHR=aVals.filter(function(v){return isOver?v>line:v<line;}).length/aVals.length;
-      var tHR=todayIsHome===true?hHR:todayIsHome===false?aHR:(hHR+aHR)/2;
-      var s2=tHR>=0.80?88:tHR>=0.70?75:tHR>=0.60?63:tHR>=0.50?50:tHR>=0.40?37:tHR>=0.30?25:12;
-      var loc2=todayIsHome===true?"home":todayIsHome===false?"road":"avg";
-      activeSigs.push({name:"Home/Away Split",score:s2,weight:25,
-        desc:Math.round(tHR*100)+"% "+loc2+" (H:"+Math.round(hHR*100)+"% / A:"+Math.round(aHR*100)+"%) "+hVals.length+"/"+aVals.length+" G"});
-    }
-
-    // Signal 3: Platoon split (20%, gate: 15+ games vs today's hand — cached only)
-    var todayHand=p.opposingPitcherId?(_pitchHandCache[p.opposingPitcherId]||null):null;
-    if(todayHand&&p._gamePks&&p._gamePks.length>=15){
-      var sameH=[],oppH=[];
-      for(var gi=0;gi<Math.min(n,p._gamePks.length,20);gi++){
-        var gpk=p._gamePks[gi]; if(!gpk) continue;
-        var ctx=_boxCache[gpk]; if(!ctx) continue;
-        var myH=isHomeArr[gi]!==false;
-        var oppB=ctx[myH?"away":"home"];
-        var sid=oppB?oppB.starterId:null; if(!sid) continue;
-        var ph=_pitchHandCache[sid]; if(!ph) continue;
-        (ph===todayHand?sameH:oppH).push(vals[gi]);
-      }
-      if(sameH.length>=15){
-        var vsHR=sameH.filter(function(v){return isOver?v>line:v<line;}).length/sameH.length;
-        var s3=vsHR>=0.80?88:vsHR>=0.70?75:vsHR>=0.60?63:vsHR>=0.50?50:vsHR>=0.40?37:vsHR>=0.30?25:12;
-        var oppHRd=oppH.length>=5?Math.round(oppH.filter(function(v){return isOver?v>line:v<line;}).length/oppH.length*100):null;
-        var d3="vs "+todayHand+"HP: "+Math.round(vsHR*100)+"% ("+sameH.length+" G)";
-        if(oppHRd!=null) d3+=" / vs "+(todayHand==="L"?"R":"L")+"HP: "+oppHRd+"%";
-        activeSigs.push({name:"Platoon",score:s3,weight:20,desc:d3});
-      }
-    }
-
-    // Signal 4: Pitcher L3 vs L5 ERA trend (15%, gate: 3+ starts in splits)
-    if(p.opposingPitcherId){
-      try{
-        var ps=await mlFetchPitcherStats(p.opposingPitcherId);
-        if(ps&&ps.splits&&ps.splits.length>=3){
-          var sp=ps.splits;
-          var l3ER=0,l3IP=0;
-          for(var si=sp.length-3;si<sp.length;si++){
-            var ss=sp[si];
-            l3ER+=Number(ss.earnedRuns||0);
-            var rawIP=parseFloat(ss.inningsPitched||"0");
-            l3IP+=Math.floor(rawIP)+Math.round((rawIP-Math.floor(rawIP))*10)/3;
-          }
-          var l3ERA=l3IP>0?Math.round(l3ER*9/l3IP*100)/100:4.50;
-          var d4=isOver?(l3ERA-ps.era):-(l3ERA-ps.era);
-          var s4=d4>=1.5?82:d4>=0.75?70:d4>=0.25?60:d4>=-0.25?50:d4>=-0.75?40:d4>=-1.5?30:18;
-          activeSigs.push({name:"Pitcher Trend",score:s4,weight:15,
-            desc:"Opp L3 ERA "+l3ERA.toFixed(2)+" vs L5 "+ps.era.toFixed(2)+" ("+ps.games+" starts)"});
-        }
-      }catch(e){}
-    }
-
-    // Signal 5: Ballpark factor (10%)
-    var pf=homeTeamName?MLB_PARK_FACTOR[homeTeamName]:null;
-    if(pf!=null){
-      var d5=isOver?(pf-1.00):-(pf-1.00);
-      var s5=d5>=0.10?80:d5>=0.05?65:d5>=0.02?55:d5>=-0.02?50:d5>=-0.05?45:d5>=-0.10?35:20;
-      activeSigs.push({name:"Park Factor",score:s5,weight:10,
-        desc:homeTeamName+" — factor "+pf.toFixed(2)});
-    }
-
-    if(!activeSigs.length) continue;
-
-    // Weighted composite (normalize weights so missing signals redistribute)
-    var totW=activeSigs.reduce(function(acc,s){return acc+s.weight;},0);
-    var composite=activeSigs.reduce(function(acc,s){return acc+s.score*s.weight;},0)/totW;
-    var trendScore=Math.round(composite);
-
-    // Gate: 2+ signals aligned, score threshold
-    var bullSigs=activeSigs.filter(function(s){return s.score>=56;});
-    var bearSigs=activeSigs.filter(function(s){return s.score<=44;});
-    if(Math.max(bullSigs.length,bearSigs.length)<2) continue;
-    if(trendScore<65&&trendScore>35) continue;
-    // Gate: overall hit rate must be ≥55% to surface as BULLISH
-    if(trendScore>=65){
-      var overallHR=vals.filter(function(v){return isOver?v>line:v<line;}).length/n;
-      if(overallHR<0.55) continue;
-    }
-
-    // Flags (labels only — not part of scoring)
-    var flags=[];
-    if(p.todayOrderSlot!=null){
-      if(p.todayOrderSlot<=3) flags.push({lbl:"TOP OF ORDER",cls:"ct-flag-bull"});
-      else if(p.todayOrderSlot>=7) flags.push({lbl:"BOTTOM OF ORDER",cls:"ct-flag-mut"});
-    }
-    if((p.valueFlags||[]).indexOf("HIGH_K_TEAM")>=0) flags.push({lbl:"HIGH K TEAM",cls:"ct-flag-bull"});
-    if((p.guardrailFlags||[]).indexOf("CONTACT_TEAM")>=0) flags.push({lbl:"CONTACT TEAM",cls:"ct-flag-warn"});
-
-    results.push({
-      player:p.player,mkt:p._market,mktLbl:mktLbl,game:p._game,
-      trendScore:trendScore,direction:trendScore>=65?"bullish":"bearish",
-      signals:activeSigs,flags:flags,
-      _vals:vals.slice(0,15),_dates:p._dates?p._dates.slice(0,15):[],
-      _line:line,_isOver:isOver
-    });
-  }
-
-  // Most extreme scores first
-  results.sort(function(a,b){
-    return Math.max(b.trendScore,100-b.trendScore)-Math.max(a.trendScore,100-a.trendScore);
-  });
-  return results;
-}
-
-function toggleCompositeCard(card){
-  var wasOpen=card.classList.contains('ct-expanded');
-  document.querySelectorAll('.ct-card').forEach(function(c){c.classList.remove('ct-expanded');});
-  if(!wasOpen) card.classList.add('ct-expanded');
-}
-
-function _ctHitBarChart(c){
-  var vals=c._vals,dates=c._dates,line=c._line,isOver=c._isOver;
-  if(!vals||vals.length<2) return '';
-  var n=Math.min(15,vals.length);
-  var pts=vals.slice(0,n).slice().reverse();
-  var dts=(dates||[]).slice(0,n).slice().reverse();
-  var hits=pts.filter(function(v){return isOver?v>line:v<line;}).length;
-  var seasonHR=hits/n;
-  var W=300,H=72,L=4,R=W-4,T=7,BAR_H=45,LABEL_Y=T+BAR_H+11;
-  var barW=(R-L)/n,effW=Math.max(2,barW-1.5);
-  var parts=[];
-  for(var i=0;i<n;i++){
-    var hit=isOver?pts[i]>line:pts[i]<line;
-    var bx=(L+i*barW+0.75).toFixed(1);
-    parts.push('<rect x="'+bx+'" y="'+T+'" width="'+effW.toFixed(1)+'" height="'+BAR_H+'" fill="'+(hit?'#00e87a':'#ff4f4f')+'" rx="2" opacity=".75"/>');
-    if(dts[i]&&(i===0||i===n-1||(n>4&&i===Math.round((n-1)/2)))){
-      var d=new Date(dts[i]);
-      var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      var lbl=MON[d.getMonth()]+' '+d.getDate();
-      var lx=(L+i*barW+0.75+effW/2).toFixed(1);
-      parts.push('<text x="'+lx+'" y="'+LABEL_Y+'" text-anchor="middle" fill="#3a3a3a" font-size="7">'+lbl+'</text>');
-    }
-  }
-  var hrY=(T+BAR_H*(1-seasonHR)).toFixed(1);
-  parts.push('<line x1="'+L+'" y1="'+hrY+'" x2="'+R+'" y2="'+hrY+'" stroke="#555" stroke-width="1" stroke-dasharray="3,3"/>');
-  parts.push('<text x="'+(R-2)+'" y="'+(parseFloat(hrY)-2)+'" text-anchor="end" fill="#555" font-size="7">Szn '+Math.round(seasonHR*100)+'%</text>');
-  return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">'+parts.join('')+'</svg>';
-}
-
-function _ctExplanation(c){
-  var isBull=c.direction==="bullish";
-  var keyDir=isBull?"bullish":"bearish";
-  var aligned=c.signals.filter(function(s){return isBull?s.score>=56:s.score<=44;});
-  var top1=aligned[0],top2=aligned[1];
-  var s1="",s2="";
-  if(top1){
-    var d1=top1.desc.replace(/\s+/g,' ').trim();
-    if(top1.name==="L5 vs Season"){
-      if(top1._l5HR!=null) s1=c.player+" is hitting this prop in "+Math.round(top1._l5HR*5)+" of the last 5 games ("+Math.round(top1._l5HR*100)+"%)"+
-        (top1._sznHR!=null?", vs a "+Math.round(top1._sznHR*100)+"% season rate":"")+".";
-      else s1=c.player+" is "+(isBull?"running above":"running below")+" their season baseline: "+d1+".";
-    } else if(top1.name==="Home/Away Split") s1=c.player+" shows a notable home/away split — "+d1+".";
-    else if(top1.name==="Park Factor") s1="Park conditions favor "+(isBull?"hitters":"pitchers")+" today: "+d1+".";
-    else if(top1.name==="Platoon") s1="Platoon advantage aligns: "+d1+".";
-    else if(top1.name==="Pitcher Trend") s1="The opposing pitcher is "+(isBull?"struggling":"trending well")+" recently: "+d1+".";
-    else s1=top1.name+": "+d1+".";
-  }
-  if(top2){
-    var d2=top2.desc.replace(/\s+/g,' ').trim();
-    if(top2.name==="L5 vs Season")
-      s2=top2._l5HR!=null?"Recent form corroborates: "+Math.round(top2._l5HR*5)+"/5 L5 ("+Math.round(top2._l5HR*100)+"%).":"Recent form corroborates: "+d2+".";
-    else if(top2.name==="Home/Away Split") s2="Home/away splits further support the "+keyDir+" case: "+d2+".";
-    else if(top2.name==="Park Factor") s2="Park factor adds a "+(isBull?"tailwind":"headwind")+": "+d2+".";
-    else if(top2.name==="Platoon") s2="Platoon data reinforces this: "+d2+".";
-    else if(top2.name==="Pitcher Trend") s2="Opposing pitcher form adds weight: "+d2+".";
-    else s2=top2.name+" corroborates: "+d2+".";
-  }
-  var nA=aligned.length;
-  var s3=(nA>=2?nA+" independent signals align "+keyDir:"One signal aligns "+keyDir)+", producing a composite score of "+c.trendScore+".";
-  return [s1,s2,s3].filter(Boolean).join(" ");
-}
-
-function renderCompositeSection(composite){
-  if(!composite||!composite.length) return "";
-  var cards=composite.map(function(c){
-    var isBull=c.direction==="bullish";
-    var clr=isBull?"#00e87a":"#ff4f4f";
-    var barW=isBull?c.trendScore:(100-c.trendScore);
-    var sigsHtml=c.signals.map(function(s){
-      var sCls=s.score>=56?"ct-sig-bull":s.score<=44?"ct-sig-bear":"ct-sig-neu";
-      var arrow=s.score>=56?"▲":s.score<=44?"▼":"—";
-      return '<div class="ct-sig-row '+sCls+'">'
-        +'<span class="ct-sig-name">'+esc(s.name)+'</span>'
-        +'<span class="ct-sig-arrow">'+arrow+' '+s.score+'</span>'
-        +'<span class="ct-sig-desc">'+esc(s.desc)+'</span>'
-        +'</div>';
-    }).join("");
-    var flagsHtml=c.flags.length
-      ?'<div class="ct-flags">'+c.flags.map(function(f){
-          return '<span class="ct-flag '+f.cls+'">'+esc(f.lbl)+'</span>';
-        }).join("")+'</div>'
-      :"";
-    var graphHtml=_ctHitBarChart(c);
-    var sigRows=c.signals.map(function(s){
-      var bull=s.score>=56,bear=s.score<=44;
-      var drCls=bull?"bull":bear?"bear":"neu";
-      var arrow=bull?"▲":bear?"▼":"—";
-      return '<tr><td class="ct-expand-sig-nm">'+esc(s.name)+'</td>'
-        +'<td class="ct-expand-sig-vl">'+esc(s.desc)+'</td>'
-        +'<td class="ct-expand-sig-dr '+drCls+'">'+arrow+'</td></tr>';
-    }).join("");
-    var expandHtml='<div class="ct-expand"><div class="ct-expand-inner">'
-      +(graphHtml?'<div class="ct-expand-graph"><div class="ct-expand-lbl">Hit Rate — Last '+Math.min(15,(c._vals||[]).length)+' Games</div>'+graphHtml+'</div>':"")
-      +'<div class="ct-expand-lbl">Signal Breakdown</div>'
-      +'<table class="ct-expand-sig-tbl"><tbody>'+sigRows+'</tbody></table>'
-      +'<div class="ct-expand-explain">'+_ctExplanation(c)+'</div>'
-    +'</div></div>';
-    return '<div class="ct-card '+(isBull?"ct-bull":"ct-bear")+'" onclick="toggleCompositeCard(this)">'
-      +'<div class="ct-card-top">'
-        +'<div><div class="ct-player">'+esc(c.player)+'</div>'
-          +'<div class="ct-mkt">'+esc(c.mktLbl)+'</div></div>'
-        +'<div class="ct-score-block">'
-          +'<span class="ct-dir-badge '+(isBull?"ct-dir-bull":"ct-dir-bear")+'">'+(isBull?"BULLISH":"BEARISH")+'</span>'
-          +'<span class="ct-score-num" style="color:'+clr+'">'+c.trendScore+'</span>'
-        +'</div>'
-      +'</div>'
-      +'<div class="ct-bar-wrap"><div class="ct-bar-track">'
-        +'<div class="ct-bar-fill" style="width:'+barW+'%;background:'+clr+'"></div>'
-      +'</div></div>'
-      +sigsHtml+flagsHtml+expandHtml
-    +'</div>';
-  }).join("");
-  return '<div class="ct-section">'
-    +'<div class="ct-section-hdr">'
-      +'<span class="ct-section-title">COMPOSITE TRENDS</span>'
-      +'<span class="ct-section-sub">Multi-signal batter analysis &mdash; MLB only</span>'
-    +'</div>'
-    +'<div class="ct-grid">'+cards+'</div>'
-  +'</div>';
-}
 
 /* --- Sparkline ----------------------------------------------------- */
 function renderSparkline(vals,line,isOver){
@@ -8319,6 +7979,15 @@ function _trCumulativeChartSvg(resolved){
   return svg;
 }
 
+function calcROI(plays){
+  var res=plays.filter(function(e){return e.result==='hit'||e.result==='miss';});
+  if(!res.length) return {roi:0,units:0};
+  var tot=res.reduce(function(s,e){
+    var o=e.odds||-110;
+    return s+(e.result==='hit'?(o>=0?o/100:100/Math.abs(o)):-1);
+  },0);
+  return {roi:+(tot/res.length*100).toFixed(1),units:+tot.toFixed(2)};
+}
 function _trendsStatsSummaryHtml(data){
   var plays=data.plays||[];
   var allRes=plays.filter(function(e){return e.result==='hit'||e.result==='miss';});
@@ -8336,9 +8005,11 @@ function _trendsStatsSummaryHtml(data){
   var l10w=last10.filter(function(e){return e.result==='hit';}).length;
   var l10l=last10.length-l10w;
   var l10cls=l10w>l10l?'ts-pos':l10w<l10l?'ts-neg':'ts-neu';
-  var unitTotal=wins-losses;
-  var unitStr=(unitTotal>=0?'+':'')+unitTotal+'u';
-  var unitCls=unitTotal>0?'ts-pos':unitTotal<0?'ts-neg':'ts-neu';
+  var _roi=calcROI(plays);
+  var roiStr=(_roi.roi>=0?'+':'')+_roi.roi+'%';
+  var roiCls=_roi.roi>0?'ts-pos':_roi.roi<0?'ts-neg':'ts-neu';
+  var unitStr=(_roi.units>=0?'+':'')+_roi.units.toFixed(2)+'u';
+  var unitCls=_roi.units>0?'ts-pos':_roi.units<0?'ts-neg':'ts-neu';
   var mktMap={};
   allRes.forEach(function(e){
     var k=e.marketDisplay||e.market||''; if(!k) return;
@@ -8357,6 +8028,7 @@ function _trendsStatsSummaryHtml(data){
     {lbl:'HIT RATE',val:hitRate+'%',cls:hitRateCls},
     {lbl:'STREAK',val:streakStr,cls:streakCls},
     {lbl:'LAST 10',val:l10w+'-'+l10l,cls:l10cls},
+    {lbl:'ROI',val:roiStr,cls:roiCls},
     {lbl:'UNITS',val:unitStr,cls:unitCls},
     {lbl:'BEST MARKET',val:bestMkt?esc(bestMkt.length>16?bestMkt.slice(0,15)+'…':bestMkt):'—',cls:bestMkt?'ts-pos':'ts-neu',sub:bestMkt?Math.round(bestRate*100)+'%':null},
     {lbl:'TOTAL PLAYS',val:String(plays.length),cls:'ts-neu'}
@@ -8435,7 +8107,6 @@ function renderTrends(trends){
       +'" data-ttype="'+o.k+'">'+o.lbl+'</button>';}).join("")+
     '</div></div>';
   // Empty state for filtered view
-  var _ctHtml=(_trendsSport==="baseball_mlb"&&_compositeTrendsData.length)?renderCompositeSection(_compositeTrendsData):"";
   var _statsHtml=_pdStatsCache?_trendsStatsSummaryHtml(_pdStatsCache):"";
   if(!visible.length){
     var FILTER_NAMES={streak:"Streak",homeway:"Home/Away Split",linevalue:"Line Value",
@@ -8443,9 +8114,9 @@ function renderTrends(trends){
     var emptyMsg=_trendsFilter==="all"
       ?"No trends found — check back as lines post closer to game time"
       :"No "+( FILTER_NAMES[_trendsFilter]||_trendsFilter)+" trends detected today — check back as lines move closer to game time";
-    mount.innerHTML=_statsHtml+ctrlHtml+_ctHtml+'<div class="tc-no-data"><div class="nd-icon">🔍</div><p>'+emptyMsg+'</p></div>';
+    mount.innerHTML=_statsHtml+ctrlHtml+'<div class="tc-no-data"><div class="nd-icon">🔍</div><p>'+emptyMsg+'</p></div>';
   } else {
-    mount.innerHTML=_statsHtml+ctrlHtml+_ctHtml+
+    mount.innerHTML=_statsHtml+ctrlHtml+
       '<div class="trend-grid">'+visible.map(function(t){var s=_sigInfo(t);return renderTrendCard(t,s.cls,s.label);}).join("")+'</div>'+
       '<p class="trends-empty-note">'+visible.length+' trend'+(visible.length!==1?"s":"")+'&nbsp;&nbsp;·&nbsp;&nbsp;Click any card for details&nbsp;&nbsp;·&nbsp;&nbsp;All data live</p>';
   }
@@ -8581,7 +8252,6 @@ async function trendsFetchAndLoad(){
       var teamSitTrends=await calcTeamSituationalTrends();
       if(teamSitTrends.length) trends=trends.concat(teamSitTrends);
       trends.sort(function(a,b){ return b.conf-a.conf; });
-      _compositeTrendsData=await calcCompositeTrends();
     }catch(ce){ calcErr=ce; }
     ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
     if(calcErr) throw calcErr;
@@ -9986,7 +9656,7 @@ function renderGameTop5(picks,isScanning){
         var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
         var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
         if(!h.some(function(e){return e.player===p.player&&e.market===mkt&&e.date===today;})){
-          h.unshift({date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,game:p._game||"",line:line,confidence:conf,tier:tier.t,result:"pending",loggedAt:Date.now(),source:"manual"});
+          h.unshift({date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,game:p._game||"",line:line,confidence:conf,tier:tier.t,odds:p.bestOdds||null,result:"pending",loggedAt:Date.now(),source:"manual"});
           added++;
         }
       });
