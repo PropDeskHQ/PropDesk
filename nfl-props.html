@@ -5707,7 +5707,7 @@ function _renderPdStatsData(mount,data){
     html+='<div style="display:flex;gap:16px;align-items:baseline;margin-bottom:2px"><div style="font-size:16px;font-weight:800;color:'+_pdRoiClr+'">'+(_pdRoi.roi>=0?'+':'')+_pdRoi.roi+'% ROI</div><div style="font-size:14px;font-weight:700;color:'+_pdUClr+'">'+(_pdRoi.units>=0?'+':'')+_pdRoi.units.toFixed(2)+'u</div></div>';
     var _csrt=allRes.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.loggedAt||0)-(b.loggedAt||0);});
     var _cpts=[],_csum=0;
-    _csrt.forEach(function(e){var o=e.odds||-110;_csum+=(e.result==='hit'?(o>=0?o/100:100/Math.abs(o)):-1);_cpts.push(_csum);});
+    _csrt.forEach(function(e){var o=e.odds||-130;_csum+=(e.result==='hit'?(o>=0?o/100:100/Math.abs(o)):-1);_cpts.push(_csum);});
     if(_cpts.length>=2){
       var _cVW=400,_cVH=100,_cLp=34,_cRp=22,_cTp=8,_cBp=18;
       var _cn=_cpts.length;
@@ -8040,7 +8040,7 @@ function calcROI(plays){
   var res=plays.filter(function(e){return e.result==='hit'||e.result==='miss';});
   if(!res.length) return {roi:0,units:0};
   var tot=res.reduce(function(s,e){
-    var o=e.odds||-110;
+    var o=e.odds||-130;
     return s+(e.result==='hit'?(o>=0?o/100:100/Math.abs(o)):-1);
   },0);
   return {roi:+(tot/res.length*100).toFixed(1),units:+tot.toFixed(2)};
