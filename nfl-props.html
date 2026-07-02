@@ -5709,22 +5709,37 @@ function _renderPdStatsData(mount,data){
     var _cpts=[],_csum=0;
     _csrt.forEach(function(e){var o=e.odds||-110;_csum+=(e.result==='hit'?(o>=0?o/100:100/Math.abs(o)):-1);_cpts.push(_csum);});
     if(_cpts.length>=2){
-      var _cW=400,_cH=80,_cpd=6,_cn=_cpts.length;
+      var _cVW=400,_cVH=100,_cLp=34,_cRp=22,_cTp=8,_cBp=18;
+      var _cn=_cpts.length;
       var _cmn=Math.min.apply(null,_cpts.concat([0])),_cmx=Math.max.apply(null,_cpts.concat([0]));
-      var _crng=_cmx-_cmn||1,_ciW=_cW-_cpd*2,_ciH=_cH-_cpd*2;
-      var _cxf=function(i){return _cpd+(_cn===1?_ciW/2:i*_ciW/(_cn-1));};
-      var _cyf=function(v){return _cpd+_ciH*(1-(v-_cmn)/_crng);};
+      var _crng=_cmx-_cmn||1,_cChW=_cVW-_cLp-_cRp,_cChH=_cVH-_cTp-_cBp;
+      var _cxf=function(i){return _cLp+(_cn===1?_cChW/2:i*_cChW/(_cn-1));};
+      var _cyf=function(v){return _cTp+_cChH*(1-(v-_cmn)/_crng);};
       var _cz=_cyf(0),_cpos=_csum>=0,_cclr=_cpos?'#00e87a':'#ff4f4f';
       var _cln=_cpts.map(function(v,i){return _cxf(i).toFixed(1)+','+_cyf(v).toFixed(1);}).join(' ');
       var _cfp=_cln+' '+_cxf(_cn-1).toFixed(1)+','+_cz.toFixed(1)+' '+_cxf(0).toFixed(1)+','+_cz.toFixed(1);
-      html+='<div style="margin:8px 0 6px">'
-        +'<svg viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:6px;background:#0a0a0a">'
-        +'<defs><linearGradient id="pdRoiGrd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+_cclr+'" stop-opacity=".18"/><stop offset="100%" stop-color="'+_cclr+'" stop-opacity="0"/></linearGradient></defs>'
-        +'<line x1="'+_cpd+'" y1="'+_cz.toFixed(1)+'" x2="'+(400-_cpd)+'" y2="'+_cz.toFixed(1)+'" stroke="#2a2a2a" stroke-width="1" stroke-dasharray="4,4"/>'
-        +'<polygon points="'+_cfp+'" fill="url(#pdRoiGrd)"/>'
-        +'<polyline points="'+_cln+'" fill="none" stroke="'+_cclr+'" stroke-width="1.5" stroke-linejoin="round"/>'
-        +'<circle cx="'+_cxf(_cn-1).toFixed(1)+'" cy="'+_cyf(_cpts[_cn-1]).toFixed(1)+'" r="3" fill="'+_cclr+'"/>'
-        +'</svg></div>';
+      var _cTkSt=_crng>200?100:_crng>100?50:_crng>40?25:_crng>15?10:5;
+      var _cTks=[],_ctk;
+      for(_ctk=0;_ctk<=_cmx;_ctk+=_cTkSt)_cTks.push(_ctk);
+      for(_ctk=-_cTkSt;_ctk>=_cmn;_ctk-=_cTkSt)_cTks.push(_ctk);
+      var _cFmtD=function(d){if(!d)return'';var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var p=(d+'').split(/[-\/]/);return p.length>=3?M[+p[1]-1]+' '+parseInt(p[2],10):'';};
+      var _cDIs=[0,Math.round(_cn/4),Math.round(_cn/2),Math.round(3*_cn/4),_cn-1].filter(function(v,i,a){return a.indexOf(v)===i;});
+      var _cSvg='<svg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:6px;background:#0a0a0a">'
+        +'<defs><linearGradient id="pdRoiGrd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+_cclr+'" stop-opacity=".18"/><stop offset="100%" stop-color="'+_cclr+'" stop-opacity="0"/></linearGradient></defs>';
+      _cTks.forEach(function(tk){
+        var ty=_cyf(tk),isZ=tk===0;
+        _cSvg+='<line x1="'+_cLp+'" y1="'+ty.toFixed(1)+'" x2="'+(_cVW-_cRp)+'" y2="'+ty.toFixed(1)+'" stroke="'+(isZ?'#2a2a2a':'#1a1a1a')+'" stroke-width="1"'+(isZ?' stroke-dasharray="4,4"':'')+'"/>';
+        _cSvg+='<text x="'+(_cLp-3)+'" y="'+(ty+3).toFixed(1)+'" text-anchor="end" font-size="8" fill="#444" font-family="system-ui,sans-serif">'+(tk>0?'+':'')+tk+'u</text>';
+      });
+      _cSvg+='<polygon points="'+_cfp+'" fill="url(#pdRoiGrd)"/>';
+      _cSvg+='<polyline points="'+_cln+'" fill="none" stroke="'+_cclr+'" stroke-width="1.5" stroke-linejoin="round"/>';
+      _cSvg+='<circle cx="'+_cxf(_cn-1).toFixed(1)+'" cy="'+_cyf(_cpts[_cn-1]).toFixed(1)+'" r="3" fill="'+_cclr+'"/>';
+      _cDIs.forEach(function(idx){
+        var dx=_cxf(idx),anch=idx===0?'start':idx===_cn-1?'end':'middle';
+        _cSvg+='<text x="'+dx.toFixed(1)+'" y="96" text-anchor="'+anch+'" font-size="8" fill="#444" font-family="system-ui,sans-serif">'+_cFmtD(_csrt[idx].date)+'</text>';
+      });
+      _cSvg+='</svg>';
+      html+='<div style="margin:8px 0 6px">'+_cSvg+'</div>';
     }
     var _cDolNet=(_pdRoi.units>=0?'+$':'−$')+Math.abs(Math.round(_pdRoi.units*100));
     html+='<div style="margin-bottom:8px">'
