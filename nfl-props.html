@@ -878,6 +878,50 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   </div>
 </div>
 
+<!-- ── DISCLAIMER MODAL ── -->
+<div id="_disclaimerModal" style="display:none;position:fixed;inset:0;z-index:9550;background:rgba(0,0,0,.97);overflow-y:auto">
+  <div style="min-height:100%;display:flex;flex-direction:column;align-items:center;padding:20px 16px 48px">
+    <div style="text-align:center;padding:28px 0 20px">
+      <div style="font-size:24px;font-weight:800;letter-spacing:-.5px">Prop<span style="color:#00ff87">Desk</span></div>
+    </div>
+    <div style="background:#161616;border:1px solid #222;border-radius:16px;width:100%;max-width:480px;padding:24px">
+      <h2 style="font-size:18px;font-weight:700;color:#fff;margin:0 0 20px">Before You Use PropDesk</h2>
+      <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #1e1e1e">
+        <div style="font-size:10px;font-weight:700;color:#00ff87;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">Not Financial Advice</div>
+        <div style="font-size:13px;color:#aaa;line-height:1.65">PropDesk provides sports analytics and statistical data for informational and entertainment purposes only. Nothing on this platform constitutes financial advice, investment advice, or a recommendation to place any bet or wager. All analysis, confidence scores, hit rates, and model outputs are statistical tools — not guarantees of future results.</div>
+      </div>
+      <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #1e1e1e">
+        <div style="font-size:10px;font-weight:700;color:#00ff87;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">You Assume All Risk</div>
+        <div style="font-size:13px;color:#aaa;line-height:1.65">Sports betting involves real financial risk. Past performance of PropDesk's model does not guarantee future results. You are solely responsible for any betting decisions you make. PropDesk is not liable for any financial losses incurred as a result of using this platform.</div>
+      </div>
+      <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #1e1e1e">
+        <div style="font-size:10px;font-weight:700;color:#00ff87;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">Legal in Your Jurisdiction</div>
+        <div style="font-size:13px;color:#aaa;line-height:1.65">It is your responsibility to ensure that sports betting is legal in your state or jurisdiction before placing any wager. PropDesk does not facilitate, process, or accept any bets or wagers. We do not partner with or endorse any sportsbook.</div>
+      </div>
+      <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #1e1e1e;border-left:3px solid #f59e0b;padding-left:16px">
+        <div style="font-size:10px;font-weight:700;color:#f59e0b;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">Responsible Gambling</div>
+        <div style="font-size:13px;color:#aaa;line-height:1.65">If you or someone you know has a gambling problem, free help is available 24/7. Call or text <b style="color:#e4c07a">1-800-GAMBLER (1-800-426-2537)</b> or visit <b style="color:#e4c07a">ncpgambling.org</b>.</div>
+      </div>
+      <div style="margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #1e1e1e">
+        <div style="font-size:10px;font-weight:700;color:#00ff87;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">Age Requirement</div>
+        <div style="font-size:13px;color:#aaa;line-height:1.65">By continuing, you confirm that you are 18 years of age or older (or the legal gambling age in your jurisdiction).</div>
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#00ff87;letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">Data &amp; Privacy</div>
+        <div style="font-size:13px;color:#aaa;line-height:1.65">PropDesk collects your email address to manage your account. We do not sell your data to third parties. Your tracked plays are stored securely and are only visible to you.</div>
+      </div>
+    </div>
+    <div style="width:100%;max-width:480px;margin-top:16px;background:#161616;border:1px solid #222;border-radius:12px;padding:20px">
+      <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;margin-bottom:16px">
+        <input type="checkbox" id="_disclaimerCb" style="width:18px;height:18px;margin-top:2px;accent-color:#00ff87;cursor:pointer;flex-shrink:0">
+        <span style="font-size:13px;color:#ccc;line-height:1.5">I have read and agree to the above terms</span>
+      </label>
+      <button id="_disclaimerBtn" onclick="_acknowledgeDisclaimer()" disabled style="width:100%;background:#222;color:#555;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:700;cursor:not-allowed;transition:background .15s,color .15s">I Agree — Enter PropDesk</button>
+      <div style="text-align:center;margin-top:12px;font-size:11px;color:#444">You can review these terms anytime in the More menu</div>
+    </div>
+  </div>
+</div>
+
 <!-- ── TRIAL EXPIRED OVERLAY ── -->
 <div id="_trialExpired" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.97);align-items:center;justify-content:center">
   <div style="text-align:center;padding:32px 24px;max-width:380px">
@@ -10412,9 +10456,37 @@ function _initAuth(){
     if(event==='SIGNED_OUT'){ _showAuthModal(); }
   });
 }
+var _disclaimerAckCb=null;
+function _showDisclaimerModal(callback){
+  _disclaimerAckCb=callback;
+  var m=$('_disclaimerModal'); if(m) m.style.display='block';
+  var cb=$('_disclaimerCb'),btn=$('_disclaimerBtn');
+  if(cb&&btn){
+    cb.checked=false;
+    btn.disabled=true;
+    btn.style.background='#222'; btn.style.color='#555'; btn.style.cursor='not-allowed';
+    cb.onchange=function(){
+      if(cb.checked){ btn.disabled=false; btn.style.background='#00ff87'; btn.style.color='#000'; btn.style.cursor='pointer'; }
+      else{ btn.disabled=true; btn.style.background='#222'; btn.style.color='#555'; btn.style.cursor='not-allowed'; }
+    };
+  }
+}
+function _acknowledgeDisclaimer(){
+  var btn=$('_disclaimerBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  function _proceed(){ var m=$('_disclaimerModal'); if(m) m.style.display='none'; if(_disclaimerAckCb){ _disclaimerAckCb(); _disclaimerAckCb=null; } }
+  _supabase.auth.updateUser({data:{disclaimer_acknowledged:true}}).then(_proceed).catch(_proceed);
+}
 function _checkTrialAndLaunch(user){
-  var ADMIN_EMAILS=['coopctaylor10@icloud.com'];
   _authUser=user;
+  if(!(user.user_metadata||{}).disclaimer_acknowledged){
+    _showDisclaimerModal(function(){ _doLaunchUser(user); });
+    return;
+  }
+  _doLaunchUser(user);
+}
+function _doLaunchUser(user){
+  var ADMIN_EMAILS=['coopctaylor10@icloud.com'];
   if(ADMIN_EMAILS.indexOf(user.email)>=0){ init(); _initAcctBtn(user); _sbMigrateIfNeeded(user); return; }
   var ts=(user.user_metadata||{}).trial_start;
   if(!ts){ _showTrialExpired(); return; }
