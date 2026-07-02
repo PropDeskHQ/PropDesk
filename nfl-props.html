@@ -837,8 +837,51 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .ml-reason p{font-size:12px;color:var(--mut);line-height:1.65;margin:0}
 @media(max-width:520px){.ml-reason-wrap{grid-template-columns:1fr}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+
+<!-- ── AUTH TRIAL BANNER ── -->
+<div id="_trialBanner" style="display:none"></div>
+
+<!-- ── AUTH MODAL ── -->
+<div id="_authModal" style="display:none;position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.93);align-items:center;justify-content:center">
+  <div style="background:#161616;border:1px solid #222;border-radius:16px;width:100%;max-width:380px;margin:16px;overflow:hidden">
+    <div style="padding:28px 28px 20px;text-align:center">
+      <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px">Prop<span style="color:#00ff87">Desk</span></div>
+      <div style="font-size:12px;color:#666;line-height:1.5">Data-first prop analysis for bettors who want an edge</div>
+    </div>
+    <div style="display:flex;border-bottom:1px solid #222;padding:0 28px">
+      <button id="_authTabLogin" onclick="_authSetTab('login')" style="flex:1;padding:10px 0;font-size:13px;font-weight:600;border:none;border-bottom:2px solid #00ff87;background:none;color:#fff;cursor:pointer">Log In</button>
+      <button id="_authTabSignup" onclick="_authSetTab('signup')" style="flex:1;padding:10px 0;font-size:13px;font-weight:600;border:none;border-bottom:2px solid transparent;background:none;color:#666;cursor:pointer">Sign Up</button>
+    </div>
+    <div id="_authErr" style="min-height:18px;padding:12px 28px 0;font-size:12px;color:#ff4f4f;text-align:center"></div>
+    <!-- Login form -->
+    <div id="_authLogin" style="padding:12px 28px 28px">
+      <div style="margin-bottom:12px"><input id="_authLiEmail" type="email" placeholder="Email address" autocomplete="email" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;font-size:13px;color:#fff;outline:none"></div>
+      <div style="margin-bottom:20px"><input id="_authLiPw" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')_authLogin()" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;font-size:13px;color:#fff;outline:none"></div>
+      <button id="_authLiBtn" onclick="_authLogin()" style="width:100%;background:#00ff87;color:#000;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">Log In</button>
+    </div>
+    <!-- Signup form -->
+    <div id="_authSignup" style="display:none;padding:12px 28px 28px">
+      <div style="margin-bottom:12px"><input id="_authEmail" type="email" placeholder="Email address" autocomplete="email" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;font-size:13px;color:#fff;outline:none"></div>
+      <div style="margin-bottom:12px"><input id="_authPw" type="password" placeholder="Password (min 6 characters)" autocomplete="new-password" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;font-size:13px;color:#fff;outline:none"></div>
+      <div style="margin-bottom:20px"><input id="_authPw2" type="password" placeholder="Confirm password" autocomplete="new-password" onkeydown="if(event.key==='Enter')_authSignup()" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;font-size:13px;color:#fff;outline:none"></div>
+      <button id="_authSuBtn" onclick="_authSignup()" style="width:100%;background:#00ff87;color:#000;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TRIAL EXPIRED OVERLAY ── -->
+<div id="_trialExpired" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.97);align-items:center;justify-content:center">
+  <div style="text-align:center;padding:32px 24px;max-width:380px">
+    <div style="font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px">Prop<span style="color:#00ff87">Desk</span></div>
+    <div style="font-size:40px;margin:20px 0 16px">&#9200;</div>
+    <div style="font-size:20px;font-weight:800;margin-bottom:10px">Trial Expired</div>
+    <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:28px">Your 90-day free trial has ended.<br>Contact us to continue using PropDesk.</div>
+    <a href="mailto:propdeskhq@gmail.com" style="display:inline-block;background:#00ff87;color:#000;border-radius:8px;padding:12px 28px;font-size:14px;font-weight:700;text-decoration:none">Contact Us</a>
+  </div>
+</div>
 
 <!-- HEADER -->
 <header class="hdr">
@@ -1164,6 +1207,9 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 
 <script>
 "use strict";
+var SUPABASE_URL='https://xwmvkfhlfntjgouibftt.supabase.co';
+var SUPABASE_KEY='sb_publishable_RKjp7WAmXRR7YXxyu1zHIQ_MEBWPDQw';
+var _supabase;
 /* ============ CONFIG ============ */
 var ODDS_BASE = "https://api.the-odds-api.com/v4";
 
@@ -10160,7 +10206,93 @@ async function fetchWeather(homeTeam,sport){
   }catch(e){return null;}
 }
 
-document.addEventListener("DOMContentLoaded",init);
+/* ============ AUTH ============ */
+function _initAuth(){
+  _supabase=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  _supabase.auth.getSession().then(function(res){
+    var session=res.data&&res.data.session;
+    if(!session){ _showAuthModal(); }
+    else{ _checkTrialAndLaunch(session.user); }
+  });
+  _supabase.auth.onAuthStateChange(function(event,session){
+    if(event==='SIGNED_OUT'){ _showAuthModal(); }
+  });
+}
+function _checkTrialAndLaunch(user){
+  var ts=(user.user_metadata||{}).trial_start;
+  if(!ts){ _showTrialExpired(); return; }
+  var daysLeft=90-Math.floor((Date.now()-new Date(ts))/86400000);
+  if(daysLeft<=0){ _showTrialExpired(); return; }
+  _showTrialBanner(daysLeft);
+  init();
+}
+function _showTrialBanner(daysLeft){
+  var b=$('_trialBanner');
+  if(!b) return;
+  var urgent=daysLeft<=7;
+  b.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:6px 16px;font-size:12px;'+(urgent?'background:#2a2000;color:#ffcc00;border-bottom:1px solid #3a3000':'background:#111a11;color:#666;border-bottom:1px solid #1a2a1a');
+  b.innerHTML='<span>'+(urgent?'⚠ ':'')+' Free trial — <b>'+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining</b></span>'
+    +'<button onclick="this.parentNode.style.display=\'none\'" style="background:none;border:none;color:inherit;cursor:pointer;font-size:18px;line-height:1;padding:0 0 0 12px;opacity:.7">&times;</button>';
+}
+function _showTrialExpired(){
+  var o=$('_trialExpired');
+  if(o) o.style.display='flex';
+}
+function _showAuthModal(){
+  var m=$('_authModal');
+  if(m){ m.style.display='flex'; _authSetTab('login'); }
+}
+function _authSetTab(tab){
+  var err=$('_authErr');
+  if(err){ err.textContent=''; err.style.color='#ff4f4f'; }
+  var su=$('_authSignup'),li=$('_authLogin');
+  var tsu=$('_authTabSignup'),tli=$('_authTabLogin');
+  if(!su||!li) return;
+  if(tab==='signup'){
+    su.style.display='block'; li.style.display='none';
+    tsu.style.color='#fff'; tsu.style.borderBottomColor='#00ff87';
+    tli.style.color='#666'; tli.style.borderBottomColor='transparent';
+  } else {
+    su.style.display='none'; li.style.display='block';
+    tli.style.color='#fff'; tli.style.borderBottomColor='#00ff87';
+    tsu.style.color='#666'; tsu.style.borderBottomColor='transparent';
+  }
+}
+function _authSignup(){
+  var email=($('_authEmail').value||'').trim();
+  var pw=$('_authPw').value||'';
+  var pw2=$('_authPw2').value||'';
+  var err=$('_authErr'),btn=$('_authSuBtn');
+  err.style.color='#ff4f4f';
+  if(!email||!pw||!pw2){ err.textContent='All fields required.'; return; }
+  if(pw!==pw2){ err.textContent='Passwords do not match.'; return; }
+  if(pw.length<6){ err.textContent='Password must be at least 6 characters.'; return; }
+  err.textContent=''; btn.disabled=true; btn.textContent='Creating account…';
+  _supabase.auth.signUp({email:email,password:pw,options:{data:{trial_start:new Date().toISOString()}}}).then(function(res){
+    btn.disabled=false; btn.textContent='Create Account';
+    if(res.error){ err.textContent=res.error.message; return; }
+    var u=res.data&&res.data.user;
+    if(u&&u.identities&&u.identities.length===0){ err.textContent='An account with this email already exists. Please log in.'; return; }
+    if(res.data&&res.data.session){ $('_authModal').style.display='none'; _checkTrialAndLaunch(res.data.user); }
+    else{ err.style.color='#00ff87'; err.textContent='Check your email to confirm your account, then log in.'; }
+  });
+}
+function _authLogin(){
+  var email=($('_authLiEmail').value||'').trim();
+  var pw=$('_authLiPw').value||'';
+  var err=$('_authErr'),btn=$('_authLiBtn');
+  err.style.color='#ff4f4f';
+  if(!email||!pw){ err.textContent='Email and password required.'; return; }
+  err.textContent=''; btn.disabled=true; btn.textContent='Signing in…';
+  _supabase.auth.signInWithPassword({email:email,password:pw}).then(function(res){
+    btn.disabled=false; btn.textContent='Log In';
+    if(res.error){ err.textContent=res.error.message; return; }
+    $('_authModal').style.display='none';
+    _checkTrialAndLaunch(res.data.user);
+  });
+}
+
+document.addEventListener("DOMContentLoaded",_initAuth);
 </script>
 
 <!-- TREND DETAIL OVERLAY -->
