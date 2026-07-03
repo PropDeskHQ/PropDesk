@@ -5556,7 +5556,13 @@ async function _sbMigrateIfNeeded(user){
     if((chk.data||[]).length>0){
       var all=await _supabase.from('plays').select('*').eq('user_id',user.id).order('logged_at',{ascending:false});
       if(all.error||!all.data) return;
-      savePlayHist(all.data.map(_sbMapToLocal));
+      const sbPlays=all.data.map(_sbMapToLocal);
+      const sbLoggedAts=new Set(sbPlays.map(p=>p.loggedAt));
+      const localPlays=loadPlayHist();
+      const pendingLocal=localPlays.filter(p=>p.loggedAt&&!sbLoggedAts.has(p.loggedAt));
+      const merged=[...pendingLocal,...sbPlays];
+      merged.sort((a,b)=>(b.loggedAt||0)-(a.loggedAt||0));
+      savePlayHist(merged);
       _histLastSbLoad=Date.now();
       return;
     }
