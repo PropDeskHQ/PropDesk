@@ -304,8 +304,9 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   .bb{font-size:20px}
   .adj-val{font-size:20px}
   .vs b{font-size:20px}
-  .adj-btn{width:18px;height:18px;font-size:11px}
-  .adj-ctrl{gap:5px}
+  .adj-btn{width:44px;height:44px;font-size:14px}
+  .adj-ctrl{flex-direction:column;gap:0;align-items:center}
+  .adj-orig,.adj-reset{display:none}
   /* Player cell stacks 8-9 quick-stat chips in one column and gets very tall — vertical-align:middle
      (set at line 206) then floats Book Line/Stepper/Confidence in the middle of that tall row,
      detached from the player name at top. Align them to the top instead. */
@@ -316,6 +317,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
   .qs-toggle:active{color:var(--text);border-color:#3a3a3a}
   .pl-qstats{display:none}
   .pl-qstats.open{display:flex}
+  .wl{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  .ph-hit,.ph-miss,.ph-void,.tph-hit,.tph-miss,.tph-void,.ml-hit,.ml-miss,.ml-void{min-height:44px!important}
 }
 
 /* SUMMARY BAR */
@@ -846,6 +849,28 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .ml-reason-hdr-neg{color:var(--mut2)}
 .ml-reason p{font-size:12px;color:var(--mut);line-height:1.65;margin:0}
 @media(max-width:520px){.ml-reason-wrap{grid-template-columns:1fr}}
+@media(max-width:480px){
+  #_authModal > div{max-height:85vh;overflow-y:auto!important}
+  .tabrow.prop{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabrow.prop::-webkit-scrollbar{display:none}
+  .g5-hdr .g5-title{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .g5-hdr .g5-sub{display:none}
+  .filterbar{gap:6px}
+  .filterbar .fb-lbl{display:none}
+  .filterbar .count{display:none}
+  .filterbar select{flex:1;min-width:0}
+  .more-drawer{max-height:calc(100vh - 64px);overflow-y:auto}
+  .btn{min-height:44px}
+  .btn-toggle{min-height:44px}
+  .tcc-toggle button{min-height:44px}
+  .tc-share-sm{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  .td-close{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center}
+  .dc-btn{min-height:44px}
+  .why-btn{padding:8px 12px}
+  .dc-gs-link-drawer{display:inline-block;padding:12px 0}
+  .onb-connect-btn{min-height:44px;padding:8px 12px}
+  .onb-dismiss-btn{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
