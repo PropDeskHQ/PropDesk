@@ -1053,7 +1053,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   <!-- GAMES PAGE -->
   <div class="page active" id="page-games">
     <div class="tabrow" id="sportTabs"></div>
-    <div class="games" id="gamesRow"><div class="empty" style="padding:18px">Connect your API key, then pick a sport.</div></div>
+    <div class="games" id="gamesRow"><div class="empty" style="padding:18px">Pick a sport to see today's props.</div></div>
 
     <!-- Game detail — shown when a game is selected -->
     <div id="gameDetail" style="display:none">
@@ -2946,7 +2946,6 @@ function skeletonTable(){
 async function loadBoard(){
   if(!ST.eventId || !ST.market) return;
   if(ST.market==="_h2h"){loadMoneylineBoard();return;}
-  if(!getKey()){ toast("Connect your API key first"); return; }
   destroyCharts();
   var cm=$("gameContentMount"); if(cm) cm.style.display="";
   var trMount=$("trendsMount"); if(trMount) trMount.style.display="none";
@@ -9042,8 +9041,8 @@ function initTrends(){
 
 async function loadTrends(){
   var mount=$("trendsMount"); if(!mount) return;
-  if(!ST.eventId||!getKey()){
-    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Connect your API key and select a game on the <strong>Props</strong> tab to see trends.</p></div>';
+  if(!ST.eventId){
+    mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game on the <strong>Props</strong> tab to see trends.</p></div>';
     return;
   }
   mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Calculating trends from live data...</p></div>';
@@ -10476,8 +10475,8 @@ async function loadGameTrends(){
   $("filterBar").style.display="none";
   $("potgMount").innerHTML=""; $("lotdMount").innerHTML="";
   var sb=$("summaryBar"); if(sb) sb.style.display="none";
-  if(!ST.eventId||!getKey()){
-    trMount.innerHTML='<div class="tc-no-data"><div class="nd-icon">🔑</div><p>Connect your API key and select a game first.</p></div>'; return;
+  if(!ST.eventId){
+    trMount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📊</div><p>Select a game on the Props tab to get started.</p></div>'; return;
   }
   trMount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading trends for this game…</p></div>';
   var mks=LOTD_MARKETS[ST.sport]||[];
