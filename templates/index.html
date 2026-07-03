@@ -10349,6 +10349,8 @@ function renderGameTop5(picks,isScanning){
     return;
   }
   var html='<div class="g5-hdr"><span class="g5-title">Best Plays</span><span class="g5-sub">· '+picks.length+' qualified</span><button class="g5-track-all-btn" id="g5TrackAllBtn">+ Track All</button><button class="g5-share-game-btn" id="g5ShareGameBtn">Share Game</button></div>'+_g5TsHtml(ST.eventId,isScanning);
+  var _g5Today=new Date().toISOString().slice(0,10);
+  var _g5Hist=[];try{_g5Hist=JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]");}catch(e){}
   picks.forEach(function(p,i){
     var conf=getEffectiveConf(p);
     var tier=confTierOf(conf);
@@ -10368,6 +10370,8 @@ function renderGameTop5(picks,isScanning){
       '<span class="t10-line-badge '+lineCls+'">'+esc(fmtLine(pdLine||p.bestLine,side))+'</span>';
     var snap=buildT10SnapLine(p,mktName);
     var analysis=generateWhyExplanation(p);
+    var _g5Mkt=p._market||ST.market;
+    var _g5Tracked=_g5Hist.some(function(e){return e.player===p.player&&e.market===_g5Mkt&&e.date===_g5Today;});
     html+=
       '<div class="t10-card '+cardCls+'">'+
         '<div class="t10-row-top">'+
@@ -10387,6 +10391,7 @@ function renderGameTop5(picks,isScanning){
         '<div class="t10-foot">'+
           '<button class="t10-why-btn" data-g5why="'+i+'">Why? &#9656;</button>'+
           '<div class="t10-foot-btns">'+
+            '<button class="mini trk-btn'+(_g5Tracked?' trk-done':'')+'" data-g5track="'+i+'"'+(_g5Tracked?' disabled':'')+'>'+(_g5Tracked?'&#10003; Tracked':'+ Track')+'</button>'+
             '<button class="t10-parlay-btn" data-g5add="'+i+'">+ Parlay</button>'+
             '<button class="t10-share-btn" data-g5share="'+i+'">Share ↗</button>'+
           '</div>'+
@@ -10462,6 +10467,32 @@ function renderGameTop5(picks,isScanning){
       var md=null; for(var x=0;x<ma.length;x++){if(ma[x].k===(p._market||"")){md=ma[x];break;}}
       copyText(buildTop10ShareItem(idx+1,p,md?md.n:(p._market||"").replace(/_/g," "),sk));
       toast("Copied!");
+    };
+  });
+  mount.querySelectorAll("[data-g5track]").forEach(function(btn){
+    btn.onclick=function(){
+      var idx=parseInt(btn.getAttribute("data-g5track"),10);
+      var p=picks[idx]; if(!p) return;
+      var today=new Date().toISOString().slice(0,10);
+      var mkt=p._market||ST.market;
+      var sp=p._sport||ST.sport;
+      var spLabel={baseball_mlb:"MLB",americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL"}[sp]||sp;
+      var _isT=!!(mkt&&(THRESHOLD_MARKETS[sp]||{})[mkt]);
+      var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
+      var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
+      var conf=getEffectiveConf(p);
+      var tier=confTierOf(conf);
+      var h=[];try{h=JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||"[]");}catch(e){h=[];}
+      if(!h.some(function(e){return e.player===p.player&&e.market===mkt&&e.date===today;})){
+        var e2={date:today,player:p.player,market:mkt,marketDisplay:marketName(mkt),sport:spLabel,game:p._game||"",line:line,confidence:conf,tier:tier.t,odds:p.bestOdds||null,result:"pending",loggedAt:Date.now(),source:"manual"};
+        h.unshift(e2);
+        localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(h));
+        _sbSavePlay(e2);
+        _toastTrack("Added to My Plays ✓");
+        if($("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
+      }
+      btn.textContent="✓ Tracked";
+      setTimeout(function(){ btn.textContent="+ Track"; },1500);
     };
   });
 }
