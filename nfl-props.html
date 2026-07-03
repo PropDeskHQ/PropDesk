@@ -802,7 +802,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .ml-c3-disc{font-size:9px;color:var(--mut2);line-height:1.4;text-align:center;margin-top:14px;opacity:.5;font-style:italic}
 @media(max-width:480px){
   .ml-c3-row{gap:6px}.ml-c3-prob{font-size:36px}
-  .ml-c3-name{font-size:14px}.ml-c3-odds{font-size:18px}.ml-c3-bar-nick{display:none}
+  .ml-c3-name{font-size:14px;white-space:normal}.ml-c3-odds{font-size:18px}.ml-c3-bar-nick{display:none}
 }
 /* GAME INFO STRIP */
 .gis-wrap{background:#111;border:1px solid #1e1e1e;border-radius:12px;overflow:hidden;margin:10px 0 14px}
@@ -889,6 +889,15 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   .ph-card-row>div:first-child{width:100%}
   .ph-card-res{width:100%;display:flex;gap:6px;padding-top:6px}
   .ph-card-res .btn{flex:1;min-width:0!important}
+  /* Game card player name */
+  .game .gm-best-pl{max-width:140px}
+  /* Game strip swipe-hint fade */
+  .games{-webkit-mask-image:linear-gradient(to right,black calc(100% - 40px),transparent 100%);mask-image:linear-gradient(to right,black calc(100% - 40px),transparent 100%)}
+  /* Sport pill count badge */
+  #sportTabs .pill,#t10SportTabs .pill,#trendsSportTabs .pill{padding:6px 14px;font-size:12px}
+  /* My History market filter pills → horizontal scroll */
+  .tabrow:has(.ph-a-mkt){overflow-x:auto;flex-wrap:nowrap!important;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .tabrow:has(.ph-a-mkt)::-webkit-scrollbar{display:none}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
