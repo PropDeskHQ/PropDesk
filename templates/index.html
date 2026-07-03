@@ -6273,7 +6273,13 @@ async function renderPlayHistory(){
     try{
       var sbRes=await _supabase.from('plays').select('*').eq('user_id',_authUser.id).order('logged_at',{ascending:false});
       if(!sbRes.error&&sbRes.data){
-        savePlayHist(sbRes.data.map(_sbMapToLocal));
+        const sbPlays=sbRes.data.map(_sbMapToLocal);
+        const sbLoggedAts=new Set(sbPlays.map(p=>p.loggedAt));
+        const localPlays=loadPlayHist();
+        const pendingLocal=localPlays.filter(p=>p.loggedAt&&!sbLoggedAts.has(p.loggedAt));
+        const merged=[...pendingLocal,...sbPlays];
+        merged.sort((a,b)=>(b.loggedAt||0)-(a.loggedAt||0));
+        savePlayHist(merged);
         _histLastSbLoad=Date.now();
       }
     }catch(e){}
@@ -8962,7 +8968,7 @@ function renderTrends(trends){
       var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
       var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
       var _trSpMap={'americanfootball_nfl':'NFL','basketball_nba':'NBA','icehockey_nhl':'NHL','baseball_mlb':'MLB'};
-      var entry={date:today,player:t.player||t.team||'',market:t._rawMarket||t._market||'',line:t._rawLine!=null?String(t._rawLine):'',confidence:null,result:'pending',source:'trend',sport:_trSpMap[_trendsSport]||'',game:t._game||t.game||'',trendType:typeLabel,trendSignal:t.headline||'',trendRecord:t.record||'',trendWinRate:t.hitRate!=null?t.hitRate/100:null,trendSystem:typeLabel,trendDescription:t.headline||'',trendSampleSize:_trSamp,teamId:t.teamId||null,loggedAt:Date.now(),odds:null};
+      var entry={date:today,player:t.player||t.team||'',market:t._rawMarket||t._market||'',line:t._rawLine!=null?String(t._rawLine):'',confidence:null,result:'pending',source:'trend',type:'trend',sport:_trSpMap[_trendsSport]||'',game:t._game||t.game||'',trendType:typeLabel,trendSignal:t.headline||'',trendRecord:t.record||'',trendWinRate:t.hitRate!=null?t.hitRate/100:null,trendSystem:typeLabel,trendDescription:t.headline||'',trendSampleSize:_trSamp,teamId:t.teamId||null,loggedAt:Date.now(),odds:null};
       var h=loadPlayHist(); h.unshift(entry); savePlayHist(h);
       _sbSavePlay(entry);
       btn.textContent='✓ Tracked'; btn.disabled=true; btn.classList.add('trk-done');
