@@ -1269,7 +1269,6 @@ var SUPABASE_KEY='sb_publishable_RKjp7WAmXRR7YXxyu1zHIQ_MEBWPDQw';
 var _supabase;
 var _authUser=null;
 /* ============ CONFIG ============ */
-var ODDS_BASE = "https://api.the-odds-api.com/v4";
 
 var SPORTS = [
   {key:"americanfootball_nfl", label:"NFL"},
@@ -1942,8 +1941,8 @@ function countUp(node,target,dec,fromVal,suffix){
 
 /* ============ ODDS FETCH ============ */
 function apiUrl(path,params){
-  var u=ODDS_BASE+path+"?apiKey="+encodeURIComponent(getKey());
-  if(params) for(var k in params) u+="&"+k+"="+encodeURIComponent(params[k]);
+  var u='/api/odds/?_path=/v4'+path;
+  if(params) for(var k in params) u+='&'+k+'='+encodeURIComponent(params[k]);
   return u;
 }
 function setStatus(state,quotaText){
