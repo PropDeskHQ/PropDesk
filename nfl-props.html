@@ -8378,7 +8378,7 @@ async function calcTeamSituationalTrends(){
               type:"teamsit",conf:Math.round(Math.min(88,55+pRate*25+Math.min(pVsOpp.length,15))),
               player:tp.name,systemName:"PITCHER DOMINANCE",
               headline:(tp.myPitcherName||"Pitcher")+" vs "+tp.oppName+" — "+pW+"-"+(pVsOpp.length-pW)+", "+pRA.toFixed(2)+" R/G in "+pVsOpp.length+" starts",
-              title:tp.name+" | Pitcher vs Opponent",
+              title:(tp.myPitcherName||"Pitcher")+" vs "+tp.oppName,
               record:pW+"-"+(pVsOpp.length-pW)+" L"+pVsOpp.length,
               hitRate:Math.round(pRate*100),recordCls:pRate<0.5?"under":"",
               detail:pVsOpp.length+" starts by "+(tp.myPitcherName||"today's pitcher")+" vs "+tp.oppName+". Win rate: "+Math.round(pRate*100)+"%. Avg R allowed: "+pRA.toFixed(2)+".",
@@ -8405,8 +8405,8 @@ async function calcTeamSituationalTrends(){
           trends.push({
             type:"teamsit",conf:Math.round(Math.min(85,50+Math.abs(hRate-rRate)*150+Math.min(Math.min(hGs.length,rGs.length),40))),
             player:tp.name,systemName:"HOME/ROAD DOMINANCE",
-            headline:tp.name+" "+bLocLbl+" — "+Math.round(bTodayRate*100)+"% vs "+Math.round(bOtherRate*100)+"% "+(tp.isHomeToday?"on road":"at home")+" (L3 seasons)",
-            title:tp.name+" | Home/Road Split",
+            headline:tp.name+" "+bLocLbl+" — "+Math.round(bTodayRate*100)+"% win rate vs "+Math.round(bOtherRate*100)+"% "+(tp.isHomeToday?"on the road":"at home")+" over the last 3 seasons",
+            title:tp.name+(tp.isHomeToday?" at Home":" on the Road"),
             record:bW+"-"+(bTodayGms.length-bW)+" "+bLocLbl,
             hitRate:Math.round(bTodayRate*100),recordCls:bTodayRate<0.5?"under":"",
             detail:bTodayGms.length+" games "+bLocLbl+" over 3 seasons. Win rate "+bLocLbl+": "+Math.round(bTodayRate*100)+"% vs "+(tp.isHomeToday?"on road":"at home")+": "+Math.round(bOtherRate*100)+"%.",
@@ -8436,8 +8436,8 @@ async function calcTeamSituationalTrends(){
             trends.push({
               type:"teamsit",conf:Math.round(Math.min(82,50+Math.abs(restedR-b2bR)*120+Math.min(Math.min(b2bList.length,restedList.length),30))),
               player:tp.name,systemName:"REST ADVANTAGE",
-              headline:tp.name+" "+cRestLbl+" — "+Math.round(cRate*100)+"% win rate vs "+Math.round(cOther*100)+"% "+(cTodayIsRested?"on 0 rest":"with 2+ rest")+" (L3 seasons)",
-              title:tp.name+" | Rest Splits",
+              headline:tp.name+(cTodayIsRested?" with 1+ days rest":" on back-to-back")+" — "+Math.round(cRate*100)+"% win rate vs "+Math.round(cOther*100)+"% "+(cTodayIsRested?"on 0 days rest":"with rest")+" (last 3 seasons)",
+              title:tp.name+(cTodayIsRested?" with Rest":" on Back-to-Back"),
               record:cW+"-"+(cGmsList.length-cW)+" "+cRestLbl,
               hitRate:Math.round(cRate*100),recordCls:cRate<0.5?"under":"",
               detail:cGmsList.length+" games in this rest situation over 3 seasons. Today: "+todayRest+" day(s) since last game.",
@@ -8466,8 +8466,8 @@ async function calcTeamSituationalTrends(){
           trends.push({
             type:"teamsit",conf:Math.round(Math.min(83,50+Math.abs(vaRate-vbRate)*100+Math.min(Math.min(vsAbove.length,vsBelow.length),40))),
             player:tp.name,systemName:"OPPONENT QUALITY",
-            headline:tp.name+" vs "+dOppLbl+" — "+Math.round(dRate*100)+"% win rate L3 seasons ("+dW+"-"+(dGmsList.length-dW)+")",
-            title:tp.name+" | Opponent Quality",
+            headline:tp.name+" vs "+dOppLbl+" — "+Math.round(dRate*100)+"% win rate ("+dW+"-"+(dGmsList.length-dW)+") over last 3 seasons",
+            title:tp.name+" vs "+(oppIsGood?"Above-.500":"Sub-.500")+" Teams",
             record:dW+"-"+(dGmsList.length-dW)+" vs "+dOppLbl,
             hitRate:Math.round(dRate*100),recordCls:dRate<0.5?"under":"",
             detail:dGmsList.length+" games vs "+dOppLbl+" over 3 seasons. Win rate: "+Math.round(dRate*100)+"% vs "+(oppIsGood?"sub-.500":"above-.500")+": "+Math.round(dOther*100)+"%.",
@@ -8494,8 +8494,8 @@ async function calcTeamSituationalTrends(){
           trends.push({
             type:"teamsit",conf:Math.round(Math.min(82,50+Math.abs(dRate2-nRate)*100+Math.min(Math.min(dayGms.length,nightGms.length),40))),
             player:tp.name,systemName:"DAY/NIGHT SPLIT",
-            headline:tp.name+" in "+eDNLbl+" — "+Math.round(eDNRate*100)+"% win rate vs "+Math.round(eDNOther*100)+"% at "+(isDay?"night":"day")+" (L3 seasons)",
-            title:tp.name+" | Day/Night Split",
+            headline:tp.name+" in "+eDNLbl+" — "+Math.round(eDNRate*100)+"% win rate vs "+Math.round(eDNOther*100)+"% at "+(isDay?"night":"day")+" (last 3 seasons)",
+            title:tp.name+" in "+(isDay?"Day":"Night")+" Games",
             record:eDNW+"-"+(eDNGms.length-eDNW)+" in "+eDNLbl,
             hitRate:Math.round(eDNRate*100),recordCls:eDNRate<0.5?"under":"",
             detail:eDNGms.length+" "+eDNLbl+" over 3 seasons.",
@@ -8515,8 +8515,8 @@ async function calcTeamSituationalTrends(){
           trends.push({
             type:"teamsit",conf:Math.round(Math.min(80,50+Math.abs(opR-0.5)*100+Math.min(openers.length,30))),
             player:tp.name,systemName:"SERIES OPENER",
-            headline:tp.name+" as series opener — "+Math.round(opR*100)+"% win rate ("+opW+"-"+(openers.length-opW)+") L3 seasons",
-            title:tp.name+" | Series Opener",
+            headline:tp.name+" in series openers — "+Math.round(opR*100)+"% win rate ("+opW+"-"+(openers.length-opW)+") over last 3 seasons",
+            title:tp.name+" as Series Opener",
             record:opW+"-"+(openers.length-opW)+" in series openers",
             hitRate:Math.round(opR*100),recordCls:opR<0.5?"under":"",
             detail:openers.length+" series openers tracked over 3 seasons.",
@@ -8537,7 +8537,7 @@ async function calcTeamSituationalTrends(){
           trends.push({
             type:"teamsit",conf:Math.round(Math.min(83,50+Math.abs(h2hR-0.5)*100+Math.min(h2h.length,25))),
             player:tp.name,systemName:"HEAD-TO-HEAD",
-            headline:tp.name+" vs "+tp.oppName+" L3 seasons — "+h2hW+"-"+(h2h.length-h2hW)+" ("+pctStr+")",
+            headline:tp.name+" is "+h2hW+"-"+(h2h.length-h2hW)+" ("+pctStr+") vs "+tp.oppName+" over the last 3 seasons",
             title:tp.name+" vs "+tp.oppName,
             record:h2hW+"-"+(h2h.length-h2hW)+" vs "+tp.oppName,
             hitRate:Math.round(h2hR*100),recordCls:h2hR<0.5?"under":"",
@@ -8613,7 +8613,6 @@ function _trendCardTitle(t){
   }
   if(t.type==="homeway") return t.player+" — Home/away split";
   if(t.type==="matchup") return t.player+" — Situational matchup edge";
-  if(t.type==="teamsit") return t.player+" — Team situational system";
   return t.title||t.player;
 }
 function _trendActionLine(t){
@@ -8642,9 +8641,7 @@ function _trendActionLine(t){
     var mside=t.recordCls==="under"?"Under":"Over";
     return "Favorable matchup for "+t.player+" — historical splits back the "+mside;
   }
-  if(t.type==="teamsit"){
-    return "Team historically performs well in this spot — situational edge detected";
-  }
+  if(t.type==="teamsit") return "";
   return "";
 }
 function renderTrendCard(t, sigCls, sigLabel){
