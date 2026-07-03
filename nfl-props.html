@@ -10527,7 +10527,7 @@ function _authSetTab(tab){
     tsu.style.color='#666'; tsu.style.borderBottomColor='transparent';
   }
 }
-function _authSignup(){
+async function _authSignup(){
   var email=($('_authEmail').value||'').trim();
   var pw=$('_authPw').value||'';
   var pw2=$('_authPw2').value||'';
@@ -10537,13 +10537,44 @@ function _authSignup(){
   if(pw!==pw2){ err.textContent='Passwords do not match.'; return; }
   if(pw.length<6){ err.textContent='Password must be at least 6 characters.'; return; }
   err.textContent=''; btn.disabled=true; btn.textContent='Creating account…';
-  _supabase.auth.signUp({email:email,password:pw,options:{data:{trial_start:new Date().toISOString()}}}).then(function(res){
+  try{
+    var lim=await _supabase.from('app_config').select('value').eq('key','free_trial_limit').single();
+    var cnt=await _supabase.from('app_config').select('value').eq('key','total_signups').single();
+    var limit=parseInt((lim.data||{}).value||'500');
+    var count=parseInt((cnt.data||{}).value||'0');
+    if(count>=limit){ showWaitlist(); return; }
+    var res=await _supabase.auth.signUp({email:email,password:pw,options:{data:{trial_start:new Date().toISOString()}}});
     btn.disabled=false; btn.textContent='Create Account';
     if(res.error){ err.textContent=res.error.message; return; }
     var u=res.data&&res.data.user;
     if(u&&u.identities&&u.identities.length===0){ err.textContent='An account with this email already exists. Please log in.'; return; }
+    await _supabase.from('app_config').update({value:String(count+1)}).eq('key','total_signups');
     if(res.data&&res.data.session){ $('_authModal').style.display='none'; _checkTrialAndLaunch(res.data.user); }
     else{ err.style.color='#00ff87'; err.textContent='Check your email to confirm your account, then log in.'; }
+  }catch(e){ btn.disabled=false; btn.textContent='Create Account'; err.textContent='Something went wrong. Please try again.'; }
+}
+function showWaitlist(){
+  var m=$('_authModal'); if(!m) return;
+  var inner=m.querySelector('div');
+  inner.innerHTML='<div style="padding:32px 28px 28px;text-align:center">'
+    +'<div style="font-size:24px;font-weight:800;letter-spacing:-.5px;margin-bottom:10px">Prop<span style="color:#00ff87">Desk</span></div>'
+    +'<div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:10px">PropDesk is currently full</div>'
+    +'<div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:24px">The free trial is currently at capacity. Drop your email below to get notified when spots open up.</div>'
+    +'<input id="_wlEmail" type="email" placeholder="Your email address" style="width:100%;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:10px 12px;font-size:13px;color:#fff;outline:none;box-sizing:border-box;margin-bottom:10px">'
+    +'<button id="_wlBtn" onclick="_wlSubmit()" style="width:100%;background:#00ff87;color:#000;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">Join Waitlist</button>'
+    +'<div id="_wlMsg" style="min-height:18px;margin-top:12px;font-size:12px;color:#00ff87;text-align:center"></div>'
+    +'</div>';
+}
+function _wlSubmit(){
+  var emailVal=($('_wlEmail').value||'').trim();
+  var btn=$('_wlBtn'),msg=$('_wlMsg');
+  if(!emailVal){ msg.style.color='#ff4f4f'; msg.textContent='Please enter your email.'; return; }
+  btn.disabled=true; btn.textContent='Joining…';
+  _supabase.from('waitlist').insert({email:emailVal,joined_at:new Date().toISOString()}).then(function(res){
+    if(res.error){ btn.disabled=false; btn.textContent='Join Waitlist'; msg.style.color='#ff4f4f'; msg.textContent='Something went wrong. Please try again.'; return; }
+    btn.style.display='none';
+    var ei=$('_wlEmail'); if(ei) ei.style.display='none';
+    msg.textContent="You're on the list. We'll reach out when spots open.";
   });
 }
 function _authLogin(){
