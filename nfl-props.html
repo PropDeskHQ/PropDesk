@@ -899,6 +899,41 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   .tabrow:has(.ph-a-mkt){overflow-x:auto;flex-wrap:nowrap!important;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .tabrow:has(.ph-a-mkt)::-webkit-scrollbar{display:none}
 }
+/* ─── ONBOARDING TOUR ─── */
+#_onbOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:8900;display:none}
+#_onbHighlight{position:fixed;z-index:8901;pointer-events:none;border-radius:8px;box-shadow:0 0 0 3px #00e87a,0 0 20px rgba(0,232,122,.35);display:none;transition:left .15s,top .15s,width .15s,height .15s}
+#_onbTooltip{position:fixed;z-index:8902;display:none;opacity:0;max-width:300px;min-width:240px;transition:opacity .18s ease}
+._onb-card{background:#1a1a1a;border:1px solid #2a2a2a;border-left:3px solid #00e87a;border-radius:12px;padding:16px 16px 14px;box-shadow:0 8px 32px rgba(0,0,0,.7);position:relative}
+._onb-step-count{font-size:10px;font-weight:700;color:#555;text-align:right;margin-bottom:8px;letter-spacing:.5px;text-transform:uppercase}
+._onb-text{font-size:14px;color:#fff;line-height:1.55}
+._onb-detail-toggle{background:none;border:none;color:#555;font-size:12px;cursor:pointer;padding:0;margin:10px 0 0;display:flex;align-items:center;gap:4px;line-height:1}
+._onb-detail-toggle:hover{color:#999}
+._onb-detail-body{margin-top:8px;font-size:12px;color:#888;line-height:1.6;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid #222}
+._onb-detail-body ul{padding-left:16px;margin:4px 0 8px}
+._onb-detail-body li{margin-bottom:3px}
+._onb-detail-body b{color:#aaa}
+._onb-detail-body p{margin:0 0 6px}
+._onb-detail-body p:last-child{margin-bottom:0}
+._onb-actions{display:flex;align-items:center;justify-content:space-between;margin-top:13px;gap:6px}
+._onb-skip{font-size:11px;color:#444;cursor:pointer;text-decoration:none;flex-shrink:0}
+._onb-skip:hover{color:#888}
+._onb-btns{display:flex;gap:6px;align-items:center}
+._onb-back{background:none;border:1px solid #2e2e2e;color:#777;border-radius:7px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;min-height:36px;transition:border-color .15s,color .15s}
+._onb-back:hover{border-color:#555;color:#ccc}
+._onb-next{background:#00e87a;color:#000;border:none;border-radius:7px;padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;min-height:36px;transition:background .15s}
+._onb-next:hover{background:#00ff8a}
+._onb-finish{background:#00e87a;color:#000;border:none;border-radius:8px;padding:10px 18px;font-size:13px;font-weight:700;cursor:pointer;min-height:44px;width:100%;margin-top:13px;transition:background .15s}
+._onb-finish:hover{background:#00ff8a}
+._onb-arrow-up,._onb-arrow-down,._onb-arrow-left,._onb-arrow-right{position:absolute;width:0;height:0}
+._onb-arrow-up{border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:9px solid #2a2a2a;top:-9px;left:50%;transform:translateX(-50%)}
+._onb-arrow-up::after{content:'';position:absolute;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:7px solid #1a1a1a;top:0;left:0}
+._onb-arrow-down{border-left:8px solid transparent;border-right:8px solid transparent;border-top:9px solid #2a2a2a;bottom:-9px;left:50%;transform:translateX(-50%)}
+._onb-arrow-down::after{content:'';position:absolute;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:7px solid #1a1a1a;top:0;left:0}
+._onb-arrow-right{border-top:8px solid transparent;border-bottom:8px solid transparent;border-left:9px solid #2a2a2a;right:-9px;top:50%;transform:translateY(-50%)}
+._onb-arrow-right::after{content:'';position:absolute;width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:7px solid #1a1a1a;top:0;left:0}
+._onb-arrow-left{border-top:8px solid transparent;border-bottom:8px solid transparent;border-right:9px solid #2a2a2a;left:-9px;top:50%;transform:translateY(-50%)}
+._onb-arrow-left::after{content:'';position:absolute;width:0;height:0;border-top:6px solid transparent;border-bottom:6px solid transparent;border-right:7px solid #1a1a1a;top:0;left:0}
+@media(max-width:480px){#_onbTooltip{max-width:calc(100vw - 24px);min-width:0}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -978,6 +1013,11 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
     </div>
   </div>
 </div>
+
+<!-- ── ONBOARDING TOUR ── -->
+<div id="_onbOverlay"></div>
+<div id="_onbHighlight"></div>
+<div id="_onbTooltip"><div class="_onb-card"><div id="_onbContent"></div></div></div>
 
 <!-- ── TRIAL EXPIRED OVERLAY ── -->
 <div id="_trialExpired" style="display:none;position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,.97);align-items:center;justify-content:center">
@@ -7427,6 +7467,107 @@ function showPage(name){
 }
 
 
+/* ============ ONBOARDING TOUR ============ */
+var _onbCurrentStep=0;
+var _onbSteps=[
+  {targetId:'sportTabs',text:"Start here — pick a sport to see today’s games and top prop picks.",position:'below'},
+  {targetSel:'.conf-badge',text:"This is PropDesk’s confidence score. 75%+ means a strong signal. 90%+ is ELITE — our highest conviction plays.",detail:true,position:'left'},
+  {targetSel:'.trk-btn:not(.trk-done)',text:"Hit + Track to save any play to My History. We’ll track whether it hits or misses automatically.",position:'left'},
+  {targetSel:'[data-nav="trends"]',text:"The Trends tab shows PropDesk’s full public record — hit rate, ROI, and the systems behind today’s picks.",position:'above'},
+  {targetSel:'[data-nav="history"]',text:"Your History tab tracks every play you’ve saved — your personal hit rate and ROI over time.",position:'above',isFinal:true}
+];
+function _startOnboarding(){
+  var o=$('_onbOverlay'); if(!o) return;
+  o.style.display='block';
+  _onbCurrentStep=0;
+  _showOnbStep(0);
+}
+function _getOnbTarget(step){
+  if(step.targetId) return document.getElementById(step.targetId);
+  if(step.targetSel) return document.querySelector(step.targetSel);
+  return null;
+}
+function _showOnbStep(n){
+  var step=_onbSteps[n]; if(!step) return;
+  var tt=$('_onbTooltip'),hl=$('_onbHighlight'),cont=$('_onbContent');
+  if(!tt||!cont) return;
+  var detailHtml='';
+  if(step.detail){
+    detailHtml='<div><button class="_onb-detail-toggle" id="_onbDetailToggle" onclick="_onbToggleDetail()">'
+      +'How is this calculated? <span id="_onbDetailArrow">▾</span></button>'
+      +'<div id="_onbDetailBody" class="_onb-detail-body" style="display:none">'
+      +'<p>PropDesk blends three data windows:</p><ul>'
+      +'<li><b>Last 5 games (60% weight)</b> — most predictive of tonight</li>'
+      +'<li><b>Last 10 games (25% weight)</b> — smooths out hot/cold streaks</li>'
+      +'<li><b>Full season (15% weight)</b> — baseline calibration</li>'
+      +'</ul><p>Then we adjust for: hitting streak or cold streak, season batting average, opposing pitcher ERA (last 5 starts), and lineup position. The final score is clamped — no play ever shows above 95% confidence.</p>'
+      +'</div></div>';
+  }
+  var actHtml;
+  if(step.isFinal){
+    actHtml='<button class="_onb-finish" onclick="_onbComplete()">Got it — Let’s Go</button>'
+      +'<div class="_onb-actions" style="margin-top:8px">'
+      +'<button class="_onb-back" onclick="_onbBack()">← Back</button>'
+      +'<a class="_onb-skip" onclick="_onbSkip()">Skip tour</a>'
+      +'</div>';
+  } else {
+    actHtml='<div class="_onb-actions">'
+      +'<a class="_onb-skip" onclick="_onbSkip()">Skip tour</a>'
+      +'<div class="_onb-btns">'
+      +(n>0?'<button class="_onb-back" onclick="_onbBack()">← Back</button>':'')
+      +'<button class="_onb-next" onclick="_onbNext()">Next →</button>'
+      +'</div></div>';
+  }
+  var arrowCls=step.position==='below'?'_onb-arrow-up':step.position==='above'?'_onb-arrow-down':step.position==='left'?'_onb-arrow-right':'_onb-arrow-left';
+  var card=tt.querySelector('._onb-card');
+  var oldArr=card&&card.querySelector('[class^="_onb-arrow"]'); if(oldArr) oldArr.remove();
+  cont.innerHTML='<div class="_onb-step-count">'+(n+1)+' of '+_onbSteps.length+'</div>'
+    +'<div class="_onb-text">'+step.text+'</div>'
+    +detailHtml
+    +actHtml;
+  if(card) card.insertAdjacentHTML('beforeend','<div class="'+arrowCls+'"></div>');
+  tt.style.opacity='0';
+  tt.style.display='block';
+  if(hl) hl.style.display='none';
+  var target=_getOnbTarget(step);
+  requestAnimationFrame(function(){
+    var tw=tt.offsetWidth||280,th=tt.offsetHeight||160;
+    var vw=window.innerWidth,vh=window.innerHeight;
+    var MARGIN=12,PAD=8,left,top;
+    if(target){
+      var r=target.getBoundingClientRect();
+      var p=6;
+      if(hl){hl.style.left=(r.left-p)+'px';hl.style.top=(r.top-p)+'px';hl.style.width=(r.width+p*2)+'px';hl.style.height=(r.height+p*2)+'px';hl.style.display='block';}
+      if(step.position==='below'){left=r.left+r.width/2-tw/2;top=r.bottom+MARGIN;}
+      else if(step.position==='above'){left=r.left+r.width/2-tw/2;top=r.top-th-MARGIN;}
+      else if(step.position==='left'){left=r.left-tw-MARGIN;top=r.top+r.height/2-th/2;}
+      else{left=r.right+MARGIN;top=r.top+r.height/2-th/2;}
+    } else {left=vw/2-tw/2;top=vh/3-th/2;}
+    left=Math.max(PAD,Math.min(vw-tw-PAD,left));
+    top=Math.max(PAD,Math.min(vh-th-PAD,top));
+    tt.style.left=Math.round(left)+'px';
+    tt.style.top=Math.round(top)+'px';
+    tt.style.opacity='1';
+  });
+}
+function _onbNext(){if(_onbCurrentStep<_onbSteps.length-1){_onbCurrentStep++;_showOnbStep(_onbCurrentStep);}}
+function _onbBack(){if(_onbCurrentStep>0){_onbCurrentStep--;_showOnbStep(_onbCurrentStep);}}
+function _onbToggleDetail(){
+  var b=document.getElementById('_onbDetailBody'),a=document.getElementById('_onbDetailArrow');
+  if(!b) return;
+  var open=b.style.display!=='none';
+  b.style.display=open?'none':'block';
+  if(a) a.textContent=open?'▾':'▴';
+}
+function _onbComplete(){_onbHide();try{_supabase.auth.updateUser({data:{onboarding_complete:true}}).catch(function(){});}catch(e){}}
+function _onbSkip(){_onbHide();try{_supabase.auth.updateUser({data:{onboarding_complete:true}}).catch(function(){});}catch(e){}}
+function _onbHide(){
+  var o=$('_onbOverlay');if(o) o.style.display='none';
+  var t=$('_onbTooltip');if(t){t.style.display='none';t.style.opacity='0';}
+  var h=$('_onbHighlight');if(h) h.style.display='none';
+}
+
+
 /* ============ INIT ============ */
 function init(){
   $("hdrDate").textContent=new Date().toLocaleDateString([], {weekday:"short",month:"short",day:"numeric"});
@@ -10574,6 +10715,9 @@ function _doLaunchUser(user){
   init();
   _initAcctBtn(user);
   _sbMigrateIfNeeded(user);
+  if(!(user.user_metadata||{}).onboarding_complete){
+    setTimeout(function(){ _startOnboarding(); },700);
+  }
 }
 function _showTrialBanner(daysLeft){
   var b=$('_trialBanner');
