@@ -1327,6 +1327,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   <button class="more-drawer-item" data-more-action="parlay"><span class="more-drawer-ic">+</span>Parlay Builder</button>
   <button class="more-drawer-item" data-more-action="how"><span class="more-drawer-ic">?</span>How It Works</button>
   <button class="more-drawer-item" data-more-action="disclaimer"><span class="more-drawer-ic">!</span>Disclaimer</button>
+  <button class="more-drawer-item" data-more-action="walkthrough"><span class="more-drawer-ic">▶</span>Walk Through</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -7618,7 +7619,7 @@ function init(){
     b.onclick=function(){
       var action=b.getAttribute("data-more-action");
       closeMoreDrawer();
-      if(action==="parlay") openParlay(); else showPage(action);
+      if(action==="parlay") openParlay(); else if(action==="walkthrough") _startOnboarding(); else showPage(action);
     };
   });
   $("searchIn").addEventListener("input",function(){ renderTable(false); });
