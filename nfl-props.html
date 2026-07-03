@@ -5519,7 +5519,10 @@ function _sbMapToLocal(r){
     sport:r.sport||null,line:r.line||null,confidence:r.confidence||null,tier:r.tier||null,
     result:r.result||'pending',game:r.game||null,type:r.type||null,odds:r.odds||null,
     edge:r.edge||null,source:r.source||'manual',trendType:r.trend_type||null,
-    trendSignal:r.trend_signal||null,loggedAt:r.logged_at,autoResolved:r.auto_resolved||false};
+    trendSignal:r.trend_signal||null,trendRecord:r.trend_record||null,
+    trendWinRate:r.trend_win_rate||null,trendSystem:r.trend_system||null,
+    trendDescription:r.trend_description||null,trendSampleSize:r.trend_sample_size||null,
+    teamId:r.team_id||null,loggedAt:r.logged_at,autoResolved:r.auto_resolved||false};
 }
 function _sbToRow(play,uid){
   return {user_id:uid,date:play.date,player:play.player||null,market:play.market||null,
@@ -5528,6 +5531,9 @@ function _sbToRow(play,uid){
     game:play.game||null,type:play.type||(play.source==='trend'?'trend':'prop'),
     odds:play.odds||null,edge:play.edge||null,source:play.source||'manual',
     trend_type:play.trendType||null,trend_signal:play.trendSignal||null,
+    trend_record:play.trendRecord||null,trend_win_rate:play.trendWinRate||null,
+    trend_system:play.trendSystem||null,trend_description:play.trendDescription||null,
+    trend_sample_size:play.trendSampleSize||null,team_id:play.teamId||null,
     logged_at:play.loggedAt,auto_resolved:play.autoResolved||false};
 }
 function _sbSavePlay(play){
@@ -5550,8 +5556,7 @@ async function _sbMigrateIfNeeded(user){
     if((chk.data||[]).length>0){
       var all=await _supabase.from('plays').select('*').eq('user_id',user.id).order('logged_at',{ascending:false});
       if(all.error||!all.data) return;
-      savePlayHist(all.data.filter(function(r){return r.source!=='trend';}).map(_sbMapToLocal));
-      saveTrendPlayHist(all.data.filter(function(r){return r.source==='trend';}).map(_sbMapToLocal));
+      savePlayHist(all.data.map(_sbMapToLocal));
       _histLastSbLoad=Date.now();
       return;
     }
@@ -6268,8 +6273,7 @@ async function renderPlayHistory(){
     try{
       var sbRes=await _supabase.from('plays').select('*').eq('user_id',_authUser.id).order('logged_at',{ascending:false});
       if(!sbRes.error&&sbRes.data){
-        savePlayHist(sbRes.data.filter(function(r){return r.source!=='trend';}).map(_sbMapToLocal));
-        saveTrendPlayHist(sbRes.data.filter(function(r){return r.source==='trend';}).map(_sbMapToLocal));
+        savePlayHist(sbRes.data.map(_sbMapToLocal));
         _histLastSbLoad=Date.now();
       }
     }catch(e){}
@@ -6303,6 +6307,7 @@ async function renderPlayHistory(){
   /* ── sport+market-filtered stats dataset ── */
   var statData=all.filter(function(e){
     if(e.type==='moneyline') return false;
+    if(e.source==='trend') return false;
     if(_histFilters.sport!=="all"&&e.sport!==_histFilters.sport) return false;
     if(_histFilters.market!=="all"&&e.market!==_histFilters.market) return false;
     return true;
@@ -6376,7 +6381,7 @@ async function renderPlayHistory(){
     .sort(function(a,b){ return b.rate-a.rate; });
 
   /* ── past-date pending ── */
-  var pastPending=all.filter(function(e){ return e.result==="pending"&&e.date<today; });
+  var pastPending=all.filter(function(e){ return e.result==="pending"&&e.date<today&&e.source!=='trend'; });
 
   /* ── storage ── */
   var storeKB=Math.round(JSON.stringify(all).length/1024);
@@ -6673,20 +6678,43 @@ async function renderPlayHistory(){
             '<button class="btn ph-miss" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>'+
             '<button class="btn ph-void" data-i="'+i+'" style="min-width:48px;min-height:32px;padding:6px 10px;font-size:11px;font-weight:700;background:none;color:var(--mut);border:1px solid var(--bd2);border-radius:6px;margin-left:6px">∅ Void</button>';
 
+          var isTrend=e.source==='trend';
+          var mktCell=isTrend
+            ?'<span style="background:rgba(0,232,122,.12);color:#00e87a;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:.04em">'+esc(e.trendType||e.trendSystem||'TREND')+'</span>'
+            :(e.type==='moneyline'?'<span style="background:rgba(99,102,241,.15);color:#818cf8;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:.03em">ML</span>':'<span style="color:var(--mut)">'+esc(e.marketDisplay||e.market||"")+'</span>');
+          var lineCell=isTrend?esc(e.trendRecord||''):esc(e.line||"");
+          var confCell=isTrend
+            ?(e.trendWinRate!=null?'<span style="font-size:11px;font-weight:700;color:#00e87a">'+Math.round(e.trendWinRate*100)+'%</span>':'<span style="color:var(--mut)">—</span>')
+            :'<span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span>';
+          var rmCell=isTrend
+            ?'<button class="btn ph-trk-exp" data-ti="'+i+'" title="Details" style="margin-right:4px">▶</button><button class="btn ph-rm-btn" data-i="'+i+'">✕ Remove</button>'
+            :'<button class="btn ph-rm-btn" data-i="'+i+'">✕ Remove</button>';
           html+='<tr class="ph-play-row" style="'+rowStyle+'">';
           html+='<td class="ph-td-date" style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
           html+='<td class="ph-td-player" style="padding:9px 10px;font-weight:700">'+esc(e.player||"")+'</td>';
-          html+='<td class="ph-td-market" style="padding:9px 10px;white-space:nowrap">'+(e.type==='moneyline'?'<span style="background:rgba(99,102,241,.15);color:#818cf8;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:.03em">ML</span>':'<span style="color:var(--mut)">'+esc(e.marketDisplay||e.market||"")+'</span>')+'</td>';
-          html+='<td class="ph-td-line" style="padding:9px 10px">'+esc(e.line||"")+'</td>';
-          html+='<td class="ph-td-conf" style="padding:9px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span></td>';
+          html+='<td class="ph-td-market" style="padding:9px 10px;white-space:nowrap">'+mktCell+'</td>';
+          html+='<td class="ph-td-line" style="padding:9px 10px">'+lineCell+'</td>';
+          html+='<td class="ph-td-conf" style="padding:9px 10px">'+confCell+'</td>';
           if(showTrendCols){
             html+='<td class="ph-td-trend" style="padding:9px 10px;text-align:center">'+trendHtml+'</td>';
             html+='<td class="ph-td-days" style="padding:9px 10px;text-align:center;color:var(--mut)">'+dsSince+'</td>';
           }
           html+='<td class="ph-td-game" style="padding:9px 10px;color:var(--mut)">'+esc(e.game||"")+'</td>';
           html+='<td class="ph-td-result" style="padding:9px 10px;white-space:nowrap">'+res+'</td>';
-          html+='<td class="ph-td-rm" style="padding:9px 10px;white-space:nowrap"><button class="btn ph-rm-btn" data-i="'+i+'">✕ Remove</button></td>';
+          html+='<td class="ph-td-rm" style="padding:9px 10px;white-space:nowrap">'+rmCell+'</td>';
           html+='</tr>';
+          if(isTrend&&(e.trendDescription||e.trendRecord)){
+            var trRec=[];
+            if(e.trendRecord) trRec.push(e.trendRecord);
+            if(e.trendWinRate!=null) trRec.push(Math.round(e.trendWinRate*100)+'% win rate');
+            if(e.trendSampleSize) trRec.push(e.trendSampleSize+'-game sample');
+            html+='<tr class="ph-trend-detail" id="phTD-'+i+'" style="display:none"><td colspan="'+colSpan+'" style="padding:10px 16px;background:var(--surf2);border-bottom:1px solid var(--bd)">';
+            html+='<div style="font-size:11px">';
+            if(e.trendSystem) html+='<div style="font-weight:800;color:#00e87a;font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">'+esc(e.trendSystem)+'</div>';
+            if(e.trendDescription) html+='<div style="color:var(--text);margin-bottom:6px;line-height:1.5">'+esc(e.trendDescription)+'</div>';
+            if(trRec.length) html+='<div style="color:var(--mut);font-size:10px">'+trRec.join(' · ')+'</div>';
+            html+='</div></td></tr>';
+          }
         });
       }
     });
@@ -6701,6 +6729,16 @@ async function renderPlayHistory(){
   mount.innerHTML=html;
 
   /* ── wire events ── */
+  mount.querySelectorAll('.ph-trk-exp').forEach(function(btn){
+    btn.onclick=function(ev){
+      ev.stopPropagation();
+      var det=document.getElementById('phTD-'+btn.getAttribute('data-ti'));
+      if(!det) return;
+      var open=det.style.display!=='none';
+      det.style.display=open?'none':'';
+      btn.textContent=open?'▶':'▼';
+    };
+  });
   mount.querySelectorAll('.ph-flt').forEach(function(b){
     b.onclick=function(){ _histFilters[b.getAttribute('data-flt')]=b.getAttribute('data-v'); renderPlayHistory(); };
   });
@@ -7126,14 +7164,19 @@ async function _phAutoResolveAll(){
   _arRunning=true;
   try{
     var h=loadPlayHist();
-    var propPend=h.filter(function(e){ return e.result==="pending"&&e.sport==="MLB"&&e.type!=="moneyline"&&_arPastGate(e.date)&&!e.autoResolveLocked; });
+    var propPend=h.filter(function(e){ return e.result==="pending"&&e.sport==="MLB"&&e.type!=="moneyline"&&e.source!=='trend'&&_arPastGate(e.date)&&!e.autoResolveLocked; });
     var mlPend=h.filter(function(e){ return e.result==="pending"&&e.type==="moneyline"&&_arPastGate(e.date)&&!e.autoResolveLocked; });
+    var trendPend=h.filter(function(e){ return e.result==="pending"&&e.source==='trend'&&_arPastGate(e.date)&&!e.autoResolveLocked; });
     for(var i=0;i<propPend.length;i++){
       var resolved=await resolvePlayAutomatically(propPend[i]);
       if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
     }
     for(var i=0;i<mlPend.length;i++){
       var resolved=await resolveMoneylinePick(mlPend[i]);
+      if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
+    }
+    for(var i=0;i<trendPend.length;i++){
+      var resolved=await resolveTrendPlay(trendPend[i]);
       if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
     }
   }catch(e){}
@@ -7238,6 +7281,29 @@ async function resolveMoneylinePick(play){
     if(result!=="hit"&&result!=="miss") return false;
     var h=loadPlayHist(),updated=false;
     h.forEach(function(e){ if(e.loggedAt===play.loggedAt&&e.player===play.player&&e.market===play.market){ e.result=result;e.autoResolved=true;updated=true; } });
+    if(!updated) return false;
+    savePlayHist(h);
+    _sbUpdatePlay(play.loggedAt,{result:result,auto_resolved:true});
+    return result;
+  }catch(e){ return false; }
+}
+
+async function resolveTrendPlay(play){
+  try{
+    if(!play||play.source!=='trend'||play.result!=='pending'||play.autoResolveLocked) return false;
+    if(!_arPastGate(play.date)) return false;
+    var teamName=play.player||''; if(!teamName) return false;
+    var sport=(play.sport||'MLB').toUpperCase();
+    var parts=(play.game||'').split(/ vs | @ /);
+    var awayHint=(parts[0]||'').trim(),homeHint=(parts[1]||'').trim();
+    var result=null;
+    if(sport==='MLB') result=await _mlArResolveMlb(play.date,teamName,awayHint,homeHint);
+    else if(sport==='NBA') result=await _mlArResolveEspn(play.date,teamName,awayHint,homeHint,'basketball/nba');
+    else if(sport==='NHL') result=await _mlArResolveNhl(play.date,teamName,awayHint,homeHint);
+    else if(sport==='NFL') result=await _mlArResolveEspn(play.date,teamName,awayHint,homeHint,'football/nfl');
+    if(result!=='hit'&&result!=='miss') return false;
+    var h=loadPlayHist(),updated=false;
+    h.forEach(function(e){ if(e.loggedAt===play.loggedAt&&e.player===play.player){ e.result=result;e.autoResolved=true;updated=true; } });
     if(!updated) return false;
     savePlayHist(h);
     _sbUpdatePlay(play.loggedAt,{result:result,auto_resolved:true});
@@ -8900,8 +8966,11 @@ function renderTrends(trends){
       var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":
         t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
         t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":"GAME TOTAL";
-      var entry={date:today,player:t.player||t.team||'',market:t._rawMarket||t._market||'',line:t._rawLine!=null?String(t._rawLine):'',confidence:null,result:'pending',source:'trend',trendType:typeLabel,trendSignal:t.headline||'',loggedAt:Date.now(),odds:null};
-      var h=loadTrendPlayHist(); h.push(entry); saveTrendPlayHist(h);
+      var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
+      var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
+      var _trSpMap={'americanfootball_nfl':'NFL','basketball_nba':'NBA','icehockey_nhl':'NHL','baseball_mlb':'MLB'};
+      var entry={date:today,player:t.player||t.team||'',market:t._rawMarket||t._market||'',line:t._rawLine!=null?String(t._rawLine):'',confidence:null,result:'pending',source:'trend',sport:_trSpMap[_trendsSport]||'',game:t._game||t.game||'',trendType:typeLabel,trendSignal:t.headline||'',trendRecord:t.record||'',trendWinRate:t.hitRate!=null?t.hitRate/100:null,trendSystem:typeLabel,trendDescription:t.headline||'',trendSampleSize:_trSamp,teamId:t.teamId||null,loggedAt:Date.now(),odds:null};
+      var h=loadPlayHist(); h.unshift(entry); savePlayHist(h);
       _sbSavePlay(entry);
       btn.textContent='✓ Tracked';
       btn.disabled=true;
