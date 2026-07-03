@@ -7230,8 +7230,6 @@ function _updateDrawerConnection(){
       +'<button class="btn live-btn dc-btn'+(live?" on":"")+'" id="drawerLiveBtn">'+(live?"Live ON":"Live OFF")+'</button></div>';
     html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:#00e87a">Connected</div></div>'
       +'<button class="btn btn-disc dc-btn" id="drawerDiscBtn">Disconnect</button></div>';
-    var tk=key.length>8?key.slice(0,8)+"...":key;
-    html+='<div class="dc-row" id="drawerKeyRow"><div class="dc-left"><div class="dc-title">API Key</div></div><span class="dc-val dc-key-val" id="drawerKeyCopy">'+tk+'</span></div>';
     if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="drawerCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="drawerRefreshBtn">Refresh Now</button></div>';
     if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
   }
@@ -7241,7 +7239,6 @@ function _updateDrawerConnection(){
   var ddb=$("drawerDiscBtn"); if(ddb) ddb.onclick=doDisconnect;
   var dcb=$("drawerConnBtn"); if(dcb) dcb.onclick=function(){ var i=$("drawerKeyInput"); if(i&&i.value.trim()) doConnect(i.value.trim()); };
   var dki=$("drawerKeyInput"); if(dki) dki.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()) doConnect(this.value.trim()); });
-  var dkr=$("drawerKeyRow"); if(dkr) dkr.onclick=function(){ navigator.clipboard.writeText(key||"").then(function(){ var kc=$("drawerKeyCopy"); if(kc){kc.textContent="Copied!"; setTimeout(_updateDrawerConnection,1200);} }).catch(function(){ toast("Copy failed"); }); };
   var drb=$("drawerRefreshBtn"); if(drb) drb.onclick=function(){ closeMoreDrawer(); toast("Refreshing…"); silentRefresh(); };
 }
 async function _updateDrawerAccount(){
@@ -7383,7 +7380,6 @@ function _updateSettingsPanel(){
   html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:'+sc+'">'+sl+'</div></div>'
     +(connected?'<button class="btn btn-disc dc-btn" id="spDiscBtn">Disconnect</button>':'<button class="btn btn-accent dc-btn" id="spConnTrigger">Connect</button>')+'</div>';
   if(!connected) html+='<div class="dc-row dc-key-input-row"><input class="keyin" id="spKeyInput" placeholder="Paste API key…" autocomplete="off"><button class="btn btn-accent dc-btn" id="spConnBtn">Go</button></div>';
-  if(connected){ var tk=key.length>8?key.slice(0,8)+"...":key; html+='<div class="dc-row" id="spKeyRow"><div class="dc-left"><div class="dc-title">API Key</div></div><span class="dc-val dc-key-val" id="spKeyCopy">'+tk+'</span></div>'; }
   if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="spCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="spRefreshBtn">Refresh Now</button></div>';
   if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
   el.innerHTML=html;
@@ -7392,7 +7388,6 @@ function _updateSettingsPanel(){
   var sct=$("spConnTrigger"); if(sct) sct.onclick=function(e){ e.stopPropagation(); var i=$("spKeyInput"); if(i) i.focus(); };
   var scb=$("spConnBtn"); if(scb) scb.onclick=function(e){ e.stopPropagation(); var i=$("spKeyInput"); if(i&&i.value.trim()) doConnect(i.value.trim()); };
   var ski=$("spKeyInput"); if(ski) ski.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()){ e.stopPropagation(); doConnect(this.value.trim()); } });
-  var skr=$("spKeyRow"); if(skr) skr.onclick=function(e){ e.stopPropagation(); navigator.clipboard.writeText(key||"").then(function(){ var kc=$("spKeyCopy"); if(kc){kc.textContent="Copied ✓"; setTimeout(_updateSettingsPanel,1200);} }).catch(function(){ toast("Copy failed"); }); };
   var srb=$("spRefreshBtn"); if(srb) srb.onclick=function(e){ e.stopPropagation(); closeSettingsPanel(); toast("Refreshing…"); silentRefresh(); };
   _updateGearIcon();
 }
