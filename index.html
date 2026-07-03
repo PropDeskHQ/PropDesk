@@ -870,6 +870,25 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   .dc-gs-link-drawer{display:inline-block;padding:12px 0}
   .onb-connect-btn{min-height:44px;padding:8px 12px}
   .onb-dismiss-btn{min-height:44px;min-width:44px;display:inline-flex;align-items:center;justify-content:center}
+  /* My History → card layout */
+  .ph-tbl-wrap table,.ph-tbl-wrap thead,.ph-tbl-wrap tbody{display:block}
+  .ph-tbl-wrap thead{display:none}
+  .ph-date-hdr{display:block}
+  .ph-date-hdr td{display:block;width:100%;padding:7px 10px;border:none;box-sizing:border-box}
+  .ph-play-row{display:block;margin:0 0 8px;border-radius:8px;background:var(--card,#111);border:1px solid var(--bd);padding:10px 12px}
+  .ph-play-row td{display:block;width:100%;border:none;padding:2px 0;box-sizing:border-box;white-space:normal!important}
+  .ph-td-date,.ph-td-trend,.ph-td-days,.ph-td-rm{display:none!important}
+  .ph-td-player{font-weight:700;font-size:13px;padding-bottom:2px!important}
+  .ph-td-market{font-size:12px}
+  .ph-td-line{font-size:12px;color:var(--mut)}
+  .ph-td-game{font-size:11px;color:var(--mut2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap!important}
+  .ph-td-result{display:flex!important;flex-wrap:wrap;gap:6px;padding-top:8px!important;white-space:normal!important}
+  .ph-td-result .ph-hit,.ph-td-result .ph-miss,.ph-td-result .ph-void{flex:1;min-width:0}
+  /* Trend/ML history → stack result buttons below info */
+  .ph-card-row{flex-wrap:wrap!important;align-items:flex-start!important}
+  .ph-card-row>div:first-child{width:100%}
+  .ph-card-res{width:100%;display:flex;gap:6px;padding-top:6px}
+  .ph-card-res .btn{flex:1;min-width:0!important}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -6542,7 +6561,7 @@ async function renderPlayHistory(){
     html+='<button class="btn" id="phCollapseAll" style="font-size:10px;padding:4px 10px">Collapse All</button>';
     html+='</div>';
 
-    html+='<div style="overflow:clip"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    html+='<div class="ph-tbl-wrap"><table style="width:100%;border-collapse:collapse;font-size:12px">';
     html+='<thead><tr>'+sh("date","Date")+sh("player","Player")+'<th style="'+TH_S+'">Market</th><th style="'+TH_S+'">Line</th>'+sh("confidence","Conf");
     if(showTrendCols) html+='<th style="'+TH_S+'">Trend</th><th style="'+TH_S+'">Days Since</th>';
     html+='<th style="'+TH_S+'">Game</th>'+sh("result","Result")+'<th style="'+TH_S+'"></th></tr></thead><tbody>';
@@ -6613,19 +6632,19 @@ async function renderPlayHistory(){
             '<button class="btn ph-miss" data-i="'+i+'" style="min-width:52px;min-height:32px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>'+
             '<button class="btn ph-void" data-i="'+i+'" style="min-width:48px;min-height:32px;padding:6px 10px;font-size:11px;font-weight:700;background:none;color:var(--mut);border:1px solid var(--bd2);border-radius:6px;margin-left:6px">∅ Void</button>';
 
-          html+='<tr style="'+rowStyle+'">';
-          html+='<td style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
-          html+='<td style="padding:9px 10px;font-weight:700">'+esc(e.player||"")+'</td>';
-          html+='<td style="padding:9px 10px;white-space:nowrap">'+(e.type==='moneyline'?'<span style="background:rgba(99,102,241,.15);color:#818cf8;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:.03em">ML</span>':'<span style="color:var(--mut)">'+esc(e.marketDisplay||e.market||"")+'</span>')+'</td>';
-          html+='<td style="padding:9px 10px">'+esc(e.line||"")+'</td>';
-          html+='<td style="padding:9px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span></td>';
+          html+='<tr class="ph-play-row" style="'+rowStyle+'">';
+          html+='<td class="ph-td-date" style="padding:9px 10px;color:var(--mut);white-space:nowrap">'+esc(e.date)+'</td>';
+          html+='<td class="ph-td-player" style="padding:9px 10px;font-weight:700">'+esc(e.player||"")+'</td>';
+          html+='<td class="ph-td-market" style="padding:9px 10px;white-space:nowrap">'+(e.type==='moneyline'?'<span style="background:rgba(99,102,241,.15);color:#818cf8;font-size:10px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:.03em">ML</span>':'<span style="color:var(--mut)">'+esc(e.marketDisplay||e.market||"")+'</span>')+'</td>';
+          html+='<td class="ph-td-line" style="padding:9px 10px">'+esc(e.line||"")+'</td>';
+          html+='<td class="ph-td-conf" style="padding:9px 10px"><span class="vt '+tier.c+'" style="font-size:10px">'+esc(String(e.confidence||""))+'%</span></td>';
           if(showTrendCols){
-            html+='<td style="padding:9px 10px;text-align:center">'+trendHtml+'</td>';
-            html+='<td style="padding:9px 10px;text-align:center;color:var(--mut)">'+dsSince+'</td>';
+            html+='<td class="ph-td-trend" style="padding:9px 10px;text-align:center">'+trendHtml+'</td>';
+            html+='<td class="ph-td-days" style="padding:9px 10px;text-align:center;color:var(--mut)">'+dsSince+'</td>';
           }
-          html+='<td style="padding:9px 10px;color:var(--mut)">'+esc(e.game||"")+'</td>';
-          html+='<td style="padding:9px 10px;white-space:nowrap">'+res+'</td>';
-          html+='<td style="padding:9px 10px;white-space:nowrap"><button class="btn ph-rm-btn" data-i="'+i+'">✕ Remove</button></td>';
+          html+='<td class="ph-td-game" style="padding:9px 10px;color:var(--mut)">'+esc(e.game||"")+'</td>';
+          html+='<td class="ph-td-result" style="padding:9px 10px;white-space:nowrap">'+res+'</td>';
+          html+='<td class="ph-td-rm" style="padding:9px 10px;white-space:nowrap"><button class="btn ph-rm-btn" data-i="'+i+'">✕ Remove</button></td>';
           html+='</tr>';
         });
       }
@@ -6801,7 +6820,7 @@ function _renderTrendPlayHistory(contentMount){
         '<button class="btn tph-hit" data-lat="'+e.loggedAt+'" style="min-width:46px;min-height:28px;padding:4px 10px;font-size:11px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:6px;margin-right:5px">✓ Hit</button>'+
         '<button class="btn tph-miss" data-lat="'+e.loggedAt+'" style="min-width:46px;min-height:28px;padding:4px 10px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>'+
         '<button class="btn tph-void" data-lat="'+e.loggedAt+'" style="min-width:42px;min-height:28px;padding:4px 8px;font-size:11px;font-weight:700;background:none;color:var(--mut);border:1px solid var(--bd2);border-radius:6px;margin-left:5px">∅ Void</button>';
-      html+='<div style="padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px">';
+      html+='<div class="ph-card-row" style="padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px">';
       html+='<div style="flex:1;min-width:0">';
       html+='<div style="font-size:12px;font-weight:700;margin-bottom:3px">'+esc(e.player||'')+'</div>';
       html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
@@ -6809,7 +6828,7 @@ function _renderTrendPlayHistory(contentMount){
       if(e.trendType) html+='<span style="background:rgba(0,232,122,.12);color:#00e87a;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;letter-spacing:.03em">'+esc(e.trendType)+'</span>';
       if(e.trendSignal) html+='<span style="font-size:10px;color:var(--mut2)">'+esc(e.trendSignal)+'</span>';
       html+='</div></div>';
-      html+='<div style="flex-shrink:0">'+resBadge+'</div>';
+      html+='<div class="ph-card-res">'+resBadge+'</div>';
       html+='</div>';
     });
     html+='</div>';
@@ -6883,14 +6902,14 @@ function _renderMLHistory(contentMount,all,sport){
         '<button class="btn ml-hit" data-lat="'+esc(lat)+'" style="min-width:46px;min-height:28px;padding:4px 10px;font-size:11px;font-weight:700;background:var(--accent);color:#000;border:none;border-radius:6px;margin-right:5px">✓ Hit</button>'+
         '<button class="btn ml-miss" data-lat="'+esc(lat)+'" style="min-width:46px;min-height:28px;padding:4px 10px;font-size:11px;font-weight:700;background:var(--red);color:#fff;border:none;border-radius:6px">✗ Miss</button>'+
         '<button class="btn ml-void" data-lat="'+esc(lat)+'" style="min-width:42px;min-height:28px;padding:4px 8px;font-size:11px;font-weight:700;background:none;color:var(--mut);border:1px solid var(--bd2);border-radius:6px;margin-left:5px">∅ Void</button>';
-      html+='<div style="padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px">';
+      html+='<div class="ph-card-row" style="padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px">';
       html+='<div style="flex:1;min-width:0">';
       html+='<div style="font-size:12px;font-weight:700;margin-bottom:3px">'+esc(e.player||e.team||'')+'</div>';
       html+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
       if(e.sport) html+='<span style="font-size:10px;color:var(--mut)">'+esc(e.sport)+'</span>';
       if(e.odds!=null) html+='<span style="font-size:10px;color:var(--mut2)">'+esc(String(e.odds))+'</span>';
       html+='</div></div>';
-      html+='<div style="flex-shrink:0">'+resBadge+'</div>';
+      html+='<div class="ph-card-res">'+resBadge+'</div>';
       html+='</div>';
     });
     html+='</div>';
