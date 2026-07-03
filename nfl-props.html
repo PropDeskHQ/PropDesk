@@ -999,9 +999,6 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   <div class="hdr-r">
     <button class="btn live-btn" id="liveBtn">Live OFF</button>
     <span class="countdown" id="countdown" style="display:none"></span>
-    <input class="keyin" id="keyInput" placeholder="Odds API key" autocomplete="off">
-    <button class="btn btn-accent" id="connectBtn">Connect</button>
-    <button class="btn btn-disc" id="disconnectBtn" style="display:none">Disconnect</button>
     <span class="dot" id="statusDot"></span>
     <span class="quota" id="quota"></span>
     <button id="settingsBtn" class="settings-btn" title="Connection settings">⚙</button>
@@ -1010,11 +1007,6 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 </header>
 <div id="settingsPanel" class="settings-panel"></div>
 <div id="acctPanel" class="acct-panel"></div>
-<div id="onbBanner" class="onb-banner hidden">
-  <span class="onb-banner-text">&#128075; New here? Connect your Odds API key to get started &rarr;</span>
-  <button class="onb-connect-btn" id="onbBannerConnBtn">Connect</button>
-  <button class="onb-dismiss-btn" id="onbBannerDismissBtn" title="Dismiss">&#10005;</button>
-</div>
 
 <div class="wrap">
 
@@ -1265,22 +1257,6 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   </div>
 </div>
 
-<!-- ONBOARDING -->
-<div class="onb" id="onb">
-  <div class="onb-box">
-    <div class="onb-step1" id="onbStep1">
-      <div class="obig">Welcome to Prop<b>Desk</b></div>
-      <p>Live sportsbook prop lines, scored for value across the NFL, NBA, NHL and MLB. We collect odds from many books, find the edge, and rank every prop 0-100.</p>
-      <p style="font-size:13px">Get your free Odds API key at <a href="https://the-odds-api.com" target="_blank" rel="noopener">the-odds-api.com</a>.</p>
-      <div class="obform"><input id="onbKey" placeholder="Paste your API key"><button class="btn btn-accent" id="onbConnect">Connect</button></div>
-    </div>
-    <div class="onb-step2" id="onbStep2">
-      <div class="obig">You're connected.</div>
-      <p>Select a sport and a game above to load live prop lines. Pick a prop market, then explore the Prop of the Day, Best Plays, and Trends for every game.</p>
-      <button class="btn btn-accent" id="onbDone" style="width:100%;padding:11px">Start Analyzing</button>
-    </div>
-  </div>
-</div>
 
 <!-- MOBILE BOTTOM NAV -->
 <nav class="botnav" id="botnav">
@@ -1961,7 +1937,7 @@ function fmtOdds(o){ o=Math.round(Number(o)); return o>0?"+"+o:""+o; }
 function $(id){ return document.getElementById(id); }
 function el(tag,cls,html){ var e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e; }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
-function getKey(){ return (localStorage.getItem("pe_key")||"").trim(); }
+function getKey(){ return "1"; }
 function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._tm); t._tm=setTimeout(function(){t.classList.remove("show");},1600); }
 function clean(name){ return String(name||"").replace(/\s+(Jr|Sr|II|III|IV|V)\.?$/i,"").replace(/\s*\(\d{4}\)\s*$/,"").trim(); }
 function avg(arr){ if(!arr.length) return 0; var s=0; for(var i=0;i<arr.length;i++) s+=arr[i]; return s/arr.length; }
@@ -2027,8 +2003,6 @@ function readQuota(resp){
 }
 
 async function fetchEvents(){
-  var key=getKey();
-  if(!key){ toast("Enter your API key first"); return; }
   var row=$("gamesRow"); row.innerHTML='<div class="empty" style="padding:18px">Loading games...</div>';
   try{
     var _evUrl=apiUrl("/sports/"+ST.sport+"/events",{dateFormat:"iso"});
@@ -7283,33 +7257,17 @@ function exportPlayHistStats(all,allRes,allHits,allRate,rate7,rate30,r7len,r30le
 /* ============ NAV ============ */
 function _updateDrawerConnection(){
   var el=$("drawerConn"); if(!el) return;
-  var key=getKey(), connected=!!key, live=ST.live;
+  var live=ST.live;
   var m=Math.floor((ST.liveSecs||0)/60), s=(ST.liveSecs||0)%60;
   var quotaText=($("quota").textContent||"").trim();
-  var html;
-  if(!connected){
-    html='<div class="dc-label">CONNECTION</div>'
-      +'<div class="dc-gs-drawer">'
-      +'<div class="dc-gs-title">Connect to get started</div>'
-      +'<div class="dc-gs-sub">Enter your Odds API key to load live games and props.</div>'
-      +'<div class="dc-key-input-row" style="padding:0;margin-top:4px"><input class="keyin" id="drawerKeyInput" placeholder="Paste API key…" autocomplete="off"><button class="btn btn-accent dc-btn" id="drawerConnBtn">Connect</button></div>'
-      +'<a class="dc-gs-link-drawer" href="https://the-odds-api.com" target="_blank" rel="noopener">Get a free key at the-odds-api.com &rarr;</a>'
-      +'</div>';
-  } else {
-    html='<div class="dc-label">CONNECTION</div>';
-    html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Live Mode</div><div class="dc-sub">Auto-refresh prop data</div></div>'
-      +'<button class="btn live-btn dc-btn'+(live?" on":"")+'" id="drawerLiveBtn">'+(live?"Live ON":"Live OFF")+'</button></div>';
-    html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:#00e87a">Connected</div></div>'
-      +'<button class="btn btn-disc dc-btn" id="drawerDiscBtn">Disconnect</button></div>';
-    if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="drawerCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="drawerRefreshBtn">Refresh Now</button></div>';
-    if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
-  }
+  var html='<div class="dc-label">CONNECTION</div>';
+  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Live Mode</div><div class="dc-sub">Auto-refresh prop data</div></div>'
+    +'<button class="btn live-btn dc-btn'+(live?" on":"")+'" id="drawerLiveBtn">'+(live?"Live ON":"Live OFF")+'</button></div>';
+  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:#00e87a">Connected</div></div></div>';
+  if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="drawerCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="drawerRefreshBtn">Refresh Now</button></div>';
+  if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
   el.innerHTML=html;
-  // Wire handlers
   var dlb=$("drawerLiveBtn"); if(dlb) dlb.onclick=toggleLive;
-  var ddb=$("drawerDiscBtn"); if(ddb) ddb.onclick=doDisconnect;
-  var dcb=$("drawerConnBtn"); if(dcb) dcb.onclick=function(){ var i=$("drawerKeyInput"); if(i&&i.value.trim()) doConnect(i.value.trim()); };
-  var dki=$("drawerKeyInput"); if(dki) dki.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()) doConnect(this.value.trim()); });
   var drb=$("drawerRefreshBtn"); if(drb) drb.onclick=function(){ closeMoreDrawer(); toast("Refreshing…"); silentRefresh(); };
 }
 async function _updateDrawerAccount(){
@@ -7431,34 +7389,26 @@ function closeMoreDrawer(){ $("moreOverlay").classList.remove("open"); $("moreDr
 function _updateGearIcon(){
   var btn=$("settingsBtn"); if(!btn) return;
   var open=$("settingsPanel")&&$("settingsPanel").classList.contains("open");
-  var connected=!!getKey();
   btn.classList.toggle("live",ST.live);
   btn.classList.toggle("open",!!open);
-  btn.classList.toggle("disconnected",!connected);
+  btn.classList.remove("disconnected");
 }
 function openSettingsPanel(){ var p=$("settingsPanel"); if(!p) return; p.classList.add("open"); _updateSettingsPanel(); }
 function closeSettingsPanel(){ var p=$("settingsPanel"); if(!p) return; p.classList.remove("open"); _updateGearIcon(); }
 function toggleSettingsPanel(){ var p=$("settingsPanel"); if(!p) return; if(p.classList.contains("open")) closeSettingsPanel(); else openSettingsPanel(); }
 function _updateSettingsPanel(){
   var el=$("settingsPanel"); if(!el) return;
-  var key=getKey(), connected=!!key, live=ST.live;
+  var live=ST.live;
   var m=Math.floor((ST.liveSecs||0)/60), s=(ST.liveSecs||0)%60;
   var quotaText=($("quota").textContent||"").trim();
-  var sc=connected?"#00e87a":"#ff5050", sl=connected?"Connected":"Disconnected";
   var html='<div class="dc-label">CONNECTION</div>';
   html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Live Mode</div><div class="dc-sub">Auto-refresh prop data</div></div>'
-    +'<button class="btn live-btn dc-btn'+(live?" on":"")+(connected?"":" disabled")+'" id="spLiveBtn"'+(connected?"":" disabled")+'>'+(live?"Live ON":"Live OFF")+'</button></div>';
-  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:'+sc+'">'+sl+'</div></div>'
-    +(connected?'<button class="btn btn-disc dc-btn" id="spDiscBtn">Disconnect</button>':'<button class="btn btn-accent dc-btn" id="spConnTrigger">Connect</button>')+'</div>';
-  if(!connected) html+='<div class="dc-row dc-key-input-row"><input class="keyin" id="spKeyInput" placeholder="Paste API key…" autocomplete="off"><button class="btn btn-accent dc-btn" id="spConnBtn">Go</button></div>';
+    +'<button class="btn live-btn dc-btn'+(live?" on":"")+'" id="spLiveBtn">'+(live?"Live ON":"Live OFF")+'</button></div>';
+  html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API Status</div><div class="dc-sub" style="color:#00e87a">Connected</div></div></div>';
   if(live) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">Next refresh</div><div class="dc-sub" id="spCountdown">in '+m+':'+(s<10?"0"+s:s)+'</div></div><button class="btn dc-btn" id="spRefreshBtn">Refresh Now</button></div>';
   if(quotaText) html+='<div class="dc-row"><div class="dc-left"><div class="dc-title">API calls remaining</div></div><span class="dc-val" style="color:#666">'+quotaText+'</span></div>';
   el.innerHTML=html;
-  var slb=$("spLiveBtn"); if(slb) slb.onclick=function(e){ e.stopPropagation(); if(connected) toggleLive(); };
-  var sdb=$("spDiscBtn"); if(sdb) sdb.onclick=function(e){ e.stopPropagation(); doDisconnect(); };
-  var sct=$("spConnTrigger"); if(sct) sct.onclick=function(e){ e.stopPropagation(); var i=$("spKeyInput"); if(i) i.focus(); };
-  var scb=$("spConnBtn"); if(scb) scb.onclick=function(e){ e.stopPropagation(); var i=$("spKeyInput"); if(i&&i.value.trim()) doConnect(i.value.trim()); };
-  var ski=$("spKeyInput"); if(ski) ski.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()){ e.stopPropagation(); doConnect(this.value.trim()); } });
+  var slb=$("spLiveBtn"); if(slb) slb.onclick=function(e){ e.stopPropagation(); toggleLive(); };
   var srb=$("spRefreshBtn"); if(srb) srb.onclick=function(e){ e.stopPropagation(); closeSettingsPanel(); toast("Refreshing…"); silentRefresh(); };
   _updateGearIcon();
 }
@@ -7476,66 +7426,6 @@ function showPage(name){
   window.scrollTo(0,0);
 }
 
-/* ============ ONBOARDING ============ */
-function maybeOnboard(){
-  if(!getKey() && !localStorage.getItem("pe_onboarded")) $("onb").classList.add("open");
-}
-
-/* ============ ONBOARDING HELPERS ============ */
-function _renderGamesEmpty(){
-  var row=$("gamesRow"); if(!row) return;
-  row.innerHTML='<div class="gs-card">'
-    +'<div class="gs-logo">Prop<b>Desk</b></div>'
-    +'<div style="font-size:17px;font-weight:700;color:#fff;margin-top:2px">Welcome to PropDesk</div>'
-    +'<div class="gs-card-sub">Connect your Odds API key to load live games and props.</div>'
-    +'<div class="gs-card-row"><input class="keyin" id="gsKeyInput" placeholder="Paste API key&hellip;" autocomplete="off"><button class="btn btn-accent" id="gsConnBtn">Connect</button></div>'
-    +'<a class="gs-card-link" href="https://the-odds-api.com" target="_blank" rel="noopener">Get a free API key at the-odds-api.com &rarr;</a>'
-    +'</div>';
-  var gcb=$("gsConnBtn"); if(gcb) gcb.onclick=function(){ var v=($("gsKeyInput")||{}).value||""; if(v.trim()) doConnect(v.trim()); };
-  var gki=$("gsKeyInput"); if(gki) gki.addEventListener("keydown",function(e){ if(e.key==="Enter"&&this.value.trim()) doConnect(this.value.trim()); });
-}
-function _maybeShowBanner(){
-  if(getKey()) return;
-  if(localStorage.getItem("pe_banner_dismissed")) return;
-  var b=$("onbBanner"); if(b) b.classList.remove("hidden");
-}
-
-/* ============ CONNECT ============ */
-function doConnect(key){
-  key=(key||"").trim();
-  if(!key){ toast("Enter a valid key"); return; }
-  localStorage.setItem("pe_key", key);
-  $("keyInput").value=key; setStatus("on","");
-  $("disconnectBtn").style.display="inline";
-  if(!ST.live){
-    ST.live=true;
-    $("liveBtn").textContent="Live ON"; $("liveBtn").classList.add("on");
-    $("countdown").style.display="inline";
-    ST.liveSecs=300; tickLive();
-    ST.liveTimer=setInterval(tickLive,1000);
-  }
-  fetchEvents();
-  var _b=$("onbBanner"); if(_b) _b.classList.add("hidden");
-  _updateDrawerConnection();
-  _updateSettingsPanel();
-}
-
-function doDisconnect(){
-  localStorage.removeItem("pe_key");
-  localStorage.setItem("pe_live","0");
-  $("keyInput").value=""; setStatus("","");
-  $("disconnectBtn").style.display="none";
-  if(ST.live){
-    ST.live=false;
-    $("liveBtn").textContent="Live OFF"; $("liveBtn").classList.remove("on");
-    $("countdown").style.display="none";
-    clearInterval(ST.liveTimer); ST.liveTimer=null;
-  }
-  toast("Disconnected");
-  _renderGamesEmpty();
-  _updateDrawerConnection();
-  _updateSettingsPanel();
-}
 
 /* ============ INIT ============ */
 function init(){
@@ -7549,25 +7439,18 @@ function init(){
   if(savedMarket && (MARKETS[ST.sport]||[]).some(function(m){return m.k===savedMarket;})) ST.market=savedMarket;
   if(savedEvent) ST.eventId=savedEvent;
 
-  // Key existence drives Live — if key is saved, auto-connect and start Live immediately
-  var k=getKey();
-  if(k){
-    $("keyInput").value=k; setStatus("on","");
-    $("disconnectBtn").style.display="inline";
-    ST.live=true;
-    $("liveBtn").textContent="Live ON"; $("liveBtn").classList.add("on");
-    $("countdown").style.display="inline";
-    ST.liveSecs=300; tickLive();
-    ST.liveTimer=setInterval(tickLive,1000);
-  }
+  // Auto-start Live — API is server-side, no user key needed
+  setStatus("on","");
+  ST.live=true;
+  $("liveBtn").textContent="Live ON"; $("liveBtn").classList.add("on");
+  $("countdown").style.display="inline";
+  ST.liveSecs=300; tickLive();
+  ST.liveTimer=setInterval(tickLive,1000);
   _updateGearIcon();
 
   renderSportTabs(); renderPropTabs();
 
-  $("connectBtn").onclick=function(){ doConnect($("keyInput").value); };
-  $("keyInput").addEventListener("keydown",function(e){ if(e.key==="Enter") doConnect($("keyInput").value); });
   $("liveBtn").onclick=toggleLive;
-  $("disconnectBtn").onclick=doDisconnect;
 
   $("botnav").querySelectorAll("[data-nav]").forEach(function(b){
     b.onclick=function(){
@@ -7631,21 +7514,7 @@ function init(){
 
   // saveUnit / clearHist buttons removed — history page now uses auto-log system (renderPlayHistory)
 
-  $("onbConnect").onclick=function(){
-    var key=($("onbKey").value||"").trim();
-    if(!key){ toast("Enter your key"); return; }
-    localStorage.setItem("pe_key",key); $("keyInput").value=key; setStatus("on","");
-    $("disconnectBtn").style.display="inline";
-    $("onbStep1").style.display="none"; $("onbStep2").style.display="block";
-    localStorage.setItem("pe_onboarded","1");
-    fetchEvents();
-  };
-  $("onbDone").onclick=function(){ $("onb").classList.remove("open"); };
-
-  maybeOnboard();
-  if(k){ fetchEvents(); } else { _renderGamesEmpty(); _maybeShowBanner(); }
-  var _bb=$("onbBannerConnBtn"); if(_bb) _bb.onclick=function(){ openSettingsPanel(); };
-  var _bd=$("onbBannerDismissBtn"); if(_bd) _bd.onclick=function(){ localStorage.setItem("pe_banner_dismissed","1"); var _b=$("onbBanner"); if(_b) _b.classList.add("hidden"); };
+  fetchEvents();
 }
 
 /* ============================================================
@@ -10113,8 +9982,6 @@ async function loadMoneylineBoard(){
   var mlMount=$("gameMLMount"); if(!mlMount) return;
   var giMount=$("gameInfoStrip");
   mlMount.innerHTML='<div style="color:var(--mut);font-size:12px;padding:16px;text-align:center">Loading moneyline...</div>';
-  var key=(localStorage.getItem("pe_key")||"").trim();
-  if(!key){ mlMount.innerHTML='<div class="empty">Connect your API key first.</div>'; return; }
   var ev=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
   if(!ev){ mlMount.innerHTML='<div class="empty">Select a game above.</div>'; return; }
   try{
