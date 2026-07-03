@@ -2213,8 +2213,8 @@ function compositeConf(vals, line, isOver, seasonBA){
   }
   var r5=vals.length>=3?sliceHR(5):null;   // L5 recent form  (60%)
   var r10=vals.length>=7?sliceHR(10):null; // L10 trend       (25%)
-  var rAll=sliceHR(vals.length);           // 15-game hit rate (variance check + season fallback)
-  var rSzn=rAll; // game-log hit rate — same scale as r5/r10 (seasonBA is BA, not hit rate)
+  var rAll=sliceHR(vals.length);           // 15-game hit rate (variance check)
+  var rSzn=seasonBA!=null?Math.min(0.95,seasonBA*2.56):rAll; // BA→hit-rate proxy (.280→~0.717); fallback to game-log rate
   var w5=r5!=null?0.60:0, w10=r10!=null?0.25:0, wA=0.15;
   var tot=w5+w10+wA;
   if(!tot) return null;
@@ -2239,7 +2239,7 @@ function recomputeAdjConf(p,newLine){
   }
   var sa=streak>=4?0.04:streak>=3?0.025:streak>=2?0.01:streak<=-4?-0.04:streak<=-3?-0.025:streak<=-2?-0.01:0;
   var tp=vals.length<5?-0.07:(vals.length<10?-0.04:0);
-  return Math.max(0.01,Math.min(0.97,raw+sa+tp));
+  return Math.max(0.01,Math.min(0.95,raw+sa+tp));
 }
 
 // Find PropDesk Line: always seek a line different from the book line.
@@ -2553,9 +2553,12 @@ async function enrichWithConfidence(p){
     if(p.seasonBA!=null&&vals.length>=5){
       _baAdj=p.seasonBA>=0.300?0.02:p.seasonBA>=0.280?0.01:p.seasonBA>=0.260?0:p.seasonBA>=0.240?-0.005:-0.01;
     }
-    // Apply all adjustments to pdConfidence (clamp 0.01–0.97)
+    // Diminishing returns: scale context adjustments when base is already high (thinPenalty always full weight)
+    var adjScale=p.pdConfidence>=0.85?0.4:p.pdConfidence>=0.75?0.7:1.0;
+    streakAdj*=adjScale; _baAdj*=adjScale; _eraAdj*=adjScale; _lineupAdj*=adjScale;
+    // Apply all adjustments to pdConfidence (clamp 0.01–0.95)
     if(p.pdConfidence!=null){
-      p.pdConfidence=Math.max(0.01,Math.min(0.97,p.pdConfidence+streakAdj+thinPenalty+_baAdj+_eraAdj+_lineupAdj));
+      p.pdConfidence=Math.max(0.01,Math.min(0.95,p.pdConfidence+streakAdj+thinPenalty+_baAdj+_eraAdj+_lineupAdj));
       p.pdResult.confidence=p.pdConfidence;
       p.hitRate14=+(p.pdConfidence*100).toFixed(1);
       p.value=Math.round(p.pdConfidence*100);
