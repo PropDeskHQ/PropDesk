@@ -10304,7 +10304,7 @@ function updateBestPlaysDisplay(eventId,remaining){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) q.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=85) q.push(p);
     });
   });
   q.sort(function(a,b){
@@ -10378,7 +10378,7 @@ async function startGameEnrichment(eventId){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) qFinal.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=85) qFinal.push(p);
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
