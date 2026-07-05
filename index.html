@@ -10424,8 +10424,8 @@ function renderGameTop5(picks,isScanning){
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
-    var emptyMsg=isScanning?'Scanning markets for 75%+ plays…':'No plays above 75% confidence for this game.';
-    var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 75% confidence for this game.">Share Game</button>':'';
+    var emptyMsg=isScanning?'Scanning markets for 75%+ plays…':'No plays above 85% confidence for this game.';
+    var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 85% confidence for this game.">Share Game</button>':'';
     mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span>'+emptyShareBtn+'</div>'+_g5TsHtml(ST.eventId,isScanning)+'<div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
     return;
   }
