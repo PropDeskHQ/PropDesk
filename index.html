@@ -180,10 +180,11 @@ input:focus,select:focus{border-color:var(--accent)}
 /* ---- END MANUAL PARLAY BAR ---- */
 .leg-reason{font-size:11px;color:var(--mut);margin-top:3px;line-height:1.4}
 .leg-conf{font-size:12px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;align-self:flex-start}
-.leg-conf.t-lock{color:#ffd700;background:rgba(255,215,0,.1)}
+.leg-conf.t-lock{color:#00e87a;background:rgba(0,232,122,.1)}
 .leg-conf.t-elite{color:var(--accent);background:rgba(0,255,135,.1)}
 .leg-conf.t-strong{color:#7fe6a8;background:rgba(127,230,168,.08)}
-.leg-conf.t-good{color:var(--yellow);background:rgba(255,204,0,.08)}
+.leg-conf.t-good{color:#f5a623;background:rgba(245,166,35,.08)}
+.leg-conf.t-poor{color:#e84040;background:rgba(232,64,64,.08)}
 .parlay-empty{background:#141414;border-radius:12px;padding:24px 20px;text-align:center;color:var(--mut);font-size:14px;line-height:1.7}
 .parlay-empty strong{color:var(--text);display:block;margin-bottom:6px;font-size:15px}
 .parlay-leg-note{font-size:12px;color:var(--yellow);margin-top:8px;text-align:center}
@@ -230,7 +231,7 @@ thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4){text-align:cen
 .vs{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
 .vs b{font-size:36px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap}
 .vs .vt{font-size:10px;font-weight:700;letter-spacing:.5px;line-height:1;text-transform:uppercase}
-.t-lock{color:#ffd700} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:var(--yellow)} .t-poor{color:var(--mut)} .t-pass{color:var(--mut2)}
+.t-lock{color:#00e87a} .t-elite{color:var(--accent)} .t-strong{color:#7fe6a8} .t-good{color:#f5a623} .t-poor{color:#e84040} .t-pass{color:var(--mut2)}
 .ph-rm-btn{font-size:10px;font-weight:600;color:var(--mut);background:none;border:1px solid transparent;border-radius:4px;padding:2px 7px;cursor:pointer;opacity:0;transition:opacity .15s,border-color .15s}
 tr:hover .ph-rm-btn{opacity:1;border-color:var(--bd2)}
 .ph-rm-btn:hover{color:var(--red)!important;border-color:var(--red)!important}
@@ -454,16 +455,16 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .hiw-tier{padding:13px 15px;border-radius:10px;border:1px solid var(--bd2)}
 .hiw-tier-name{font-size:11px;font-weight:800;letter-spacing:.8px;margin-bottom:6px}
 .hiw-tier-desc{font-size:12px;color:var(--mut);line-height:1.6}
-.hiw-tier-lock{border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.04)}
-.hiw-tier-lock .hiw-tier-name{color:#ffd700}
+.hiw-tier-lock{border-color:rgba(0,232,122,.3);background:rgba(0,232,122,.04)}
+.hiw-tier-lock .hiw-tier-name{color:#00e87a}
 .hiw-tier-elite{border-color:rgba(0,255,135,.25);background:rgba(0,255,135,.04)}
 .hiw-tier-elite .hiw-tier-name{color:var(--accent)}
 .hiw-tier-strong{border-color:rgba(127,230,168,.2);background:rgba(127,230,168,.03)}
 .hiw-tier-strong .hiw-tier-name{color:#7fe6a8}
-.hiw-tier-good{border-color:rgba(255,204,0,.2);background:rgba(255,204,0,.03)}
-.hiw-tier-good .hiw-tier-name{color:var(--yellow)}
-.hiw-tier-poor{border-color:rgba(136,136,136,.15);background:rgba(136,136,136,.03)}
-.hiw-tier-poor .hiw-tier-name{color:var(--mut)}
+.hiw-tier-good{border-color:rgba(245,166,35,.25);background:rgba(245,166,35,.04)}
+.hiw-tier-good .hiw-tier-name{color:#f5a623}
+.hiw-tier-poor{border-color:rgba(232,64,64,.25);background:rgba(232,64,64,.04)}
+.hiw-tier-poor .hiw-tier-name{color:#e84040}
 .hiw-dont-list{display:flex;flex-direction:column;gap:14px;margin-top:16px}
 .hiw-dont{display:flex;gap:13px;align-items:flex-start}
 .hiw-dont-x{font-size:12px;font-weight:800;color:#ff5050;flex-shrink:0;margin-top:3px;letter-spacing:.5px}
@@ -506,7 +507,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tc-footer{display:flex;align-items:center;gap:6px;margin-top:14px;padding-top:10px;border-top:1px solid #1e1e1e}
 .tc-source{font-size:10px;color:var(--mut2);letter-spacing:.2px}
 .tc-conf-sm{font-size:10px;font-weight:700;color:var(--mut);margin-left:auto;white-space:nowrap}
-.tc-conf-sm.t-lock{color:#ffd700}.tc-conf-sm.t-elite{color:var(--accent)}.tc-conf-sm.t-strong{color:#7fe6a8}.tc-conf-sm.t-good{color:var(--yellow)}
+.tc-conf-sm.t-lock{color:#00e87a}.tc-conf-sm.t-elite{color:var(--accent)}.tc-conf-sm.t-strong{color:#7fe6a8}.tc-conf-sm.t-good{color:#f5a623}.tc-conf-sm.t-poor{color:#e84040}
 .tc-share-sm{font-size:10px;font-weight:700;color:var(--accent);background:none;border:1px solid rgba(0,255,135,.25);border-radius:5px;padding:3px 8px;cursor:pointer;transition:.15s}
 .tc-share-sm:hover{background:rgba(0,255,135,.12)}
 .tc-no-data{text-align:center;padding:60px 20px;color:var(--mut)}
@@ -639,10 +640,11 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .t10-sub{font-size:11px;color:var(--mut);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .t10-conf-pct{font-size:28px;font-weight:900;color:var(--accent);line-height:1;font-variant-numeric:tabular-nums}
 .t10-tier{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 7px;border-radius:4px;display:inline-block;margin-top:3px}
-.t10-tier.t-lock{background:rgba(255,215,0,.1);color:#ffd700;border:1px solid rgba(255,215,0,.22)}
+.t10-tier.t-lock{background:rgba(0,232,122,.1);color:#00e87a;border:1px solid rgba(0,232,122,.25)}
 .t10-tier.t-elite{background:rgba(0,232,122,.08);color:var(--accent);border:1px solid rgba(0,232,122,.18)}
 .t10-tier.t-strong{background:rgba(127,230,168,.06);color:#7fe6a8;border:1px solid rgba(127,230,168,.18)}
-.t10-tier.t-good{background:rgba(255,204,0,.08);color:var(--yellow);border:1px solid rgba(255,204,0,.2)}
+.t10-tier.t-good{background:rgba(245,166,35,.08);color:#f5a623;border:1px solid rgba(245,166,35,.22)}
+.t10-tier.t-poor{background:rgba(232,64,64,.08);color:#e84040;border:1px solid rgba(232,64,64,.22)}
 .t10-snap-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0;padding:7px 0;border-top:1px solid #1a1a1a;border-bottom:1px solid #1a1a1a}
 .t10-snap-text{font-size:11px;color:var(--mut);flex:1;min-width:0}
 .t10-line-badge{font-size:12px;font-weight:700;padding:2px 8px;border-radius:5px;background:#1a1a1a;border:1px solid #252525;color:#aaa;flex-shrink:0}
@@ -773,7 +775,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .ml-c3-divider{height:1px;background:#1a1a1a;margin:10px 0 18px}
 .ml-c3-tier-wrap{text-align:center;margin-bottom:14px}
 .ml-c3-tier{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:800;padding:7px 16px;border-radius:8px;background:rgba(0,255,135,.08);color:var(--accent);border:1px solid rgba(0,255,135,.22)}
-.ml-c3-tier-lock{background:rgba(255,215,0,.1)!important;color:#ffd700!important;border-color:rgba(255,215,0,.25)!important}
+.ml-c3-tier-lock{background:rgba(0,232,122,.1)!important;color:#00e87a!important;border-color:rgba(0,232,122,.25)!important}
 .ml-c3-bar{display:flex;height:24px;border-radius:6px;overflow:hidden;margin:0 0 22px;background:#111}
 .ml-c3-bar-a{background:var(--blue);display:flex;align-items:center;justify-content:space-between;padding:0 10px;gap:4px;transition:width .5s;min-width:0;overflow:hidden;color:rgba(255,255,255,.92)}
 .ml-c3-bar-h{background:var(--accent);display:flex;align-items:center;justify-content:space-between;padding:0 10px;gap:4px;transition:width .5s;min-width:0;overflow:hidden;color:rgba(0,0,0,.8)}
@@ -1080,9 +1082,9 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
         <div id="summaryBar" style="display:none">
           <div class="summary-bar">
             <span class="sb-label" id="sb-total">0 props</span>
-            <span class="sb-chip sb-lock" id="sb-lock">ELITE: 0</span>
-            <span class="sb-chip sb-elite" id="sb-elite">GREAT: 0</span>
-            <span class="sb-chip sb-good" id="sb-good">GOOD: 0</span>
+            <span class="sb-chip sb-lock" id="sb-lock">LOCK: 0</span>
+            <span class="sb-chip sb-elite" id="sb-elite">GOOD: 0</span>
+            <span class="sb-chip sb-good" id="sb-good">POTENTIAL: 0</span>
             <span class="sb-spacer"></span>
             <button class="btn-best" id="bestBetsBtn">Best Bets Only</button>
           </div>
@@ -1178,24 +1180,20 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
           <div class="hiw-tiers-label">Confidence Tiers</div>
           <div class="hiw-tier-grid">
             <div class="hiw-tier hiw-tier-lock">
-              <div class="hiw-tier-name">🔒 ELITE</div>
-              <div class="hiw-tier-desc">90%+ confidence. The player has hit this line in the overwhelming majority of recent games. L5, L10, and season hit rates all align.</div>
+              <div class="hiw-tier-name">🔒 LOCK</div>
+              <div class="hiw-tier-desc">85%+ confidence. The player has hit this line in the overwhelming majority of recent games. L5, L10, and season hit rates all align.</div>
             </div>
             <div class="hiw-tier hiw-tier-elite">
-              <div class="hiw-tier-name">✅ GREAT</div>
-              <div class="hiw-tier-desc">75–89% confidence. Strong agreement across recent form, mid-term trend, and season data. The primary target range for most plays.</div>
-            </div>
-            <div class="hiw-tier hiw-tier-strong">
-              <div class="hiw-tier-name">📊 GOOD</div>
-              <div class="hiw-tier-desc">60–74% confidence. A clear positive lean at the posted line. Reasonable as a parlay leg — edge is present, but not dominant.</div>
+              <div class="hiw-tier-name">✅ GOOD</div>
+              <div class="hiw-tier-desc">70–84% confidence. Strong agreement across recent form and trend data. The primary target range for most plays.</div>
             </div>
             <div class="hiw-tier hiw-tier-good">
-              <div class="hiw-tier-name">VALUE</div>
-              <div class="hiw-tier-desc">45–59% confidence. Slight lean with limited sample or a tight historical spread. Use as supporting context — not as a standalone bet.</div>
+              <div class="hiw-tier-name">⚡ POTENTIAL</div>
+              <div class="hiw-tier-desc">55–69% confidence. A clear lean at the posted line. Reasonable as a parlay leg — edge is present but not dominant.</div>
             </div>
             <div class="hiw-tier hiw-tier-poor">
-              <div class="hiw-tier-name">⬜ POOR</div>
-              <div class="hiw-tier-desc">Below 45% confidence. The model finds little to no edge here. Hidden by default in the prop table — visible only when filtering is removed.</div>
+              <div class="hiw-tier-name">⚠️ RISKY</div>
+              <div class="hiw-tier-desc">Below 55% confidence. Limited edge or conflicting data. Use as supporting context only — not recommended as a standalone bet.</div>
             </div>
           </div>
         </div>
@@ -1210,7 +1208,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>Home advantage is factored in per sport.</strong> The edge of playing at home is real, measurable, and different for baseball, basketball, hockey, and football. We treat each sport separately.</div></div>
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>In MLB, the starting pitcher is the single biggest variable.</strong> A great starter against a weak lineup can swing a game significantly. We pull confirmed starter data daily and weight it accordingly — it's never an afterthought.</div></div>
           <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>In NBA, back-to-back fatigue is a real, measurable edge.</strong> Teams playing the second night of a back-to-back underperform at a rate the market doesn't always fully price in. We flag it every time.</div></div>
-          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We never show a strong edge on one factor alone.</strong> ELITE and GREAT ratings on a moneyline require multiple independent signals pointing the same direction. One decent stat isn't enough to call the market wrong.</div></div>
+          <div class="hiw-point"><div class="hiw-point-dot"></div><div><strong>We never show a strong edge on one factor alone.</strong> LOCK and GOOD ratings on a moneyline require multiple independent signals pointing the same direction. One decent stat isn't enough to call the market wrong.</div></div>
         </div>
       </div>
 
@@ -1230,7 +1228,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
       <!-- 5b. BEST PLAYS -->
       <div class="hiw-section">
         <div class="hiw-section-label">Best Plays</div>
-        <p>When you select a game, PropDesk automatically scans every available prop market in the background. Any prop with 90%+ ELITE confidence surfaces automatically in the Best Plays section — no market browsing required. Results update in real time as each market completes.</p>
+        <p>When you select a game, PropDesk automatically scans every available prop market in the background. Any prop with 70%+ confidence (GOOD or LOCK) surfaces automatically in the Best Plays section — no market browsing required. Results update in real time as each market completes.</p>
         <div class="hiw-callout">Best Plays is a full-game sweep, not a filtered view of the market you're looking at. It runs across every market simultaneously so you don't miss a high-confidence play hidden in a market you haven't clicked yet.</div>
       </div>
 
@@ -1243,7 +1241,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
       <!-- 5d. HISTORY TAB -->
       <div class="hiw-section">
         <div class="hiw-section-label">Play History</div>
-        <p>The Play History tab automatically logs every prop with 80%+ confidence that surfaces during your session. Track your hit rate over time, review model calibration broken down by confidence tier, and identify which markets and players PropDesk has performed best on. For MLB, past results resolve automatically by pulling the official box score — no manual input needed.</p>
+        <p>The Play History tab automatically logs every prop with 70%+ confidence that surfaces during your session. Track your hit rate over time, review model calibration broken down by confidence tier, and identify which markets and players PropDesk has performed best on. For MLB, past results resolve automatically by pulling the official box score — no manual input needed.</p>
       </div>
 
       <!-- 6. WHAT WE DON'T DO -->
@@ -1941,8 +1939,8 @@ var ST = {
   parlayCart:[]
 };
 var ST_showNoValue=false; // show pdNoValue / hidden rows
-var ST_bestOnly=false;    // show only GREAT+ (≥75%)
-var ST_tierFilter="all";  // tier chip filter: "all"|"ELITE"|"GREAT"|"GOOD"|"VALUE"|"POOR"
+var ST_bestOnly=false;    // show only GOOD+ (≥70%)
+var ST_tierFilter="all";  // tier chip filter: "all"|"LOCK"|"GOOD"|"POTENTIAL"|"RISKY"
 // Cross-sport props accumulator — keyed by "sport|market", values are ST.props arrays (live refs)
 var _propStore={};
 // Per-game enriched prop cache — keyed by eventId, then market key. Lets Best Plays read
@@ -1958,7 +1956,7 @@ var CARD_PREVIEW_MKTS={
   americanfootball_nfl:["player_reception_yds","player_rush_yds"],
   icehockey_nhl:["player_shots_on_goal","player_goals"]
 };
-var _cardPreviewData={};  // { eventId: {bestPlay:prop|null, count80:N} }
+var _cardPreviewData={};  // { eventId: {bestPlay:prop|null, count85:N} }
 var _bgPreviewToken=0;    // increment to cancel stale background preview runs
 var _sportGameCounts={};  // { sportKey: N } — cached game counts for sport pill badges
 var _sportNextDate={};    // { sportKey: "Jun 29" } — next event date when today count is 0
@@ -1985,19 +1983,17 @@ function avg(arr){ if(!arr.length) return 0; var s=0; for(var i=0;i<arr.length;i
 function fmtStat(v){ v=Number(v); if(isNaN(v)) return "-"; if(Number.isInteger(v)) return ""+v; return v.toFixed(1); }
 
 function tierOf(s){
-  if(s>=90) return {c:"t-lock",  t:"ELITE"};
-  if(s>=75) return {c:"t-elite", t:"GREAT"};
-  if(s>=60) return {c:"t-strong",t:"GOOD"};
-  if(s>=45) return {c:"t-good",  t:"VALUE"};
-  return {c:"t-poor",t:"POOR"};
+  if(s>=85) return {c:"t-lock",  t:"LOCK"};
+  if(s>=70) return {c:"t-elite", t:"GOOD"};
+  if(s>=55) return {c:"t-good",  t:"POTENTIAL"};
+  return {c:"t-poor",t:"RISKY"};
 }
 // Confidence-based tier (used after phase-2 enrichment to display X%)
 function confTierOf(pct){ // pct is 0-100
-  if(pct>=90) return {c:"t-lock",   t:"ELITE"};
-  if(pct>=75) return {c:"t-elite",  t:"GREAT"};
-  if(pct>=60) return {c:"t-strong", t:"GOOD"};
-  if(pct>=45) return {c:"t-good",   t:"VALUE"};
-  return       {c:"t-poor",   t:"POOR"};
+  if(pct>=85) return {c:"t-lock",  t:"LOCK"};
+  if(pct>=70) return {c:"t-elite", t:"GOOD"};
+  if(pct>=55) return {c:"t-good",  t:"POTENTIAL"};
+  return       {c:"t-poor",  t:"RISKY"};
 }
 function sportLabel(k){ for(var i=0;i<SPORTS.length;i++) if(SPORTS[i].key===k) return SPORTS[i].label; return k; }
 function marketName(k){
@@ -2815,8 +2811,8 @@ function _gameCardInner(ev){
       var lineStr=fmtLine(pd.bestPlay.pdLine!=null?pd.bestPlay.pdLine:pd.bestPlay.bestLine,pd.bestPlay.pdSide||pd.bestPlay.side||"Over");
       html+='<div class="gm-best"><span class="gm-best-pl">'+esc(pd.bestPlay.player||"")+'</span><span class="gm-best-line">'+esc(lineStr)+'</span><span class="t10-tier '+tierC+'">'+conf+'%</span></div>';
     }
-    if(pd.count80>0){
-      html+='<div class="gm-count">'+pd.count80+' play'+(pd.count80===1?'':'s')+' 80%+</div>';
+    if(pd.count85>0){
+      html+='<div class="gm-count">'+pd.count85+' play'+(pd.count85===1?'':'s')+' 85%+</div>';
     } else if(!pd.bestPlay){
       html+='<div class="gm-count" style="color:#3a3a3a">No high-conf plays</div>';
     }
@@ -2833,15 +2829,15 @@ function _updateGameCard(eventId){
 }
 function _buildPreviewFromCache(eventId){
   var cached=_gamePropsCache[eventId]; if(!cached) return;
-  var bestPlay=null, count80=0;
+  var bestPlay=null, count85=0;
   Object.keys(cached).forEach(function(mk){
     (cached[mk]||[]).forEach(function(p){
       if(!p.enriched||p.pdNoValue||p.thinData||p.pdConfidence==null) return;
       var conf=Math.round(p.pdConfidence*100);
-      if(conf>=80){ count80++; if(!bestPlay||conf>getEffectiveConf(bestPlay)) bestPlay=p; }
+      if(conf>=85){ count85++; if(!bestPlay||conf>getEffectiveConf(bestPlay)) bestPlay=p; }
     });
   });
-  _cardPreviewData[eventId]={bestPlay:bestPlay,count80:count80};
+  _cardPreviewData[eventId]={bestPlay:bestPlay,count85:count85};
   _updateGameCard(eventId);
 }
 async function _startBgCardPreview(){
@@ -2861,7 +2857,7 @@ async function _startBgCardPreview(){
     try{
       var data=await fetchOdds(eventId,mktsStr);
       if(_bgPreviewToken!==token) return;
-      var bestPlay=null, count80=0;
+      var bestPlay=null, count85=0;
       for(var mi=0;mi<mkts.length;mi++){
         var mk=mkts[mi];
         var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
@@ -2872,12 +2868,12 @@ async function _startBgCardPreview(){
           try{await enrichWithConfidence(mkProps[pi]);}catch(e){}
           if(mkProps[pi].enriched&&!mkProps[pi].pdNoValue&&!mkProps[pi].thinData&&mkProps[pi].pdConfidence!=null){
             var c=Math.round(mkProps[pi].pdConfidence*100);
-            if(c>=80){count80++;if(!bestPlay||c>getEffectiveConf(bestPlay)) bestPlay=mkProps[pi];}
+            if(c>=85){count85++;if(!bestPlay||c>getEffectiveConf(bestPlay)) bestPlay=mkProps[pi];}
           }
         }
       }
       if(_bgPreviewToken!==token) return;
-      _cardPreviewData[eventId]={bestPlay:bestPlay,count80:count80};
+      _cardPreviewData[eventId]={bestPlay:bestPlay,count85:count85};
       _updateGameCard(eventId);
     }catch(e){}
     if(i<events.length-1) await new Promise(function(r){setTimeout(r,500);});
@@ -3091,7 +3087,7 @@ async function loadPropOfDay(){
     }
   });
 
-  // Show anything ≥ 60% (GOOD tier); tier label in renderPropOfDay handles ELITE/GREAT/GOOD distinction
+  // Show anything ≥ 60% (POTENTIAL tier and above); tier label in renderPropOfDay handles LOCK/GOOD/POTENTIAL distinction
   if(bestEnriched && bestEnrichedConf>=0.60){
     _potgCache[eid]={prop:bestEnriched.prop, mkt:bestEnriched.mkt};
     renderPropOfDay(bestEnriched.prop, bestEnriched.mkt);
@@ -3135,9 +3131,9 @@ function renderPropOfDay(p, mkt){
 
   // Tier label — drives the card header badge and analysis tone
   var tierInfo=confTierOf(confPct);
-  var isGoodOnly=(confPct>=60&&confPct<75);
+  var isGoodOnly=(confPct>=55&&confPct<70);
   var cardTitle=isGoodOnly?"Best Available Today":"Prop of the Day";
-  var tierNote=isGoodOnly?'<div class="warn" style="margin:6px 0 4px;font-size:11px">No ELITE or GREAT pick today — showing best available (GOOD tier)</div>':"";
+  var tierNote=isGoodOnly?'<div class="warn" style="margin:6px 0 4px;font-size:11px">No LOCK or GOOD pick today — showing best available (POTENTIAL tier)</div>':"";
 
   // Line shift note
   var shiftedUp=pdLine!=null&&p.bestLine!=null&&pdLine>p.bestLine;
@@ -3210,8 +3206,8 @@ async function loadLOTD(){
       try{ await enrichWithConfidence(_lp); }catch(e){}
       ST.market=_lotdSm;
     }
-    // GREAT + ELITE only (≥75% real confidence) — never show GOOD or below in Lay of the Day
-    pool=pool.filter(function(p){ return p.pdConfidence!=null && p.pdConfidence>=0.75 && !p.pdNoValue && !p.thinData; });
+    // GOOD + LOCK only (≥70% real confidence) — never show POTENTIAL or below in Lay of the Day
+    pool=pool.filter(function(p){ return p.pdConfidence!=null && p.pdConfidence>=0.70 && !p.pdNoValue && !p.thinData; });
     pool.sort(function(a,b){ return b.pdConfidence-a.pdConfidence; });
     if(pool.length<2){ return; }
 
@@ -3291,7 +3287,7 @@ function lotdText(legs){
   var diverse=(ST.sport!=="americanfootball_nfl")?" across different stat categories so the legs stay independent":"";
   var avgConf=Math.round(legs.reduce(function(a,l){return a+l.value;},0)/legs.length);
   return "Today's Lay of the Day combines "+esc(names)+diverse+
-    ". Every leg is rated GREAT or ELITE (75%+) — PropDesk's avg confidence is "+avgConf+"%."+
+    ". Every leg is rated GOOD or LOCK (70%+) — PropDesk's avg confidence is "+avgConf+"%."+
     " Size this as a swing bet: keep stakes modest and consider playing legs individually if your book restricts correlated props.";
 }
 
@@ -3304,11 +3300,11 @@ function filteredProps(){
     // "Show Hidden" toggle — pdNoValue and POOR tier (<45%) hidden by default
     if(!ST_showNoValue && p.enriched && p.pdNoValue) return false;
     if(!ST_showNoValue && p.enriched && !p.pdNoValue && p.pdConfidence!=null && Math.round(p.pdConfidence*100)<45) return false;
-    // "Best Bets Only" toggle — restrict to GREAT+ (≥75%); thin-data and no-value excluded
+    // "Best Bets Only" toggle — restrict to GOOD+ (≥70%); thin-data and no-value excluded
     if(ST_bestOnly){
       if(!p.enriched) return false;
       if(p.thinData||p.pdNoValue||p.pdConfidence==null) return false;
-      if(Math.round(p.pdConfidence*100)<75) return false;
+      if(Math.round(p.pdConfidence*100)<70) return false;
     }
     // Tier chip filter — only applies to enriched props with a valid confidence score
     if(ST_tierFilter!=="all"&&p.enriched&&!p.pdNoValue&&p.pdConfidence!=null){
@@ -3340,7 +3336,7 @@ function renderSummaryBar(){
   var locks=0,elites=0,goods=0;
   allEnriched.forEach(function(p){
     var pct=Math.round(p.pdConfidence*100);
-    if(pct>=90) locks++; else if(pct>=75) elites++; else if(pct>=60) goods++;
+    if(pct>=85) locks++; else if(pct>=70) elites++; else if(pct>=55) goods++;
   });
   var total=allEnriched.length;
   bar.style.display=total?"block":"none";
@@ -3368,23 +3364,22 @@ function renderSummaryBar(){
   var tfrEl=$("tierFilterRow");
   if(!total){ if(tfrEl) tfrEl.style.display="none"; return; }
   $("sb-total").textContent=total+" prop"+(total!==1?"s":"")+" analyzed";
-  $("sb-lock").textContent="ELITE: "+locks;
-  $("sb-elite").textContent="GREAT: "+elites;
-  $("sb-good").textContent="GOOD: "+goods;
+  $("sb-lock").textContent="LOCK: "+locks;
+  $("sb-elite").textContent="GOOD: "+elites;
+  $("sb-good").textContent="POTENTIAL: "+goods;
   var bb=$("bestBetsBtn");
   if(bb){ bb.className="btn-best"+(ST_bestOnly?" on":""); bb.textContent=ST_bestOnly?"Best Bets ✓":"Best Bets Only"; }
   /* ── Tier filter chips ── */
   if(tfrEl){
-    var tierCounts={ELITE:0,GREAT:0,GOOD:0,VALUE:0,POOR:0};
+    var tierCounts={LOCK:0,GOOD:0,POTENTIAL:0,RISKY:0};
     ST.props.filter(function(p){ return p.enriched&&!p.pdNoValue&&p.pdConfidence!=null; })
       .forEach(function(p){ var t=confTierOf(Math.round(p.pdConfidence*100)).t; if(tierCounts[t]!==undefined) tierCounts[t]++; });
     var CHIP_DEF=[
-      {k:"all",   lbl:"All",   range:"",       cls:"tf-all"},
-      {k:"ELITE", lbl:"ELITE", range:"90%+",   cls:"tf-elite-chip"},
-      {k:"GREAT", lbl:"GREAT", range:"75–89%", cls:"tf-great-chip"},
-      {k:"GOOD",  lbl:"GOOD",  range:"60–74%", cls:"tf-good-chip"},
-      {k:"VALUE", lbl:"VALUE", range:"45–59%", cls:"tf-value-chip"},
-      {k:"POOR",  lbl:"POOR",  range:"<45%",   cls:"tf-poor-chip"}
+      {k:"all",       lbl:"All",       range:"",        cls:"tf-all"},
+      {k:"LOCK",      lbl:"LOCK",      range:"85%+",    cls:"tf-lock-chip"},
+      {k:"GOOD",      lbl:"GOOD",      range:"70–84%",  cls:"tf-good-chip"},
+      {k:"POTENTIAL", lbl:"POTENTIAL", range:"55–69%",  cls:"tf-potential-chip"},
+      {k:"RISKY",     lbl:"RISKY",     range:"<55%",    cls:"tf-risky-chip"}
     ];
     var ch='<div class="tier-filter-row">';
     CHIP_DEF.forEach(function(cd){
@@ -5096,7 +5091,7 @@ function ensureChart(cb){
   if(window.Chart){ cb(); return; }
   var tries=0; var iv=setInterval(function(){ tries++; if(window.Chart){ clearInterval(iv); cb(); } else if(tries>50){ clearInterval(iv); } },120);
 }
-function tierColor(s){ if(s>=90)return "#ffd700"; if(s>=75)return "#00ff87"; if(s>=60)return "#7fe6a8"; if(s>=45)return "#ffcc00"; return "#888"; }
+function tierColor(s){ if(s>=85)return "#00e87a"; if(s>=70)return "#00ff87"; if(s>=55)return "#f5a623"; return "#e84040"; }
 // pdLine = PropDesk reference line, isOver = direction, confPct = 0-100 confidence, bookLine = original book line
 function drawAnalyzeCharts(p,pdLine,vals,seasonAvg,hitRate,dates,isOver,confPct,bookLine){
   ensureChart(function(){
@@ -5729,10 +5724,10 @@ function _phChartTimelineSvg(resolved){
 function _phChartCalibrationSvg(resolved){
   if(!resolved||resolved.length<3) return null;
   var TIERS=[
-    {min:45,max:59,exp:52,lbl:"VALUE",range:"45–59%"},
-    {min:60,max:74,exp:67,lbl:"GOOD", range:"60–74%"},
-    {min:75,max:89,exp:82,lbl:"GREAT",range:"75–89%"},
-    {min:90,max:100,exp:95,lbl:"ELITE",range:"90%+"}
+    {min:0, max:54, exp:40, lbl:"RISKY",    range:"<55%"},
+    {min:55,max:69, exp:62, lbl:"POTENTIAL",range:"55–69%"},
+    {min:70,max:84, exp:77, lbl:"GOOD",     range:"70–84%"},
+    {min:85,max:100,exp:92, lbl:"LOCK",     range:"85%+"}
   ];
   TIERS.forEach(function(t){
     t.hits=0; t.plays=0;
@@ -5905,7 +5900,7 @@ function _renderPdStatsData(mount,data){
   });
   var topMkts=Object.keys(mktMap).sort(function(a,b){ return mktMap[b].plays-mktMap[a].plays; }).slice(0,10);
   /* tiers */
-  var TIER_DEF=[{label:"ELITE",min:90,max:100,exp:92},{label:"GREAT",min:75,max:89,exp:82},{label:"GOOD",min:60,max:74,exp:67},{label:"VALUE",min:45,max:59,exp:52},{label:"POOR",min:0,max:44,exp:35}];
+  var TIER_DEF=[{label:"LOCK",min:85,max:100,exp:92},{label:"GOOD",min:70,max:84,exp:77},{label:"POTENTIAL",min:55,max:69,exp:62},{label:"RISKY",min:0,max:54,exp:40}];
   var tierMap={}; TIER_DEF.forEach(function(t){ tierMap[t.label]={plays:0,hits:0}; });
   allRes.forEach(function(e){
     var c=e.confidence||0, td=TIER_DEF.filter(function(t){ return c>=t.min&&c<=t.max; })[0];
@@ -6358,7 +6353,7 @@ async function renderPlayHistory(){
   var topMkts=Object.keys(mktMap).sort(function(a,b){ return mktMap[b].plays-mktMap[a].plays; }).slice(0,10);
 
   /* ── confidence tiers ── */
-  var TIER_DEF=[{label:"ELITE",min:90,max:100,exp:92},{label:"GREAT",min:75,max:89,exp:82},{label:"GOOD",min:60,max:74,exp:67},{label:"VALUE",min:45,max:59,exp:52},{label:"POOR",min:0,max:44,exp:35}];
+  var TIER_DEF=[{label:"LOCK",min:85,max:100,exp:92},{label:"GOOD",min:70,max:84,exp:77},{label:"POTENTIAL",min:55,max:69,exp:62},{label:"RISKY",min:0,max:54,exp:40}];
   var tierMap={};
   TIER_DEF.forEach(function(t){ tierMap[t.label]={plays:0,hits:0}; });
   allRes.forEach(function(e){
@@ -7588,7 +7583,7 @@ function showPage(name){
 var _onbCurrentStep=0;
 var _onbSteps=[
   {targetId:'sportTabs',text:"Start here — pick a sport to see today's games and top prop picks.",position:'below'},
-  {targetSel:'.conf-badge',text:"This is PropDesk's confidence score. 75%+ means a strong signal. 90%+ is ELITE — our highest conviction plays.",detail:true,position:'left'},
+  {targetSel:'.conf-badge',text:"This is PropDesk's confidence score. 70%+ is GOOD signal. 85%+ is LOCK — our highest conviction plays.",detail:true,position:'left'},
   {targetSel:'.trk-btn:not(.trk-done)',text:"Hit + Track to save any play to My History. We'll track whether it hits or misses automatically.",position:'left'},
   {targetSel:'[data-nav="trends"]',text:"The Trends tab shows PropDesk's full public record — hit rate, ROI, and the systems behind today's picks.",position:'above'},
   {targetSel:'[data-nav="history"]',text:"Your History tab tracks every play you've saved — your personal hit rate and ROI over time.",position:'above',isFinal:true}
@@ -9205,7 +9200,7 @@ function buildShareGameText(picks){
   picks.forEach(function(p){
     var conf=getEffectiveConf(p);
     var tier=confTierOf(conf).t;
-    var emoji=tier==="ELITE"?"🔒":tier==="GREAT"?"✅":"📊";
+    var emoji=tier==="LOCK"?"🔒":tier==="GOOD"?"✅":"📊";
     var sportKey=p._sport||ST.sport;
     var isT=!!(p._market&&(THRESHOLD_MARKETS[sportKey]||{})[p._market]);
     var pdLine=p.pdLine!=null?p.pdLine:p.bestLine;
@@ -9220,7 +9215,7 @@ function buildShareGameText(picks){
 function buildTop10ShareItem(rank,p,mktName,sportKey){
   var conf=getEffectiveConf(p);
   var tier=confTierOf(conf).t;
-  var emoji=tier==="ELITE"?"🏆":tier==="GREAT"?"⭐":"✅";
+  var emoji=tier==="LOCK"?"🏆":tier==="GOOD"?"⭐":"✅";
   var sp={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"}[sportKey]||"";
   var side=p.pdSide||"Over";
   var line=p.pdLine!=null?p.pdLine:p.bestLine;
@@ -9310,14 +9305,14 @@ function renderTop10(picks){
     if(copyBtn) copyBtn.style.display="none";
     return;
   }
-  var lockCt=picks.filter(function(p){return getEffectiveConf(p)>=90;}).length;
-  var eliteCt=picks.filter(function(p){var c=getEffectiveConf(p);return c>=75&&c<90;}).length;
+  var lockCt=picks.filter(function(p){return getEffectiveConf(p)>=85;}).length;
+  var eliteCt=picks.filter(function(p){var c=getEffectiveConf(p);return c>=70&&c<85;}).length;
   var goodCt=picks.length-lockCt-eliteCt;
   if(sumEl){
     var pills="";
-    if(lockCt) pills+='<span class="t10-stat-pill t10-sp-lock">'+lockCt+' ELITE</span>';
-    if(eliteCt) pills+='<span class="t10-stat-pill t10-sp-elite">'+eliteCt+' GREAT</span>';
-    if(goodCt) pills+='<span class="t10-stat-pill t10-sp-good">'+goodCt+' GOOD</span>';
+    if(lockCt) pills+='<span class="t10-stat-pill t10-sp-lock">'+lockCt+' LOCK</span>';
+    if(eliteCt) pills+='<span class="t10-stat-pill t10-sp-elite">'+eliteCt+' GOOD</span>';
+    if(goodCt) pills+='<span class="t10-stat-pill t10-sp-good">'+goodCt+' POTENTIAL</span>';
     sumEl.innerHTML=pills;
   }
   if(copyBtn){
@@ -10040,9 +10035,9 @@ function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
   // Home advantage counts as a signal only when it is the primary differentiator:
   // no other signal crossed its threshold AND homeAdv is meaningful AND edge is real
   var numSig=numSigOther+(Math.abs(f_homeAdv)>20&&absEdge>0.05&&numSigOther===0?1:0);
-  // ELITE/GREAT require 2+ independent signals; GOOD requires at least 1
-  var rawTier=hasOdds&&absEdge>=0.15?"ELITE":hasOdds&&absEdge>=0.10?"GREAT":hasOdds&&absEdge>=0.05?"GOOD":null;
-  var tier=!rawTier||numSig===0?null:(rawTier==="ELITE"||rawTier==="GREAT")&&numSig<2?"GOOD":rawTier;
+  // LOCK/GOOD require 2+ independent signals; POTENTIAL requires at least 1
+  var rawTier=hasOdds&&absEdge>=0.15?"LOCK":hasOdds&&absEdge>=0.10?"GOOD":hasOdds&&absEdge>=0.05?"POTENTIAL":null;
+  var tier=!rawTier||numSig===0?null:(rawTier==="LOCK"||rawTier==="GOOD")&&numSig<2?"POTENTIAL":rawTier;
 
   adjustments.sort(function(a,b){return b.mag-a.mag;});
   return{home:home,away:away,time:ev.commence_time,
@@ -10067,8 +10062,8 @@ function renderMoneylineCard(c){
   var tierHtml="";
   if(c.tier){
     var favNick=mlNick(favHome?c.home:c.away);
-    var tierEmoji=c.tier==="ELITE"?"🏆":c.tier==="GREAT"?"⭐":"💪";
-    var tierCl="ml-c3-tier"+(c.tier==="ELITE"?" ml-c3-tier-lock":"");
+    var tierEmoji=c.tier==="LOCK"?"🏆":c.tier==="GOOD"?"⭐":"💪";
+    var tierCl="ml-c3-tier"+(c.tier==="LOCK"?" ml-c3-tier-lock":"");
     tierHtml='<div class="ml-c3-tier-wrap"><span class="'+tierCl+'">'+tierEmoji+' '+esc(c.tier)+' — '+esc(favNick)+' +'+edgePct+'%</span></div>';
   }
 
@@ -10343,7 +10338,7 @@ function updateBestPlaysDisplay(eventId,remaining){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) q.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=70) q.push(p);
     });
   });
   q.sort(function(a,b){
@@ -10417,7 +10412,7 @@ async function startGameEnrichment(eventId){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) qFinal.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=70) qFinal.push(p);
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
@@ -10463,8 +10458,8 @@ function renderGameTop5(picks,isScanning){
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
-    var emptyMsg=isScanning?'Scanning markets for 75%+ plays…':'No plays above 75% confidence for this game.';
-    var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 75% confidence for this game.">Share Game</button>':'';
+    var emptyMsg=isScanning?'Scanning markets for 70%+ plays…':'No plays above 70% confidence for this game.';
+    var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 70% confidence for this game.">Share Game</button>':'';
     mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span>'+emptyShareBtn+'</div>'+_g5TsHtml(ST.eventId,isScanning)+'<div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
     return;
   }
