@@ -6517,17 +6517,18 @@ async function renderPlayHistory(){
   /* ─── SECTION 4: CONFIDENCE TIER CALIBRATION ─── */
   if(allRes.length){
     html+=_phSectionHdr("By Confidence Tier");
-    html+=_phTbl(['Tier','Range','Plays','Hit Rate','Expected','Gap'],
+    html+=_phTbl(['Tier','Range','Plays','Hit Rate','ROI%','Units'],
       TIER_DEF.map(function(t){
         var tm=tierMap[t.label], rate=_phRate(tm.hits,tm.plays);
-        var gap=rate!==null?rate-t.exp:null;
-        var gapColor=gap===null?"var(--mut)":Math.abs(gap)<=5?"var(--accent)":Math.abs(gap)<=10?"var(--yellow)":"var(--red)";
+        var _tr=tm.plays>0?calcROI(statData.filter(function(e){var c=e.confidence||0;return c>=t.min&&c<=t.max;})):null;
+        var _trRoiClr=_tr?(_tr.roi>0?'#00e87a':_tr.roi<0?'#ff4f4f':'var(--mut)'):'var(--mut)';
+        var _trUClr=_tr?(_tr.units>0?'#00e87a':_tr.units<0?'#ff4f4f':'var(--mut)'):'var(--mut)';
         return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+t.label+'</td>'+
           '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+t.min+'–'+t.max+'%</td>'+
           '<td style="padding:5px 8px;font-size:11px">'+(tm.plays||'–')+'</td>'+
           '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+t.exp+'%</td>'+
-          '<td style="padding:5px 8px;font-size:11px;font-weight:700;color:'+gapColor+'">'+(gap===null?"–":(gap>=0?"+":"")+gap+"%")+'</td></tr>';
+          '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_trRoiClr+'">'+(_tr?(_tr.roi>=0?'+':'')+_tr.roi+'%':'–')+'</td>'+
+          '<td style="padding:5px 8px;font-size:11px;font-weight:700;color:'+_trUClr+'">'+(_tr?(_tr.units>=0?'+':'')+_tr.units.toFixed(2)+'u':'–')+'</td></tr>';
       }),true);
     html+='<div style="margin-bottom:16px"></div>';
   }
