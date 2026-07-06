@@ -7302,17 +7302,28 @@ async function resolveMoneylinePick(play){
 
 async function resolveTrendPlay(play){
   try{
-    if(!play||play.source!=='trend'||play.result!=='pending'||play.autoResolveLocked) return false;
+    if(!play||play.type!=='trend'||play.result!=='pending'||play.autoResolveLocked) return false;
     if(!_arPastGate(play.date)) return false;
-    var teamName=play.player||''; if(!teamName) return false;
-    var sport=(play.sport||'MLB').toUpperCase();
-    var parts=(play.game||'').split(/ vs | @ /);
-    var awayHint=(parts[0]||'').trim(),homeHint=(parts[1]||'').trim();
+    if(!play.teamId) return false;
+    var r=await fetch("https://statsapi.mlb.com/api/v1/schedule?date="+play.date+"&sportId=1&hydrate=linescore&teamId="+play.teamId,{signal:AbortSignal.timeout(8000)});
+    if(!r.ok) return false;
+    var d=await r.json();
+    var games=[];
+    (d.dates||[]).forEach(function(dt){(dt.games||[]).forEach(function(g){games.push(g);});});
     var result=null;
-    if(sport==='MLB') result=await _mlArResolveMlb(play.date,teamName,awayHint,homeHint);
-    else if(sport==='NBA') result=await _mlArResolveEspn(play.date,teamName,awayHint,homeHint,'basketball/nba');
-    else if(sport==='NHL') result=await _mlArResolveNhl(play.date,teamName,awayHint,homeHint);
-    else if(sport==='NFL') result=await _mlArResolveEspn(play.date,teamName,awayHint,homeHint,'football/nfl');
+    for(var i=0;i<games.length;i++){
+      var g=games[i];
+      var state=(g.status&&g.status.detailedState)||"";
+      if(state.toLowerCase().indexOf("final")<0&&state.toLowerCase().indexOf("over")<0) continue;
+      var hId=g.teams&&g.teams.home&&g.teams.home.team&&g.teams.home.team.id;
+      var aId=g.teams&&g.teams.away&&g.teams.away.team&&g.teams.away.team.id;
+      var hScore=Number((g.teams&&g.teams.home&&g.teams.home.score)||0);
+      var aScore=Number((g.teams&&g.teams.away&&g.teams.away.score)||0);
+      var isHome=hId===play.teamId,isAway=aId===play.teamId;
+      if(!isHome&&!isAway) continue;
+      result=(isHome?hScore>aScore:aScore>hScore)?"hit":"miss";
+      break;
+    }
     if(result!=='hit'&&result!=='miss') return false;
     var h=loadPlayHist(),updated=false;
     h.forEach(function(e){ if(e.loggedAt===play.loggedAt&&e.player===play.player){ e.result=result;e.autoResolved=true;updated=true; } });
