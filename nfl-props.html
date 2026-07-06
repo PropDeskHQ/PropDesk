@@ -10352,7 +10352,7 @@ function updateBestPlaysDisplay(eventId,remaining){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=85) q.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) q.push(p);
     });
   });
   q.sort(function(a,b){
@@ -10426,7 +10426,7 @@ async function startGameEnrichment(eventId){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=85) qFinal.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=75) qFinal.push(p);
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
@@ -10472,8 +10472,8 @@ function renderGameTop5(picks,isScanning){
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
-    var emptyMsg=isScanning?'Scanning markets for 75%+ plays…':'No plays above 85% confidence for this game.';
-    var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 85% confidence for this game.">Share Game</button>':'';
+    var emptyMsg=isScanning?'Scanning markets for 75%+ plays…':'No plays above 75% confidence for this game.';
+    var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 75% confidence for this game.">Share Game</button>':'';
     mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span>'+emptyShareBtn+'</div>'+_g5TsHtml(ST.eventId,isScanning)+'<div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
     return;
   }
