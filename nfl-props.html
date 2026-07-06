@@ -6652,7 +6652,10 @@ async function renderPlayHistory(){
       html+='<td colspan="'+colSpan+'" style="padding:7px 10px">';
       html+='<div style="display:flex;justify-content:space-between;align-items:center">';
       html+='<span style="font-size:11px;font-weight:800">'+esc(fmtDHdr(d))+(d===today?' <span style="font-size:9px;color:var(--mut);font-weight:400">today</span>':'')+'</span>';
+      html+='<span style="display:flex;align-items:center;gap:10px">';
       html+='<span style="font-size:10px;color:var(--mut)">'+esc(summary)+_dRoiHtml+' '+chevron+'</span>';
+      html+='<button class="ph-del-day btn" data-date="'+esc(d)+'" style="font-size:10px;color:#ff5555;background:none;border:none;padding:2px 4px;cursor:pointer;opacity:.5;line-height:1" title="Delete all plays from this day">🗑</button>';
+      html+='</span>';
       html+='</div></td></tr>';
 
       if(!collapsed){
@@ -6822,6 +6825,31 @@ async function renderPlayHistory(){
       var cur=d in _phCollapsedDates?_phCollapsedDates[d]:(d!==today);
       _phCollapsedDates[d]=!cur;
       renderPlayHistory();
+    };
+  });
+  mount.querySelectorAll('.ph-del-day').forEach(function(btn){
+    btn.onclick=function(ev){
+      ev.stopPropagation();
+      var d=btn.getAttribute('data-date');
+      var allForDay=loadPlayHist().filter(function(e){return e.date===d;});
+      var count=allForDay.length;
+      var td=btn.closest('tr').querySelector('td');
+      td.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:2px 0">'
+        +'<span style="font-size:11px;color:#ff5555">Delete '+count+' play'+(count!==1?'s':'')+' from '+fmtDHdr(d)+'? This cannot be undone.</span>'
+        +'<button class="ph-dday-confirm" style="font-size:11px;font-weight:700;background:rgba(255,85,85,.12);color:#ff5555;border:1px solid rgba(255,85,85,.4);border-radius:5px;padding:3px 10px;cursor:pointer">Confirm Delete</button>'
+        +'<button class="ph-dday-cancel" style="font-size:11px;color:var(--mut);background:none;border:none;cursor:pointer;padding:3px 6px">Cancel</button>'
+        +'</div>';
+      td.querySelector('.ph-dday-confirm').onclick=function(ev2){
+        ev2.stopPropagation();
+        var h=loadPlayHist().filter(function(e){return e.date!==d;});
+        savePlayHist(h);
+        if(_supabase&&_authUser) _supabase.from('plays').delete().eq('user_id',_authUser.id).eq('date',d);
+        renderPlayHistory();
+      };
+      td.querySelector('.ph-dday-cancel').onclick=function(ev2){
+        ev2.stopPropagation();
+        renderPlayHistory();
+      };
     };
   });
   var exAll=$('phExpandAll');
