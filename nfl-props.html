@@ -3102,6 +3102,14 @@ async function loadPropOfDay(){
   if(bestEnriched && bestEnrichedConf>=0.60){
     _potgCache[eid]={prop:bestEnriched.prop, mkt:bestEnriched.mkt};
     renderPropOfDay(bestEnriched.prop, bestEnriched.mkt);
+    var _pp=bestEnriched.prop, _pm=bestEnriched.mkt;
+    if(!_pp._market) _pp._market=_pm;
+    if(!_gamePropsCache[eid]) _gamePropsCache[eid]={};
+    if(!_gamePropsCache[eid][_pm]) _gamePropsCache[eid][_pm]=[];
+    var _pidx=_gamePropsCache[eid][_pm].findIndex(function(x){return x.player===_pp.player;});
+    if(_pidx===-1) _gamePropsCache[eid][_pm].push(_pp);
+    else _gamePropsCache[eid][_pm][_pidx]=_pp;
+    updateBestPlaysDisplay(eid,0);
   } else {
     renderNoPropOfDay();
   }
@@ -3129,7 +3137,8 @@ function renderNoPropOfDay(){
 function renderPropOfDay(p, mkt){
   var mount=$("potgMount");
   if(!mount||!p) return;
-  var confPct=p.pdConfidence!=null?Math.round(p.pdConfidence*100):p.value;
+  var rawConf=p.pdConfidence!=null?p.pdConfidence:p.value/100;
+  var confPct=Math.round(calcOddsAdjustedConf(rawConf,p.bestOdds)*100);
   if(confPct<60){ renderNoPropOfDay(); return; }
 
   var mktLabel=marketName(mkt);
@@ -10359,9 +10368,11 @@ function updateBestPlaysDisplay(eventId,remaining){
   if(ST.eventId!==eventId) return;
   var cached=_gamePropsCache[eventId]||{};
   var q=[];
+  var _potd=_potgCache[eventId];
   Object.keys(cached).forEach(function(mk){
-    if(MLB_HIDDEN_MARKETS[mk]) return;
+    var _mkHidden=!!MLB_HIDDEN_MARKETS[mk];
     (cached[mk]||[]).forEach(function(p){
+      if(_mkHidden&&!(_potd&&p.player===_potd.prop.player&&mk===_potd.mkt)) return;
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
       if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=70) q.push(p);
