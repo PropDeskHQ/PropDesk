@@ -1995,6 +1995,17 @@ function confTierOf(pct){ // pct is 0-100
   if(pct>=55) return {c:"t-good",  t:"POTENTIAL"};
   return       {c:"t-poor",  t:"RISKY"};
 }
+// Adjust displayed confidence downward when book is pricing heavy juice.
+// rawConf: 0-1 scale. odds: American odds integer. Returns 0-1 scale.
+// Stored confidence is never modified — display and threshold use only.
+function calcOddsAdjustedConf(rawConf,odds){
+  if(odds==null) return rawConf;
+  var breakeven=odds<0?Math.abs(odds)/(Math.abs(odds)+100):100/(odds+100);
+  var baseline=0.565; // ~-130 standard juice
+  if(breakeven<=baseline) return rawConf;
+  var penalty=(breakeven-baseline)*1.5;
+  return Math.max(0.01,rawConf-penalty);
+}
 function sportLabel(k){ for(var i=0;i<SPORTS.length;i++) if(SPORTS[i].key===k) return SPORTS[i].label; return k; }
 function marketName(k){
   for(var sp in MARKETS){ for(var j=0;j<MARKETS[sp].length;j++){ if(MARKETS[sp][j].k===k) return MARKETS[sp][j].n; } }
@@ -2594,7 +2605,7 @@ function updatePropValueDisplay(p){
     if(vt&&vt.classList.contains("vt")){ vt.textContent=""; vt.className="vt t-pass"; }
     applyPropFlags(p); return;
   }
-  var dispConf=p._adjConfidence!=null?p._adjConfidence:p.pdConfidence;
+  var dispConf=p._adjConfidence!=null?p._adjConfidence:(p.pdConfidence!=null?calcOddsAdjustedConf(p.pdConfidence,p.bestOdds):null);
   var isConf=dispConf!=null;
   if(isConf){
     var pct=Math.round(dispConf*100);
@@ -3463,7 +3474,8 @@ function generateWhyExplanation(p){
   var line=p.pdLine!=null?p.pdLine:p.bestLine;
   var vals=p._vals||[], n=vals.length;
   if(n<3) return "Insufficient game log data exists for "+esc(p.player)+" on this market to calculate a meaningful confidence score. The Thin Data flag has been applied.";
-  var conf=Math.round(((p._adjConfidence!=null?p._adjConfidence:p.pdConfidence)||0)*100);
+  var _confBase=Math.round(((p._adjConfidence!=null?p._adjConfidence:p.pdConfidence)||0)*100);
+  var conf=Math.round(calcOddsAdjustedConf(_confBase/100,p.bestOdds)*100);
   var tier=confTierOf(conf);
   var mktDisplay=marketName(mk);
   var lastName=p.player.split(" ").slice(-1)[0];
@@ -3538,6 +3550,9 @@ function generateWhyExplanation(p){
     }
   }
   parts.push(s4);
+  if(p.bestOdds!=null&&_confBase-conf>=5){
+    parts.push("Note: confidence adjusted from "+_confBase+"% to "+conf+"% to account for heavy juice at "+p.bestOdds+".");
+  }
   return parts.join(" ");
 }
 
@@ -10349,7 +10364,7 @@ function updateBestPlaysDisplay(eventId,remaining){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=70) q.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=70) q.push(p);
     });
   });
   q.sort(function(a,b){
@@ -10423,7 +10438,7 @@ async function startGameEnrichment(eventId){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(p.pdConfidence*100)>=70) qFinal.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=70) qFinal.push(p);
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
