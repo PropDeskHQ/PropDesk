@@ -1472,6 +1472,17 @@ var RATE_FRAGS = ["avg","obp","slg","ops","era","whip","pct","battingaverage","o
 
 var PITCHER_MARKETS = {pitcher_strikeouts:1,pitcher_hits_allowed:1,pitcher_earned_runs:1,pitcher_outs:1,pitcher_walks:1};
 var YESNO_MARKETS = {player_anytime_td:1,player_first_td:1,player_first_basket:1,player_anytime_goalscorer:1,player_first_goalscorer:1};
+// Calibration factors derived from PropDesk historical results (hit rate / avg confidence).
+// Values <1.0 indicate systematic overconfidence in that market. Update periodically as data grows.
+var MARKET_CALIBRATION = {
+  'batter_total_bases':    0.544,
+  'batter_rbis':           0.566,
+  'batter_runs_scored':    0.701,
+  'batter_hits_runs_rbis': 0.731,
+  'batter_hits':           0.765,
+  'pitcher_walks':         0.923,
+  'moneyline':             0.982
+};
 
 // Threshold markets: integer-count stats shown as "1+ Goals", "2+ Hits" etc.
 // SPORT-SPECIFIC — NBA player_points is a true O/U (Over 23.5 pts), NOT a threshold market.
@@ -2005,6 +2016,12 @@ function calcOddsAdjustedConf(rawConf,odds){
   if(breakeven<=baseline) return rawConf;
   var penalty=(breakeven-baseline)*1.5;
   return Math.max(0.01,rawConf-penalty);
+}
+// Chains market calibration (historical overconfidence correction) then odds adjustment.
+// Use this for all display/threshold — never for storing raw confidence.
+function calcCalibratedConf(rawConf,market,bestOdds){
+  var cal=MARKET_CALIBRATION[market]||1.0;
+  return calcOddsAdjustedConf(rawConf*cal,bestOdds);
 }
 function sportLabel(k){ for(var i=0;i<SPORTS.length;i++) if(SPORTS[i].key===k) return SPORTS[i].label; return k; }
 function marketName(k){
@@ -2605,7 +2622,7 @@ function updatePropValueDisplay(p){
     if(vt&&vt.classList.contains("vt")){ vt.textContent=""; vt.className="vt t-pass"; }
     applyPropFlags(p); return;
   }
-  var dispConf=p._adjConfidence!=null?p._adjConfidence:(p.pdConfidence!=null?calcOddsAdjustedConf(p.pdConfidence,p.bestOdds):null);
+  var dispConf=p._adjConfidence!=null?p._adjConfidence:(p.pdConfidence!=null?calcCalibratedConf(p.pdConfidence,p._market,p.bestOdds):null);
   var isConf=dispConf!=null;
   if(isConf){
     var pct=Math.round(dispConf*100);
@@ -3138,7 +3155,7 @@ function renderPropOfDay(p, mkt){
   var mount=$("potgMount");
   if(!mount||!p) return;
   var rawConf=p.pdConfidence!=null?p.pdConfidence:p.value/100;
-  var confPct=Math.round(calcOddsAdjustedConf(rawConf,p.bestOdds)*100);
+  var confPct=Math.round(calcCalibratedConf(rawConf,mkt,p.bestOdds)*100);
   if(confPct<60){ renderNoPropOfDay(); return; }
 
   var mktLabel=marketName(mkt);
@@ -3484,7 +3501,7 @@ function generateWhyExplanation(p){
   var vals=p._vals||[], n=vals.length;
   if(n<3) return "Insufficient game log data exists for "+esc(p.player)+" on this market to calculate a meaningful confidence score. The Thin Data flag has been applied.";
   var _confBase=Math.round(((p._adjConfidence!=null?p._adjConfidence:p.pdConfidence)||0)*100);
-  var conf=Math.round(calcOddsAdjustedConf(_confBase/100,p.bestOdds)*100);
+  var conf=Math.round(calcCalibratedConf(_confBase/100,mk,p.bestOdds)*100);
   var tier=confTierOf(conf);
   var mktDisplay=marketName(mk);
   var lastName=p.player.split(" ").slice(-1)[0];
@@ -10375,7 +10392,7 @@ function updateBestPlaysDisplay(eventId,remaining){
       if(_mkHidden&&!(_potd&&p.player===_potd.prop.player&&mk===_potd.mkt)) return;
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=70) q.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcCalibratedConf(p.pdConfidence,mk,p.bestOdds)*100)>=70) q.push(p);
     });
   });
   q.sort(function(a,b){
@@ -10449,7 +10466,7 @@ async function startGameEnrichment(eventId){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=70) qFinal.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcCalibratedConf(p.pdConfidence,mk,p.bestOdds)*100)>=70) qFinal.push(p);
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
