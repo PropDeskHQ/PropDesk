@@ -6859,25 +6859,26 @@ async function renderPlayHistory(){
     btn.onclick=function(ev){
       ev.stopPropagation();
       var d=btn.getAttribute('data-date');
-      var allForDay=loadPlayHist().filter(function(e){return e.date===d;});
-      var count=allForDay.length;
-      var td=btn.closest('tr').querySelector('td');
-      td.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:2px 0">'
-        +'<span style="font-size:11px;color:#ff5555">Delete '+count+' play'+(count!==1?'s':'')+' from '+fmtDHdr(d)+'? This cannot be undone.</span>'
-        +'<button class="ph-dday-confirm" style="font-size:11px;font-weight:700;background:rgba(255,85,85,.12);color:#ff5555;border:1px solid rgba(255,85,85,.4);border-radius:5px;padding:3px 10px;cursor:pointer">Confirm Delete</button>'
-        +'<button class="ph-dday-cancel" style="font-size:11px;color:var(--mut);background:none;border:none;cursor:pointer;padding:3px 6px">Cancel</button>'
-        +'</div>';
-      td.querySelector('.ph-dday-confirm').onclick=function(ev2){
-        ev2.stopPropagation();
+      if(btn.getAttribute('data-confirming')==='true'){
         var h=loadPlayHist().filter(function(e){return e.date!==d;});
         savePlayHist(h);
         if(_supabase&&_authUser) _supabase.from('plays').delete().eq('user_id',_authUser.id).eq('date',d);
         renderPlayHistory();
-      };
-      td.querySelector('.ph-dday-cancel').onclick=function(ev2){
-        ev2.stopPropagation();
-        renderPlayHistory();
-      };
+      } else {
+        btn.setAttribute('data-confirming','true');
+        btn.textContent='Confirm? ✓';
+        btn.style.color='#ff5555';
+        btn.style.opacity='1';
+        var _t=setTimeout(function(){
+          if(btn.getAttribute('data-confirming')==='true'){
+            btn.removeAttribute('data-confirming');
+            btn.textContent='🗑';
+            btn.style.color='#ff5555';
+            btn.style.opacity='.5';
+          }
+        },3000);
+        btn._confirmTimer=_t;
+      }
     };
   });
   var exAll=$('phExpandAll');
