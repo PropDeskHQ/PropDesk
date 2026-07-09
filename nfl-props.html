@@ -1472,6 +1472,12 @@ var RATE_FRAGS = ["avg","obp","slg","ops","era","whip","pct","battingaverage","o
 
 var PITCHER_MARKETS = {pitcher_strikeouts:1,pitcher_hits_allowed:1,pitcher_earned_runs:1,pitcher_outs:1,pitcher_walks:1};
 var YESNO_MARKETS = {player_anytime_td:1,player_first_td:1,player_first_basket:1,player_anytime_goalscorer:1,player_first_goalscorer:1};
+// Markets with sub-50% historical hit rates — excluded from Best Plays, warned in prop rows.
+// Values are actual hit rates from propdesk-stats.json analysis.
+var UNDERPERFORMING_MARKETS = {
+  'batter_total_bases': 0.432,
+  'batter_rbis':        0.458
+};
 
 // Threshold markets: integer-count stats shown as "1+ Goals", "2+ Hits" etc.
 // SPORT-SPECIFIC — NBA player_points is a true O/U (Over 23.5 pts), NOT a threshold market.
@@ -3615,6 +3621,7 @@ function rowHtml(p,cols,idx,silent){
     '<td>'+
       '<div class="pl-name">'+esc(p.player)+'</div>'+
       '<div class="pl-meta" id="meta-'+p._id+'">'+meta+'</div>'+
+      (UNDERPERFORMING_MARKETS[p._market||ST.market]!=null?'<div style="font-size:10px;color:#f59e0b;font-weight:700;margin-top:2px">⚠ Hist: '+Math.round(UNDERPERFORMING_MARKETS[p._market||ST.market]*100)+'% hit rate</div>':'')+
       '<button class="qs-toggle" data-pid="'+p._id+'">Stats &#9662;</button>'+
       '<div class="pl-qstats" id="qstats-'+p._id+'"></div>'+
       '<div class="pl-flags" id="flags-'+p._id+'"></div>'+
@@ -10370,6 +10377,7 @@ function updateBestPlaysDisplay(eventId,remaining){
   var q=[];
   var _potd=_potgCache[eventId];
   Object.keys(cached).forEach(function(mk){
+    if(UNDERPERFORMING_MARKETS[mk]) return;
     var _mkHidden=!!MLB_HIDDEN_MARKETS[mk];
     (cached[mk]||[]).forEach(function(p){
       if(_mkHidden&&!(_potd&&p.player===_potd.prop.player&&mk===_potd.mkt)) return;
