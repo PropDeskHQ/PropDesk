@@ -146,6 +146,15 @@ label.fl{font-size:11px;color:#555;display:block;margin-bottom:4px;text-transfor
             <option value="void">Void</option>
           </select>
         </div>
+        <div>
+          <label class="fl">Sport</label>
+          <select id="f_sport" class="infield">
+            <option value="MLB" selected>MLB</option>
+            <option value="NFL">NFL</option>
+            <option value="NBA">NBA</option>
+            <option value="NHL">NHL</option>
+          </select>
+        </div>
       </div>
       <button onclick="addPlay()" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600">Add Play</button>
     </div>
@@ -606,8 +615,9 @@ function addPlay(){
   if(plays.some(function(ex){return ex.player===player&&ex.market===mkt&&ex.date===date;})){
     alert('A '+( MKT_DISPLAY[mkt]||mkt)+' play for '+player+' on '+date+' already exists.');return;
   }
+  var sport=document.getElementById('f_sport').value||'MLB';
   var entry={date:date,player:player,market:mkt,marketDisplay:MKT_DISPLAY[mkt]||mkt,
-    sport:'MLB',line:line||'—',confidence:conf,tier:tierOf(conf),result:result,_idx:plays.length};
+    sport:sport,line:line||'—',confidence:conf,tier:tierOf(conf),result:result,_idx:plays.length};
   if(mkt==='moneyline') entry.type='moneyline';
   plays.push(entry);
   markDirty();
@@ -726,6 +736,12 @@ function doImport(){
       tier:p.tier||tierOf(Number(p.confidence)||0),
       odds:Number(p.odds)||null,
       result:p.result||'pending',
+      game:p.game||'',
+      type:p.type||'prop',
+      loggedAt:p.loggedAt||null,
+      source:p.source||'imported',
+      edge:p.edge||null,
+      autoResolved:p.autoResolved||false,
       _idx:plays.length
     });
   });
