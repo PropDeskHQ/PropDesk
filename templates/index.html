@@ -177,6 +177,13 @@ input:focus,select:focus{border-color:var(--accent)}
 .why-row{display:none}
 .why-row.open{display:table-row}
 .why-panel{font-size:12px;color:#aaa;line-height:1.65;padding:10px 16px 12px;border-top:1px solid #1a1a1a;background:#0d0d0d}
+.player-expand-btn{display:block;margin-top:5px;font-size:10px;font-weight:700;color:rgba(0,232,122,.5);background:none;border:none;cursor:pointer;padding:0;transition:color .12s;line-height:1;white-space:nowrap}
+.player-expand-btn:hover{color:var(--accent)}
+.player-xmkts-panel{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 10px;border-top:1px solid #1a1a1a;background:#0d0d0d}
+.xmkt-chip{display:flex;flex-direction:column;gap:2px;background:var(--surf2);border:1px solid var(--bd2);border-radius:8px;padding:6px 10px;min-width:80px}
+.xmkt-mkt{font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--mut2)}
+.xmkt-line{font-size:12px;font-weight:600;color:var(--text)}
+.xmkt-conf{font-size:11px;font-weight:800}
 /* ---- END MANUAL PARLAY BAR ---- */
 .leg-reason{font-size:11px;color:var(--mut);margin-top:3px;line-height:1.4}
 .leg-conf{font-size:12px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;align-self:flex-start}
@@ -3443,15 +3450,53 @@ function _updateShowHiddenBtn(){
 function renderTable(silent){
   var props=filteredProps();
   var cols=bookColumns();
-  $("resCount").textContent=props.length+" prop"+(props.length===1?"":"s");
+  // Per-player dedup: keep highest-confidence prop per player; hide extras below
+  var _seenPT={},_primaryProps=[],_inMktExtras={};
+  props.forEach(function(p){
+    if(!p._id) p._id=Math.random().toString(36).slice(2,9);
+    var k=p.player.toLowerCase().trim();
+    if(_seenPT[k]){
+      (_inMktExtras[_seenPT[k]]=_inMktExtras[_seenPT[k]]||[]).push(p);
+    } else { _seenPT[k]=p._id; _primaryProps.push(p); }
+  });
+  // Other-market enriched props from cache for expand panel
+  var _cachedGame=ST.eventId?(_gamePropsCache[ST.eventId]||{}):{};
+  var _curMkt=ST.market;
+  function _getOtherMktProps(player){
+    var k=player.toLowerCase().trim(),res=[];
+    Object.keys(_cachedGame).forEach(function(mk){
+      if(mk===_curMkt) return;
+      (_cachedGame[mk]||[]).forEach(function(cp){
+        if(cp.player.toLowerCase().trim()!==k) return;
+        if(!cp.enriched||cp.pdNoValue||cp.thinData||cp.pdConfidence==null) return;
+        res.push(cp);
+      });
+    });
+    return res.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
+  }
+  $("resCount").textContent=_primaryProps.length+" prop"+(_primaryProps.length===1?"":"s");
   var thead='<tr><th>Player</th><th>Book Line</th><th>PropDesk Line</th><th>Confidence</th>';
   cols.forEach(function(b){ thead+='<th>'+esc(b)+'</th>'; });
   thead+='</tr>';
-  var tb="";
-  props.forEach(function(p,idx){ tb+=rowHtml(p,cols,idx,silent); });
+  var tb="",_colSpan=4+cols.length,_animIdx=0;
+  _primaryProps.forEach(function(p){
+    var inMktEx=_inMktExtras[p._id]||[];
+    var otherMktEx=_getOtherMktProps(p.player);
+    var totalExtra=inMktEx.length+otherMktEx.length;
+    tb+=rowHtml(p,cols,_animIdx,silent,totalExtra);
+    _animIdx++;
+    inMktEx.forEach(function(ep){
+      if(!ep._id) ep._id=Math.random().toString(36).slice(2,9);
+      var eRow=rowHtml(ep,cols,null,true,0);
+      eRow=eRow.replace('<tr class="prow','<tr data-extra-for="'+p._id+'" style="display:none" class="prow');
+      eRow=eRow.replace('<tr class="why-row"','<tr data-extra-for="'+p._id+'" style="display:none" class="why-row"');
+      tb+=eRow;
+    });
+    if(otherMktEx.length) tb+=buildXmktsPanel(p._id,otherMktEx,_colSpan);
+  });
   $("tableMount").innerHTML='<div class="tbl-wrap"><table><thead>'+thead+'</thead><tbody>'+tb+'</tbody></table></div>';
   if(!silent){
-    props.forEach(function(p,idx){
+    _primaryProps.forEach(function(p,idx){
       var node=document.getElementById("vsc-"+p._id);
       if(!node) return;
       var isConf=p.pdConfidence!=null&&!p.pdNoValue;
@@ -3466,7 +3511,7 @@ function renderTable(silent){
       }
     });
   } else {
-    props.forEach(function(p){
+    _primaryProps.forEach(function(p){
       var node=document.getElementById("vsc-"+p._id);
       if(!node) return;
       var isConf=p.pdConfidence!=null&&!p.pdNoValue;
@@ -3479,6 +3524,7 @@ function renderTable(silent){
   props.forEach(function(p){ if(p.valueFlags) applyPropFlags(p); });
   props.forEach(function(p){ if(p.enriched) updatePropPDDisplay(p); });
   bindRowActions();
+  _bindExpandPlayerBtns();
   renderSummaryBar();
 }
 
@@ -3571,7 +3617,7 @@ function generateWhyExplanation(p){
   return parts.join(" ");
 }
 
-function rowHtml(p,cols,idx,silent){
+function rowHtml(p,cols,idx,silent,_extraCount){
   if(p._id==null) p._id=Math.random().toString(36).slice(2,9);
   var tier=tierOf(p.value);
   var isThresh=isThreshProp(p);
@@ -3631,6 +3677,7 @@ function rowHtml(p,cols,idx,silent){
         (function(){ var isTrk=_trackedThisSession[p._id]; return '<button class="mini trk-btn'+(isTrk?' trk-done':'')+'" data-act="track" data-pid="'+p._id+'"'+(isTrk?' disabled':'')+'>'+( isTrk?'✓ Tracked':'+ Track')+'</button>'; })()+
         '<button class="mini" data-act="more" data-pid="'+p._id+'">⋯</button>'+
       '</div>'+
+      (_extraCount>0?'<button class="player-expand-btn" data-pid="'+p._id+'" data-count="'+_extraCount+'" data-open="0">See all '+_extraCount+' prop'+(_extraCount===1?'':'s')+' &#9662;</button>':'')+
     '</td>'+
     '<td><div class="col-val-center"><span class="bb '+bbcls+'">'+esc(bb)+'</span>'+(p.bestOdds!=null?'<div class="pl-meta">'+fmtOdds(p.bestOdds)+'</div>':'')+'</div></td>'+
     '<td id="pdcell-'+p._id+'">'+pdCellContent+'</td>';
@@ -3695,6 +3742,31 @@ function bindRowActions(){
   });
   document.querySelectorAll('.qs-toggle[data-pid]').forEach(function(b){
     b.onclick=function(){ toggleQuickStats(b); };
+  });
+}
+function buildXmktsPanel(primaryId,otherMktProps,colSpan){
+  var chips=otherMktProps.map(function(p){
+    var conf=Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100);
+    var ct=confTierOf(conf);
+    var mktN=marketName(p._market||'');
+    var isT=isThreshProp(p);
+    var line=p.pdLine!=null?(isT?threshLabel(p.pdLine,p._market):fmtLine(p.pdLine,p.pdSide||'Over')):(p.bestLine!=null?fmtLine(p.bestLine,p.side||'Over'):'');
+    return '<div class="xmkt-chip"><span class="xmkt-mkt">'+esc(mktN)+'</span>'+(line?'<span class="xmkt-line">'+esc(line)+'</span>':'')+'<span class="xmkt-conf '+ct.c+'">'+conf+'% '+ct.t+'</span></div>';
+  }).join('');
+  return '<tr class="player-xmkts-row" data-for="'+esc(primaryId)+'" style="display:none"><td colspan="'+colSpan+'" style="padding:0"><div class="player-xmkts-panel">'+chips+'</div></td></tr>';
+}
+function _bindExpandPlayerBtns(){
+  document.querySelectorAll('.player-expand-btn[data-pid]').forEach(function(btn){
+    btn.onclick=function(){
+      var pid=btn.getAttribute('data-pid');
+      var count=parseInt(btn.getAttribute('data-count')||'0',10);
+      var isOpen=btn.getAttribute('data-open')==='1';
+      document.querySelectorAll('tr[data-extra-for="'+pid+'"]').forEach(function(r){ r.style.display=isOpen?'none':'table-row'; });
+      var panel=document.querySelector('.player-xmkts-row[data-for="'+pid+'"]');
+      if(panel) panel.style.display=isOpen?'none':'table-row';
+      btn.setAttribute('data-open',isOpen?'0':'1');
+      btn.innerHTML=isOpen?('See all '+count+' prop'+(count===1?'':'s')+' &#9662;'):('Show fewer &#9652;');
+    };
   });
 }
 function toggleQuickStats(btn){
