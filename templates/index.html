@@ -8862,6 +8862,7 @@ async function calcNRFITrends(){
   try{ probables=await mlFetchMLBProbables(); }catch(e){}
   var yr=new Date().getFullYear();
 
+  var seenGames={};
   for(var ei=0;ei<_trendsEvents.length;ei++){
     var ev=_trendsEvents[ei];
     var homeTeam=ev.home_team||"",awayTeam=ev.away_team||"";
@@ -8870,6 +8871,8 @@ async function calcNRFITrends(){
     if(!homeId||!awayId) continue;
 
     var gameStr=awayTeam+" @ "+homeTeam;
+    if(seenGames[gameStr]) continue;
+    seenGames[gameStr]=true;
     var bothGames=await Promise.all([mlbTeamRecentGames(homeId),mlbTeamRecentGames(awayId)]);
     var bothFI=await Promise.all([
       mlbFirstInningResults(homeId,bothGames[0]),
@@ -8908,15 +8911,15 @@ async function calcNRFITrends(){
 
     var descBase=awayTeam+" has scored in the 1st inning in "+awayScored+" of last "+awayFI.length+
       " games. "+homeTeam+" has scored in "+homeScored+" of last "+homeFI.length+" games.";
-    var startersLine="Starters: "+awayPitcherName+" vs "+homePitcherName;
+    var startersLine=(homePitcherName!=="TBD"||awayPitcherName!=="TBD")?"Starters: "+awayPitcherName+" vs "+homePitcherName:"";
 
     var nrfiCond=homeScoredRate<0.35&&awayScoredRate<0.35&&eraOk;
-    var yrfiCond=(homeScoredRate>0.55||awayScoredRate>0.55)||(maxERA!=null&&maxERA>=5.00);
+    var yrfiCond=(homeScoredRate>0.45||awayScoredRate>0.45)||(maxERA!=null&&maxERA>=5.00);
 
     if(nrfiCond&&combinedNRFIRate>=0.50){
       var nrfiBonus=(maxERA!=null)?(maxERA>=5.0?3:maxERA>=3.5?1:0):0;
       var nrfiConf=Math.round(Math.min(82,Math.max(55,combinedNRFIRate*100+nrfiBonus)));
-      var nrfiDesc=descBase+" Combined NRFI rate: "+Math.round(combinedNRFIRate*100)+"%. "+startersLine+".";
+      var nrfiDesc=descBase+" Combined NRFI rate: "+Math.round(combinedNRFIRate*100)+"%."+(startersLine?" "+startersLine+".":"");
       trends.push({
         type:"nrfi",conf:nrfiConf,player:awayTeam+" @ "+homeTeam,
         systemName:"NRFI LEAN",headline:nrfiDesc,
@@ -8927,10 +8930,11 @@ async function calcNRFITrends(){
         shareText:"PropDesk NRFI LEAN: "+awayTeam+" @ "+homeTeam+" — "+Math.round(combinedNRFIRate*100)+"% NRFI rate | propdeskhq.netlify.app",
         _game:gameStr,_market:"nrfi",teamId:null
       });
-    } else if(yrfiCond&&combinedYRFIRate>=0.50){
+    }
+    if(!nrfiCond&&yrfiCond&&combinedYRFIRate>=0.50){
       var yrfiBonus=(maxERA!=null&&maxERA>=5.0)?4:0;
       var yrfiConf=Math.round(Math.min(82,Math.max(55,combinedYRFIRate*100+yrfiBonus)));
-      var yrfiDesc=descBase+" Combined YRFI rate: "+Math.round(combinedYRFIRate*100)+"%. "+startersLine+".";
+      var yrfiDesc=descBase+" Combined YRFI rate: "+Math.round(combinedYRFIRate*100)+"%."+(startersLine?" "+startersLine+".":"");
       trends.push({
         type:"nrfi",conf:yrfiConf,player:awayTeam+" @ "+homeTeam,
         systemName:"YRFI LEAN",headline:yrfiDesc,
