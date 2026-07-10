@@ -9003,7 +9003,8 @@ async function calcBullpenFatigueTrends(){
       if(!lean) continue;
 
       var ipStr=totalReliefIP.toFixed(1);
-      var conf=totalReliefIP>=12?85:70;
+      var conf=Math.min(90,Math.max(65,Math.round((totalReliefIP-9)*5+65)));
+      var tmRole=tm.isHome?"HOST":"AWAY";
       var desc=tm.name+" bullpen has thrown "+ipStr+" innings over the last 3 games. "+
         "Opposing hitters may have an advantage late in the game. "+
         "Affects late-inning hitter props — most relevant for runs, H+R+RBI markets.";
@@ -9012,7 +9013,7 @@ async function calcBullpenFatigueTrends(){
         player:tm.name+" Bullpen",
         systemName:lean,
         headline:desc,
-        title:tm.name+" Bullpen Fatigue — "+gameStr,
+        title:tmRole+" "+tm.name+" Bullpen Fatigued",
         record:ipStr+" IP / last 3 games",
         hitRate:conf,recordCls:"",
         detail:desc,source:"MLB Stats API — Boxscore",
@@ -9325,16 +9326,15 @@ function renderTrends(trends){
       +'" data-ttype="'+o.k+'">'+o.lbl+'</button>';}).join("")+
     '</div></div>';
   // Empty state for filtered view
-  var _statsHtml=_pdStatsCache?_trendsStatsSummaryHtml(_pdStatsCache):"";
   if(!visible.length){
     var FILTER_NAMES={streak:"Streak",homeway:"Home/Away Split",linevalue:"Line Value",
       movement:"Sharp Money",totals:"Game Total",matchup:"Matchup",teamsit:"Situational",nrfi:"NRFI/YRFI",bullpen:"Bullpen Fatigue"};
     var emptyMsg=_trendsFilter==="all"
       ?"No trends found — check back as lines post closer to game time"
       :"No "+( FILTER_NAMES[_trendsFilter]||_trendsFilter)+" trends detected today — check back as lines move closer to game time";
-    mount.innerHTML=_statsHtml+ctrlHtml+'<div class="tc-no-data"><div class="nd-icon">🔍</div><p>'+emptyMsg+'</p></div>';
+    mount.innerHTML=ctrlHtml+'<div class="tc-no-data"><div class="nd-icon">🔍</div><p>'+emptyMsg+'</p></div>';
   } else {
-    mount.innerHTML=_statsHtml+ctrlHtml+
+    mount.innerHTML=ctrlHtml+
       '<div class="trend-grid">'+visible.map(function(t){var s=_sigInfo(t);return renderTrendCard(t,s.cls,s.label);}).join("")+'</div>'+
       '<p class="trends-empty-note">'+visible.length+' trend'+(visible.length!==1?"s":"")+'&nbsp;&nbsp;·&nbsp;&nbsp;Click any card for details&nbsp;&nbsp;·&nbsp;&nbsp;All data live</p>';
   }
