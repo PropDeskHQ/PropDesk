@@ -1827,6 +1827,7 @@ async function mlbTeamRecentGames(teamId){
           if(us.isWinner!==true&&us.isWinner!==false) return;
           all.push({
             date:g.officialDate||"",
+            gamePk:g.gamePk||null,
             isHome:isHome,
             opponentId:opp.team?opp.team.id:null,
             opponentName:opp.team?opp.team.name:"",
@@ -1851,6 +1852,34 @@ async function mlbTeamRecentGames(teamId){
   all.sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
   _teamGamesCache[ckey]=all;
   return all;
+}
+
+var _linescoreCache={};
+async function mlbFirstInningResults(teamId,recentGames){
+  var games=(recentGames||[]).filter(function(g){ return g.gamePk!=null; }).slice(0,15);
+  var results=[];
+  await Promise.all(games.map(async function(game){
+    try{
+      if(_linescoreCache[game.gamePk]===undefined){
+        var r=await fetch("https://statsapi.mlb.com/api/v1/schedule?gamePk="+game.gamePk+"&hydrate=linescore",{signal:AbortSignal.timeout(5000)});
+        if(r.ok){
+          var d=await r.json();
+          var g0=d.dates&&d.dates[0]&&d.dates[0].games&&d.dates[0].games[0];
+          _linescoreCache[game.gamePk]=g0||null;
+        } else { _linescoreCache[game.gamePk]=null; }
+      }
+      var gData=_linescoreCache[game.gamePk];
+      if(!gData||!gData.linescore||!gData.linescore.innings||!gData.linescore.innings.length) return;
+      var inn1=gData.linescore.innings[0];
+      if(!inn1) return;
+      var teamRuns=game.isHome?(inn1.home?Number(inn1.home.runs||0):null):(inn1.away?Number(inn1.away.runs||0):null);
+      var oppRuns=game.isHome?(inn1.away?Number(inn1.away.runs||0):null):(inn1.home?Number(inn1.home.runs||0):null);
+      if(teamRuns==null||oppRuns==null) return;
+      results.push({date:game.date,gamePk:game.gamePk,isHome:game.isHome,
+        teamScored1st:teamRuns>0,oppScored1st:oppRuns>0,teamRuns1st:teamRuns,oppRuns1st:oppRuns});
+    }catch(e){}
+  }));
+  return results.sort(function(a,b){ return (b.date||"").localeCompare(a.date||""); });
 }
 
 // Fetch opposing team's K% (strikeout rate as a batting team) from MLB Stats API
@@ -8825,6 +8854,98 @@ async function calcTeamSituationalTrends(){
   return trends;
 }
 
+/* === NRFI/YRFI First-Inning Trends (MLB only) === */
+async function calcNRFITrends(){
+  var trends=[];
+  if(_trendsSport!=="baseball_mlb") return trends;
+  var probables={};
+  try{ probables=await mlFetchMLBProbables(); }catch(e){}
+  var yr=new Date().getFullYear();
+
+  for(var ei=0;ei<_trendsEvents.length;ei++){
+    var ev=_trendsEvents[ei];
+    var homeTeam=ev.home_team||"",awayTeam=ev.away_team||"";
+    var teamIds=await Promise.all([mlbTeamId(homeTeam),mlbTeamId(awayTeam)]);
+    var homeId=teamIds[0],awayId=teamIds[1];
+    if(!homeId||!awayId) continue;
+
+    var gameStr=awayTeam+" @ "+homeTeam;
+    var bothGames=await Promise.all([mlbTeamRecentGames(homeId),mlbTeamRecentGames(awayId)]);
+    var bothFI=await Promise.all([
+      mlbFirstInningResults(homeId,bothGames[0]),
+      mlbFirstInningResults(awayId,bothGames[1])
+    ]);
+    var homeFI=bothFI[0],awayFI=bothFI[1];
+    if(homeFI.length<10||awayFI.length<10) continue;
+
+    var homeScored=homeFI.filter(function(g){ return g.teamScored1st; }).length;
+    var homeScoredRate=homeScored/homeFI.length;
+    var homeNRFIRate=homeFI.filter(function(g){ return !g.teamScored1st&&!g.oppScored1st; }).length/homeFI.length;
+
+    var awayScored=awayFI.filter(function(g){ return g.teamScored1st; }).length;
+    var awayScoredRate=awayScored/awayFI.length;
+    var awayNRFIRate=awayFI.filter(function(g){ return !g.teamScored1st&&!g.oppScored1st; }).length/awayFI.length;
+
+    var combinedNRFIRate=(homeNRFIRate+awayNRFIRate)/2;
+    var combinedYRFIRate=1-combinedNRFIRate;
+    var sampleN=Math.min(homeFI.length,awayFI.length);
+
+    var probKey=mlNormKey(homeTeam);
+    var prob=probables[probKey]||null;
+    var homePitcherId=prob&&prob.home?prob.home.id:null;
+    var homePitcherName=prob&&prob.home?prob.home.name:"TBD";
+    var awayPitcherId=prob&&prob.away?prob.away.id:null;
+    var awayPitcherName=prob&&prob.away?prob.away.name:"TBD";
+
+    var homeERA=null,awayERA=null;
+    try{
+      if(homePitcherId) homeERA=await mlbPitcherERA(homePitcherId,yr);
+      if(awayPitcherId) awayERA=await mlbPitcherERA(awayPitcherId,yr);
+    }catch(e){}
+    var maxERA=(homeERA!=null&&awayERA!=null)?Math.max(homeERA,awayERA):(homeERA!=null?homeERA:awayERA);
+    var eraOk=(homeERA==null&&awayERA==null)||
+              (homeERA!=null&&homeERA>=3.50)||(awayERA!=null&&awayERA>=3.50);
+
+    var descBase=awayTeam+" has scored in the 1st inning in "+awayScored+" of last "+awayFI.length+
+      " games. "+homeTeam+" has scored in "+homeScored+" of last "+homeFI.length+" games.";
+    var startersLine="Starters: "+awayPitcherName+" vs "+homePitcherName;
+
+    var nrfiCond=homeScoredRate<0.35&&awayScoredRate<0.35&&eraOk;
+    var yrfiCond=(homeScoredRate>0.55||awayScoredRate>0.55)||(maxERA!=null&&maxERA>=5.00);
+
+    if(nrfiCond&&combinedNRFIRate>=0.50){
+      var nrfiBonus=(maxERA!=null)?(maxERA>=5.0?3:maxERA>=3.5?1:0):0;
+      var nrfiConf=Math.round(Math.min(82,Math.max(55,combinedNRFIRate*100+nrfiBonus)));
+      var nrfiDesc=descBase+" Combined NRFI rate: "+Math.round(combinedNRFIRate*100)+"%. "+startersLine+".";
+      trends.push({
+        type:"nrfi",conf:nrfiConf,player:awayTeam+" @ "+homeTeam,
+        systemName:"NRFI LEAN",headline:nrfiDesc,
+        title:awayTeam+" @ "+homeTeam+" — First Inning",
+        record:Math.round(combinedNRFIRate*100)+"% NRFI rate (last "+sampleN+" games)",
+        hitRate:Math.round(combinedNRFIRate*100),recordCls:"",
+        detail:nrfiDesc,source:"MLB Stats API — Linescore",
+        shareText:"PropDesk NRFI LEAN: "+awayTeam+" @ "+homeTeam+" — "+Math.round(combinedNRFIRate*100)+"% NRFI rate | propdeskhq.netlify.app",
+        _game:gameStr,_market:"nrfi",teamId:null
+      });
+    } else if(yrfiCond&&combinedYRFIRate>=0.50){
+      var yrfiBonus=(maxERA!=null&&maxERA>=5.0)?4:0;
+      var yrfiConf=Math.round(Math.min(82,Math.max(55,combinedYRFIRate*100+yrfiBonus)));
+      var yrfiDesc=descBase+" Combined YRFI rate: "+Math.round(combinedYRFIRate*100)+"%. "+startersLine+".";
+      trends.push({
+        type:"nrfi",conf:yrfiConf,player:awayTeam+" @ "+homeTeam,
+        systemName:"YRFI LEAN",headline:yrfiDesc,
+        title:awayTeam+" @ "+homeTeam+" — First Inning",
+        record:Math.round(combinedYRFIRate*100)+"% YRFI rate (last "+sampleN+" games)",
+        hitRate:Math.round(combinedYRFIRate*100),recordCls:"under",
+        detail:yrfiDesc,source:"MLB Stats API — Linescore",
+        shareText:"PropDesk YRFI LEAN: "+awayTeam+" @ "+homeTeam+" — "+Math.round(combinedYRFIRate*100)+"% YRFI rate | propdeskhq.netlify.app",
+        _game:gameStr,_market:"nrfi",teamId:null
+      });
+    }
+  }
+  return trends;
+}
+
 /* === TYPE 7: Composite Trends (MLB batter multi-signal scoring) === */
 var MLB_PARK_FACTOR={
   "Colorado Rockies":1.14,"Cincinnati Reds":1.06,"Boston Red Sox":1.04,
@@ -8884,6 +9005,7 @@ function _trendCardTitle(t){
   }
   if(t.type==="homeway") return t.player+" — Home/away split";
   if(t.type==="matchup") return t.player+" — Situational matchup edge";
+  if(t.type==="nrfi") return t.title||t.player;
   return t.title||t.player;
 }
 function _trendActionLine(t){
@@ -8913,13 +9035,15 @@ function _trendActionLine(t){
     return "Favorable matchup for "+t.player+" — historical splits back the "+mside;
   }
   if(t.type==="teamsit") return "";
+  if(t.type==="nrfi") return "Model Only — no book line";
   return "";
 }
 function renderTrendCard(t, sigCls, sigLabel){
   var sigCls=sigCls||"tc-weak";
   var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":
     t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
-    t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":"GAME TOTAL";
+    t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":
+    t.type==="nrfi"?"FIRST INNING":"GAME TOTAL";
   var title=_trendCardTitle(t);
   var action=_trendActionLine(t);
   var systemName=t.systemName?'<div class="tc-system-name">'+esc(t.systemName)+'</div>':'';
@@ -9076,8 +9200,8 @@ function renderTrends(trends){
     return _trendsFilter==="all"||t.type===_trendsFilter;
   });
   // Sort
-  var TYPE_RECENT={movement:0,totals:1,streak:2,homeway:3,linevalue:4,matchup:5,teamsit:6};
-  var TYPE_ALPHA={homeway:0,linevalue:1,matchup:2,movement:3,streak:4,teamsit:5,totals:6};
+  var TYPE_RECENT={movement:0,totals:1,streak:2,homeway:3,linevalue:4,matchup:5,teamsit:6,nrfi:7};
+  var TYPE_ALPHA={homeway:0,linevalue:1,matchup:2,movement:3,nrfi:4,streak:5,teamsit:6,totals:7};
   if(_trendsSort==="strength"){
     visible=visible.slice().sort(function(a,b){return b.conf-a.conf;});
   } else if(_trendsSort==="recent"){
@@ -9104,7 +9228,7 @@ function renderTrends(trends){
   var FILTER_OPTS=[
     {k:"all",lbl:"All"},{k:"streak",lbl:"Streaks"},{k:"homeway",lbl:"Home/Away"},
     {k:"linevalue",lbl:"Line Value"},{k:"movement",lbl:"Sharp Money"},
-    {k:"totals",lbl:"Game Totals"},{k:"matchup",lbl:"Matchups"},{k:"teamsit",lbl:"Situational"}
+    {k:"totals",lbl:"Game Totals"},{k:"matchup",lbl:"Matchups"},{k:"teamsit",lbl:"Situational"},{k:"nrfi",lbl:"NRFI/YRFI"}
   ];
   var SORT_OPTS=[{k:"strength",lbl:"Strongest First"},{k:"recent",lbl:"Most Recent"},{k:"type",lbl:"By Type"}];
   var ctrlHtml='<div class="trends-controls">'+
@@ -9120,7 +9244,7 @@ function renderTrends(trends){
   var _statsHtml=_pdStatsCache?_trendsStatsSummaryHtml(_pdStatsCache):"";
   if(!visible.length){
     var FILTER_NAMES={streak:"Streak",homeway:"Home/Away Split",linevalue:"Line Value",
-      movement:"Sharp Money",totals:"Game Total",matchup:"Matchup",teamsit:"Situational"};
+      movement:"Sharp Money",totals:"Game Total",matchup:"Matchup",teamsit:"Situational",nrfi:"NRFI/YRFI"};
     var emptyMsg=_trendsFilter==="all"
       ?"No trends found — check back as lines post closer to game time"
       :"No "+( FILTER_NAMES[_trendsFilter]||_trendsFilter)+" trends detected today — check back as lines move closer to game time";
@@ -9150,7 +9274,7 @@ function renderTrends(trends){
       var idx=parseInt(btn.getAttribute("data-tidx"),10);
       var t=_trendsData[idx]; if(!t) return;
       var today=new Date().toISOString().slice(0,10);
-      var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":t.type==="composite"?"COMPOSITE TREND":t.type==="ml"?"MONEYLINE TREND":(t.type||"TREND").toUpperCase();
+      var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":t.type==="composite"?"COMPOSITE TREND":t.type==="ml"?"MONEYLINE TREND":t.type==="nrfi"?"FIRST INNING":(t.type||"TREND").toUpperCase();
       var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
       var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
       var _trSpMap={'americanfootball_nfl':'NFL','basketball_nba':'NBA','icehockey_nhl':'NHL','baseball_mlb':'MLB'};
@@ -9279,6 +9403,8 @@ async function trendsFetchAndLoad(){
       if(matchupTrends.length) trends=trends.concat(matchupTrends);
       var teamSitTrends=await calcTeamSituationalTrends();
       if(teamSitTrends.length) trends=trends.concat(teamSitTrends);
+      var nrfiTrends=await calcNRFITrends();
+      if(nrfiTrends.length) trends=trends.concat(nrfiTrends);
       trends.sort(function(a,b){ return b.conf-a.conf; });
     }catch(ce){ calcErr=ce; }
     ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
