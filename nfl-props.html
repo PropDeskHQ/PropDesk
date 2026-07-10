@@ -10534,6 +10534,12 @@ async function startGameEnrichment(eventId){
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
+  var _seenFinal={};
+  qFinal=qFinal.filter(function(p){
+    var k=p.player.toLowerCase().trim();
+    if(_seenFinal[k]) return false;
+    _seenFinal[k]=true; return true;
+  });
   try{
     var _hist=JSON.parse(localStorage.getItem("pe_g5_hist")||"{}");
     var _newH={};
