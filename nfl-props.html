@@ -10527,6 +10527,7 @@ async function startGameEnrichment(eventId){
   var cached=_gamePropsCache[eventId]||{};
   var qFinal=[];
   Object.keys(cached).forEach(function(mk){
+    if(UNDERPERFORMING_MARKETS[mk]) return;
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
