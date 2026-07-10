@@ -2540,7 +2540,7 @@ async function enrichWithConfidence(p){
     if(p.pdGap>0&&p.valueFlags.indexOf("LINE_ADJ")<0) p.valueFlags.push("LINE_ADJ");
 
     // ── MLB batter game context: ERA + lineup (one new fetch per game, all cached) ──
-    var _eraAdj=0, _lineupAdj=0;
+    var _eraAdj=0, _lineupAdj=0, _platoonAdj=0;
     if(ST.sport==='baseball_mlb' && thresh){
       try{
         var _pid=gl.playerId;
@@ -2564,7 +2564,11 @@ async function enrichWithConfidence(p){
                     var _era=await mlbPitcherERA(_oppStarter,new Date().getFullYear());
                     p.opposingPitcherERA=_era;
                     if(_era!=null) _eraAdj=_era>=5.00?0.025:_era>=4.00?0.012:_era>=3.50?0:_era>=2.75?-0.015:-0.025;
+                    var _handsMap=await mlbPitcherHands([_oppStarter]);
+                    p.opposingPitcherHand=_handsMap[_oppStarter]||null;
                   }
+                  var _batterHandMap=await mlbPlayerHands([_pid]);
+                  p.batterHand=(_batterHandMap[_pid]&&_batterHandMap[_pid].batSide)||null;
                 }
               }
             }
@@ -2588,12 +2592,16 @@ async function enrichWithConfidence(p){
     if(p.seasonBA!=null&&vals.length>=5){
       _baAdj=p.seasonBA>=0.300?0.02:p.seasonBA>=0.280?0.01:p.seasonBA>=0.260?0:p.seasonBA>=0.240?-0.005:-0.01;
     }
+    // Platoon split: same-side matchup = disadvantage, opposite-side = advantage; switch hitters neutral
+    if(p.opposingPitcherHand&&p.batterHand&&p.batterHand!=='S'){
+      _platoonAdj=p.batterHand===p.opposingPitcherHand?-0.030:0.020;
+    }
     // Diminishing returns: scale context adjustments when base is already high (thinPenalty always full weight)
     var adjScale=p.pdConfidence>=0.85?0.4:p.pdConfidence>=0.75?0.7:1.0;
-    streakAdj*=adjScale; _baAdj*=adjScale; _eraAdj*=adjScale; _lineupAdj*=adjScale;
+    streakAdj*=adjScale; _baAdj*=adjScale; _eraAdj*=adjScale; _lineupAdj*=adjScale; _platoonAdj*=adjScale;
     // Apply all adjustments to pdConfidence (clamp 0.01–0.95)
     if(p.pdConfidence!=null){
-      p.pdConfidence=Math.max(0.01,Math.min(0.95,p.pdConfidence+streakAdj+thinPenalty+_baAdj+_eraAdj+_lineupAdj));
+      p.pdConfidence=Math.max(0.01,Math.min(0.95,p.pdConfidence+streakAdj+thinPenalty+_baAdj+_eraAdj+_lineupAdj+_platoonAdj));
       p.pdResult.confidence=p.pdConfidence;
       p.hitRate14=+(p.pdConfidence*100).toFixed(1);
       p.value=Math.round(p.pdConfidence*100);
@@ -3583,6 +3591,13 @@ function generateWhyExplanation(p){
     var era=p.opposingPitcherERA;
     var eraAdj=era>=5.00?"+5% favorable":era>=4.00?"+2.5% favorable":era>=3.50?"neutral matchup":era>=2.75?"−3% tough matchup":"−5% tough matchup";
     s3Parts.push("opposing pitcher ERA "+era.toFixed(2)+" ("+eraAdj+")");
+  }
+  if(p.opposingPitcherHand&&p.batterHand&&p.batterHand!=='S'){
+    var _phName=p.opposingPitcherHand==='L'?'LHP':'RHP';
+    var _bhName=p.batterHand==='L'?'LHH':'RHH';
+    var _sameSide=p.batterHand===p.opposingPitcherHand;
+    var _platAdj=_sameSide?"−3% platoon penalty":"+2% platoon bonus";
+    s3Parts.push(_bhName+" vs "+_phName+" — "+(_sameSide?"unfavorable":"favorable")+" platoon matchup ("+_platAdj+")");
   }
   if(p.todayOrderSlot!=null&&p.opposingPitcherERA==null){
     var slot=p.todayOrderSlot;
@@ -4647,6 +4662,31 @@ async function mlbPitcherHands(ids){
   }
   var out={};
   uniq.forEach(function(id){ out[id]=_pitchHandCache[id]||null; });
+  return out;
+}
+
+// Batch-fetch batting/pitching hand for players — returns {id: {batSide, pitchHand}} per ID
+var _batSideCache={};
+async function mlbPlayerHands(ids){
+  var uniq=ids.filter(function(v,i,a){ return v!=null && a.indexOf(v)===i; });
+  var need=uniq.filter(function(id){ return _batSideCache[id]===undefined; });
+  if(need.length){
+    try{
+      var r=await fetch("https://statsapi.mlb.com/api/v1/people?personIds="+need.join(",")+"&fields=people,id,batSide,pitchHand",{signal:AbortSignal.timeout(8000)});
+      if(r.ok){
+        var d=await r.json();
+        (d.people||[]).forEach(function(person){
+          _batSideCache[person.id]={
+            batSide:(person.batSide&&person.batSide.code)||null,
+            pitchHand:(person.pitchHand&&person.pitchHand.code)||null
+          };
+        });
+      }
+    }catch(e){}
+    need.forEach(function(id){ if(_batSideCache[id]===undefined) _batSideCache[id]={batSide:null,pitchHand:null}; });
+  }
+  var out={};
+  uniq.forEach(function(id){ out[id]=_batSideCache[id]||{batSide:null,pitchHand:null}; });
   return out;
 }
 
