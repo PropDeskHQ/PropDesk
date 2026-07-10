@@ -9060,7 +9060,8 @@ function renderTrendCard(t, sigCls, sigLabel){
   var streakBadge=(t.streak>=3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge">🔥 STREAK '+t.streak+'</span></div>':
     (t.streak<=-3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge" style="background:rgba(255,80,80,.1);color:#ff5050;border-color:rgba(255,80,80,.2)">❄ COLD '+Math.abs(t.streak)+'</span></div>':'';
   var spark=(t._rawVals&&t._rawVals.length>=3&&t._rawLine!=null)?renderSparkline(t._rawVals,t._rawLine,t._rawIsOver!==false):'';
-  var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%"></div></div><span class="tc-hitbar-pct">'+t.hitRate+'%</span></div>':'';
+  var _hitBarColor=(t.type==="nrfi"&&t.recordCls==="under")?"#f5a623":"";
+  var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%'+(_hitBarColor?';background:'+_hitBarColor:'')+'"></div></div><span class="tc-hitbar-pct"'+(_hitBarColor?' style="color:'+_hitBarColor+'"':'')+'>'+t.hitRate+'%</span></div>':'';
   var signalHtml=sigLabel?'<span class="tc-signal-lbl tc-signal-'+sigCls.replace("tc-","")+'">'+sigLabel+'</span>':'<span></span>';
   return '<div class="tcard '+sigCls+'" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
     '<div class="tc-card-hdr">'+signalHtml+'<span class="tc-type">'+typeLabel+'</span></div>'+
@@ -9235,6 +9236,7 @@ function renderTrends(trends){
   // Signal strength thresholds (fixed — conf range is ~55-95)
   var STRONG_THRESH=82, MOD_THRESH=68;
   function _sigInfo(t){
+    if(t.type==="nrfi") return {cls:"tc-weak",label:""};
     if(t.conf>=STRONG_THRESH) return {cls:"tc-strong",label:"STRONG SIGNAL"};
     if(t.conf>=MOD_THRESH)    return {cls:"tc-moderate",label:"MODERATE"};
     return {cls:"tc-weak",label:""};
