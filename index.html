@@ -10084,6 +10084,42 @@ var ML_PARAMS={
   baseball_mlb:{winScale:400,marginScale:30,homeAdv:28,l10Scale:40,pitcherWeight:55,bullpenWeight:22}
 };
 
+/* Static MLB park factors (3-yr Statcast average, 100 = neutral).
+   Keyed by mlNormKey(teamName). Context-only — does not affect eloDiff. */
+var MLB_PARK_FACTORS={
+  coloradorockies:      {pf:115,name:"Coors Field"},
+  cincinnatireds:       {pf:107,name:"Great American Ball Park"},
+  bostonredsox:         {pf:107,name:"Fenway Park"},
+  philadelphiaphillies: {pf:106,name:"Citizens Bank Park"},
+  texasrangers:         {pf:106,name:"Globe Life Field"},
+  milwaukeebrewers:     {pf:104,name:"American Family Field"},
+  chicagocubs:          {pf:104,name:"Wrigley Field"},
+  baltimoreorioles:     {pf:103,name:"Camden Yards"},
+  torontobluejays:      {pf:103,name:"Rogers Centre"},
+  kansascityroyals:     {pf:102,name:"Kauffman Stadium"},
+  arizonadiamondbacks:  {pf:102,name:"Chase Field"},
+  houstonastros:        {pf:101,name:"Minute Maid Park"},
+  atlantabraves:        {pf:101,name:"Truist Park"},
+  newyorkyankees:       {pf:101,name:"Yankee Stadium"},
+  chicagowhitesox:      {pf:100,name:"Guaranteed Rate Field"},
+  detroittigers:        {pf:100,name:"Comerica Park"},
+  athletics:            {pf:100,name:"Sutter Health Park"},
+  oaklandathletics:     {pf:100,name:"Sutter Health Park"},
+  minnesotatwins:       {pf: 99,name:"Target Field"},
+  washingtonnationals:  {pf: 99,name:"Nationals Park"},
+  pittsburghpirates:    {pf: 99,name:"PNC Park"},
+  clevelandguardians:   {pf: 99,name:"Progressive Field"},
+  losangelesangels:     {pf: 97,name:"Angel Stadium"},
+  stlouiscardinals:     {pf: 96,name:"Busch Stadium"},
+  tampabayrays:         {pf: 96,name:"Tropicana Field"},
+  losangelesdodgers:    {pf: 96,name:"Dodger Stadium"},
+  newyorkmets:          {pf: 95,name:"Citi Field"},
+  miamimarlins:         {pf: 95,name:"loanDepot park"},
+  sanfranciscogiants:   {pf: 95,name:"Oracle Park"},
+  seattlemariners:      {pf: 94,name:"T-Mobile Park"},
+  sandiegopadres:       {pf: 93,name:"Petco Park"}
+};
+
 function mlSportCode(s){
   return s==="americanfootball_nfl"?"nfl":s==="basketball_nba"?"nba":s==="icehockey_nhl"?"nhl":"mlb";
 }
@@ -10426,6 +10462,10 @@ function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
     }
   }
 
+  var _pfData=sport==="baseball_mlb"?(MLB_PARK_FACTORS[mlNormKey(home)]||null):null;
+  var parkFactor=_pfData?_pfData.pf:null;
+  var parkName=_pfData?_pfData.name:null;
+
   if(hd.l10&&hd.l10Bonus!==0) adjustments.push({team:home,text:mlNick(home)+" "+hd.l10+" in L10",mag:Math.abs(hd.l10Bonus),isRecord:true,side:"home"});
   if(ad.l10&&ad.l10Bonus!==0) adjustments.push({team:away,text:mlNick(away)+" "+ad.l10+" in L10",mag:Math.abs(ad.l10Bonus),isRecord:true,side:"away"});
 
@@ -10440,6 +10480,8 @@ function mlComputeGame(ev,oddsEvent,standings,extraData,sport){
     {key:"b2b",label:"Back-to-back",net:Math.round(f_b2b)}
   ].filter(function(f){return f.key==="homeAdv"||Math.abs(f.net)>=1;})
    .sort(function(a,b){return Math.abs(b.net)-Math.abs(a.net);});
+  if(parkFactor!==null&&Math.abs(parkFactor-100)>=5)
+    factors.push({key:"park",label:"Park factor",net:0,parkFactor:parkFactor,parkName:parkName});
 
   // Sanity check: count factors with a genuine signal (not marginal noise)
   var numSigOther=0;
@@ -10602,6 +10644,12 @@ function renderMoneylineCard(c){
           ? fn+"'s bullpen grades favorably ("+esc(favBp.era)+" ERA, "+esc(favBp.ip)+" IP)."
           : "Bullpen data favors "+fn+" ("+esc(favBp.era)+" ERA).";
       }
+      if(f.key==="park"){
+        var pfAdj=f.parkFactor-100;
+        var pfLabel=pfAdj>=10?"one of baseball's most hitter-friendly venues":pfAdj>=5?"a hitter-friendly venue":pfAdj<=-10?"one of baseball's most pitcher-friendly venues":"a pitcher-friendly venue";
+        var pfEffect=pfAdj>0?"boosting expected scoring for both teams":"suppressing offense for both teams";
+        return (f.parkName?esc(f.parkName):"The home park")+" (PF "+f.parkFactor+") is "+pfLabel+", "+pfEffect+".";
+      }
       if(f.key==="b2b"){
         var b2bIsFav=(f.net<0&&favHome)||(f.net>0&&!favHome);
         return forFav
@@ -10618,6 +10666,8 @@ function renderMoneylineCard(c){
 
     var whyFav=["PropDesk grades "+esc(favRaw)+" at "+favProb+"%"+(favImpl!=null?" vs. the book’s "+Math.round(favImpl*100)+"%":"")+", a +"+edgePct+"-point edge."];
     proFav.slice(0,2).forEach(function(f){var s=sentence(f,true); if(s) whyFav.push(s);});
+    var _pf=facs.find(function(f){return f.key==="park";});
+    if(_pf){var _pfs=sentence(_pf,true);if(_pfs&&whyFav.length<3) whyFav.push(_pfs);}
 
     var whyNot=["PropDesk puts "+esc(undRaw)+" at "+undProb+"%"+(undImpl!=null?" vs. the book’s "+Math.round(undImpl*100)+"%":"")+"." ];
     conFav.slice(0,1).forEach(function(f){var s=sentence(f,false); if(s) whyNot.push(s);});
