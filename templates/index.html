@@ -2598,6 +2598,14 @@ async function enrichWithConfidence(p){
                   }
                   var _batterHandMap=await mlbPlayerHands([_pid]);
                   p.batterHand=(_batterHandMap[_pid]&&_batterHandMap[_pid].batSide)||null;
+                } else {
+                  var _homeN=Object.keys((_bctx.home&&_bctx.home.orderMap)||{}).length;
+                  var _awayN=Object.keys((_bctx.away&&_bctx.away.orderMap)||{}).length;
+                  if(_homeN>0||_awayN>0){
+                    p.pdNoValue=true; p.value=0; p.enriched=true;
+                    if(p.guardrailFlags.indexOf("NOT_IN_LINEUP")<0) p.guardrailFlags.push("NOT_IN_LINEUP");
+                    updatePropValueDisplay(p); updatePropPDDisplay(p); return;
+                  }
                 }
               }
             }
