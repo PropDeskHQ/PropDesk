@@ -3421,7 +3421,7 @@ function renderSummaryBar(){
   var locks=0,elites=0,goods=0;
   allEnriched.forEach(function(p){
     var pct=Math.round(p.pdConfidence*100);
-    if(pct>=85) locks++; else if(pct>=70) elites++; else if(pct>=55) goods++;
+    if(pct>=90) locks++; else if(pct>=70) elites++; else if(pct>=55) goods++;
   });
   var total=allEnriched.length;
   bar.style.display=total?"block":"none";
