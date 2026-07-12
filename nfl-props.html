@@ -2039,7 +2039,7 @@ function tierOf(s){
 }
 // Confidence-based tier (used after phase-2 enrichment to display X%)
 function confTierOf(pct){ // pct is 0-100
-  if(pct>=85) return {c:"t-lock",  t:"LOCK"};
+  if(pct>=90) return {c:"t-lock",  t:"LOCK"};
   if(pct>=70) return {c:"t-elite", t:"GOOD"};
   if(pct>=55) return {c:"t-good",  t:"POTENTIAL"};
   return       {c:"t-poor",  t:"RISKY"};
@@ -10868,7 +10868,7 @@ function updateBestPlaysDisplay(eventId,remaining){
       if(_mkHidden&&!(_potd&&p.player===_potd.prop.player&&mk===_potd.mkt)) return;
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=ST.sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=70) q.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=75) q.push(p);
     });
   });
   q.sort(function(a,b){
@@ -10943,7 +10943,7 @@ async function startGameEnrichment(eventId){
     (cached[mk]||[]).forEach(function(p){
       if(!p._market) p._market=mk;
       if(!p._sport) p._sport=sport;
-      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=70) qFinal.push(p);
+      if(p.enriched&&!p.pdNoValue&&!p.thinData&&p.pdConfidence!=null&&Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100)>=75) qFinal.push(p);
     });
   });
   qFinal.sort(function(a,b){return getEffectiveConf(b)-getEffectiveConf(a);});
