@@ -1235,7 +1235,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
       <!-- 5b. BEST PLAYS -->
       <div class="hiw-section">
         <div class="hiw-section-label">Best Plays</div>
-        <p>When you select a game, PropDesk automatically scans every available prop market in the background. Any prop with 70%+ confidence (GOOD or LOCK) surfaces automatically in the Best Plays section — no market browsing required. Results update in real time as each market completes.</p>
+        <p>When you select a game, PropDesk automatically scans every available prop market in the background. Any prop with 75%+ confidence (GOOD or LOCK) surfaces automatically in the Best Plays section — no market browsing required. Results update in real time as each market completes.</p>
         <div class="hiw-callout">Best Plays is a full-game sweep, not a filtered view of the market you're looking at. It runs across every market simultaneously so you don't miss a high-confidence play hidden in a market you haven't clicked yet.</div>
       </div>
 
@@ -7783,7 +7783,7 @@ function showPage(name){
 var _onbCurrentStep=0;
 var _onbSteps=[
   {targetId:'sportTabs',text:"Start here — pick a sport to see today’s games and top prop picks.",position:'below'},
-  {targetSel:’.conf-badge’,text:"This is PropDesk’s confidence score. 70%+ is GOOD signal. 85%+ is LOCK — our highest conviction plays.",detail:true,position:’left’},
+  {targetSel:’.conf-badge’,text:"This is PropDesk’s confidence score. 75%+ is GOOD signal. 90%+ is LOCK — our highest conviction plays.",detail:true,position:’left’},
   {targetSel:'.trk-btn:not(.trk-done)',text:"Hit + Track to save any play to My History. We’ll track whether it hits or misses automatically.",position:'left'},
   {targetSel:'[data-nav="trends"]',text:"The Trends tab shows PropDesk’s full public record — hit rate, ROI, and the systems behind today’s picks.",position:'above'},
   {targetSel:'[data-nav="history"]',text:"Your History tab tracks every play you’ve saved — your personal hit rate and ROI over time.",position:'above',isFinal:true}
@@ -10995,8 +10995,8 @@ function renderGameTop5(picks,isScanning){
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
   if(!picks.length){
-    var emptyMsg=isScanning?'Scanning markets for 70%+ plays…':'No plays above 70% confidence for this game.';
-    var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 70% confidence for this game.">Share Game</button>':'';
+    var emptyMsg=isScanning?'Scanning markets for 75%+ plays…':'No plays above 75% confidence for this game.';
+    var emptyShareBtn=!isScanning?'<button class="g5-share-game-btn" disabled title="No plays above 75% confidence for this game.">Share Game</button>':'';
     mount.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span>'+emptyShareBtn+'</div>'+_g5TsHtml(ST.eventId,isScanning)+'<div style="text-align:center;color:var(--mut);padding:16px;font-size:13px">'+emptyMsg+'</div>';
     return;
   }
