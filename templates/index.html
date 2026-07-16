@@ -13,7 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0f0f0f; --surf:#161616; --surf2:#1a1a1a; --accent:#00ff87;
+  --bg:#0f0f0f; --surf:#161616; --surf2:#1a1a1a; --card:#1a1a1a; --accent:#00ff87;
   --text:#fff; --mut:#888; --mut2:#555; --bd:#222; --bd2:#2a2a2a;
   --purple:#a78bfa; --blue:#4f9fff; --yellow:#ffcc00; --red:#ff4f4f;
 }
@@ -3868,14 +3868,14 @@ function handleTrackClick(p,btn){
   var existing=document.getElementById('trackPopover');
   if(existing){ existing.remove(); if(_trackPopoverActive===p._id){_trackPopoverActive=null;return;} }
   _trackPopoverActive=p._id;
-  var conf=p.pdConfidence!=null?Math.round(p.pdConfidence*100):(p.value||0);
+  var conf=p._adjConfidence!=null?Math.round(p._adjConfidence*100):(p.pdConfidence!=null?Math.round(p.pdConfidence*100):(p.value||0));
   var tier=confTierOf(conf);
   var mkt=p._market||ST.market;
   var sp=p._sport||ST.sport;
   var spLabel={baseball_mlb:"MLB",americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL"}[sp]||sp;
   var mktDisplay=marketName(mkt);
   var _isT=!!(mkt&&(THRESHOLD_MARKETS[sp]||{})[mkt]);
-  var pdL=p.pdLine!=null?p.pdLine:p.bestLine;
+  var pdL=p._userLine!=null?p._userLine:(p.pdLine!=null?p.pdLine:p.bestLine);
   var line=pdL!=null?(_isT?threshLabel(pdL,mkt):((p.pdSide||"Over")+" "+pdL)):"—";
   var today=new Date().toISOString().slice(0,10);
   var _evG=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
