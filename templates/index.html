@@ -10892,27 +10892,22 @@ async function startGameEnrichment(eventId){
   var allMkts=(MARKETS[sport]||[]).map(function(m){return m.k;})
     .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]&&!MLB_HIDDEN_MARKETS[k]; });
   var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
-  var BATCH=5;
   try{
-    for(var mi=0;mi<allMkts.length;mi+=BATCH){
+    for(var mi=0;mi<allMkts.length;mi++){
+      var mk=allMkts[mi];
       if(_gameEnrichTaskId[eventId]!==taskId) return;
-      var batch=allMkts.slice(mi,Math.min(mi+BATCH,allMkts.length));
       try{
-        var mkData=await fetchOdds(eventId,batch.join(","));
-        for(var bi=0;bi<batch.length;bi++){
-          var mk=batch[bi];
+        var mkData=await fetchOdds(eventId,mk);
+        var mkProps=parseProps(mkData,mk).filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null;});
+        mkProps.forEach(function(p){p._market=mk;p._sport=sport;p._game=gameLabel;});
+        if(!_gamePropsCache[eventId]) _gamePropsCache[eventId]={};
+        _gamePropsCache[eventId][mk]=mkProps;
+        for(var pi=0;pi<mkProps.length;pi++){
           if(_gameEnrichTaskId[eventId]!==taskId) return;
-          var mkProps=parseProps(mkData,mk).filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null;});
-          mkProps.forEach(function(p){p._market=mk;p._sport=sport;p._game=gameLabel;});
-          if(!_gamePropsCache[eventId]) _gamePropsCache[eventId]={};
-          _gamePropsCache[eventId][mk]=mkProps;
-          for(var pi=0;pi<mkProps.length;pi++){
-            if(_gameEnrichTaskId[eventId]!==taskId) return;
-            try{await enrichWithConfidence(mkProps[pi]);}catch(e){}
-          }
-          updateBestPlaysDisplay(eventId,allMkts.length-Math.min(mi+bi+1,allMkts.length));
+          try{await enrichWithConfidence(mkProps[pi]);}catch(e){}
         }
-      }catch(e){}
+        updateBestPlaysDisplay(eventId,allMkts.length-(mi+1));
+      }catch(e){ console.warn("[PropDesk] Best Plays scan: fetch failed",{eventId:eventId,market:mk,err:e.message||String(e)}); }
     }
   }catch(e){}
   // Final pass: apply trend-delta tracking then re-render
