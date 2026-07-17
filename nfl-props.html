@@ -10919,9 +10919,6 @@ async function startGameEnrichment(eventId){
         for(var bi=0;bi<batch.length;bi++){
           var mk=batch[bi];
           if(_gameEnrichTaskId[eventId]!==taskId) return;
-          var _cached=(_gamePropsCache[eventId]||{})[mk];
-          var _fullyEnriched=_cached&&_cached.length>0&&_cached.every(function(p){return p.enriched;});
-          if(_fullyEnriched) continue;
           var mkProps=parseProps(mkData,mk).filter(function(p){return p.bestOdds!=null&&!p.yesNo&&p.bestLine!=null;});
           mkProps.forEach(function(p){p._market=mk;p._sport=sport;p._game=gameLabel;});
           if(!_gamePropsCache[eventId]) _gamePropsCache[eventId]={};
