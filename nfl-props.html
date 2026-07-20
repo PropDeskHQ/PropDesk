@@ -8261,7 +8261,6 @@ function calcPlayerStreakTrends(){
     else if(r5!=null&&r5>=0.65){ best=r5; bestN=5; }
     if(best==null) return;
     var hits=Math.round(best*bestN), misses=bestN-hits;
-    var conf=trendConf(best,bestN);
     // Streak direction
     var streak=0;
     for(var i=0;i<vals.length;i++){
@@ -8269,6 +8268,10 @@ function calcPlayerStreakTrends(){
       if(i===0){streak=h2?1:-1;continue;}
       if(h2&&streak>0)streak++; else if(!h2&&streak<0)streak--; else break;
     }
+    var _raw=compositeConf(vals,line,isOver,p.seasonBA||null);
+    var _sa=streak>=4?0.04:streak>=3?0.025:streak>=2?0.01:streak<=-4?-0.04:streak<=-3?-0.025:streak<=-2?-0.01:0;
+    var _tp=vals.length<10?-0.04:0;
+    var conf=_raw!=null?Math.round(Math.max(0.01,Math.min(0.95,_raw+_sa+_tp))*100):trendConf(best,bestN);
     var mktLbl=marketName(p._market||ST.market);
     var direction=isOver?"Over":"Under";
     var isThresh=isThreshProp(p);
