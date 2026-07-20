@@ -9413,13 +9413,13 @@ function renderTrends(trends){
       return ra!==rb?ra-rb:b.conf-a.conf;
     });
   }
-  // Signal strength thresholds (fixed — conf range is ~55-95)
-  var STRONG_THRESH=82, MOD_THRESH=68;
   function _sigInfo(t){
     if(t.type==="nrfi"||t.type==="bullpen") return {cls:"tc-weak",label:""};
-    if(t.conf>=STRONG_THRESH) return {cls:"tc-strong",label:"STRONG SIGNAL"};
-    if(t.conf>=MOD_THRESH)    return {cls:"tc-moderate",label:"MODERATE"};
-    return {cls:"tc-weak",label:""};
+    var tier=confTierOf(t.conf||0);
+    if(tier.t==="LOCK")      return {cls:"tc-strong",  label:"LOCK"};
+    if(tier.t==="GOOD")      return {cls:"tc-moderate", label:"GOOD"};
+    if(tier.t==="POTENTIAL") return {cls:"tc-weak",     label:"POTENTIAL"};
+    return                          {cls:"tc-weak",     label:"RISKY"};
   }
   // Sort/filter controls HTML
   var FILTER_OPTS=[
