@@ -8411,7 +8411,9 @@ function calcLineValueTrends(){
       var gap=sznAvg-line;
       var gapPct=gap/sznAvg*100;
       if(gapPct>=15&&gap>=0.5){
-        var conf=Math.round(Math.min(92,55+gapPct*1.4));
+        var _rvO=p._vals?compositeConf(p._vals,line,true,p.seasonBA||null):null;
+        var _tpO=p._vals&&p._vals.length<5?-0.07:(p._vals&&p._vals.length<10?-0.04:0);
+        var conf=_rvO!=null?Math.round(Math.max(0.01,Math.min(0.95,_rvO+_tpO))*100):Math.round(Math.min(92,55+gapPct*1.4));
         trends.push({
           type:"linevalue",
           conf:conf,
@@ -8419,7 +8421,7 @@ function calcLineValueTrends(){
           headline:"The book has set "+p.player+"'s "+mktLbl+" line at "+line+" — "+gapPct.toFixed(0)+"% below his season average of "+fmtStat(sznAvg)+". The Over has value.",
           title:"Book undervaluing "+p.player,
           record:"+"+gap.toFixed(1)+" vs szn avg",
-          hitRate:Math.min(95,Math.round(55+gapPct*1.4)),
+          hitRate:conf,
           recordCls:"",
           detail:"Book line "+line+" is "+gapPct.toFixed(0)+"% below "+p.player+"'s season average of "+fmtStat(sznAvg)+" in "+mktLbl+". The line is set below historical production — Over has a statistical edge.",
           source:"Season Stats",
@@ -8435,7 +8437,9 @@ function calcLineValueTrends(){
       var gap2=line-l5Avg;
       var gapPct2=gap2/line*100;
       if(gapPct2>=15&&gap2>=0.5){
-        var conf2=Math.round(Math.min(88,55+gapPct2*1.2));
+        var _rvU=p._vals?compositeConf(p._vals,line,false,p.seasonBA||null):null;
+        var _tpU=p._vals&&p._vals.length<5?-0.07:(p._vals&&p._vals.length<10?-0.04:0);
+        var conf2=_rvU!=null?Math.round(Math.max(0.01,Math.min(0.95,_rvU+_tpU))*100):Math.round(Math.min(88,55+gapPct2*1.2));
         trends.push({
           type:"linevalue",
           conf:conf2,
@@ -8443,7 +8447,7 @@ function calcLineValueTrends(){
           headline:p.player+"'s "+mktLbl+" line is set at "+line+" — his last 5 games average "+fmtStat(l5Avg)+" ("+gapPct2.toFixed(0)+"% below). The Under has value.",
           title:"Book overvaluing "+p.player,
           record:"-"+gap2.toFixed(1)+" vs L5 avg",
-          hitRate:Math.min(88,Math.round(55+gapPct2*1.2)),
+          hitRate:conf2,
           recordCls:"under",
           detail:"Book line "+line+" is "+gapPct2.toFixed(0)+"% above "+p.player+"'s L5 average of "+fmtStat(l5Avg)+" in "+mktLbl+". Recent production is running below the line.",
           source:"L5 Game Log",
@@ -8655,7 +8659,7 @@ async function calcPlayerMatchupTrends(){
       var sub=perGame.filter(function(g){ return g && filterFn(g); });
       if(sub.length<5) return null;
       var hits=sub.filter(function(g){ return hitTest(g.val); }).length;
-      return {label:label,n:sub.length,hits:hits,rate:hits/sub.length};
+      return {label:label,n:sub.length,hits:hits,rate:hits/sub.length,vals:sub.map(function(g){ return g.val; })};
     }
     // Only compound (2-condition) splits qualify as a "matchup system" — single-stat trends already exist elsewhere
     var combos=[
@@ -8677,7 +8681,9 @@ async function calcPlayerMatchupTrends(){
     var lineLabel=isThresh?threshLabel(line,p._market):fmtLine(line,p.pdSide||"Over");
     var statPhrase=isThresh?("recorded "+lineLabel):("gone "+(p.pdSide||"Over")+" "+line+" "+mktLbl);
     var headline="When "+p.player+" "+best.label+", he has "+statPhrase+" in "+best.hits+" of his last "+best.n+" such games";
-    var conf=Math.round(Math.min(94,50+best.rate*40+Math.min(best.n,10)));
+    var _rvM=compositeConf(best.vals,line,isOver,p.seasonBA||null);
+    var _tpM=best.vals.length<5?-0.07:(best.vals.length<10?-0.04:0);
+    var conf=_rvM!=null?Math.round(Math.max(0.01,Math.min(0.95,_rvM+_tpM))*100):Math.round(Math.min(94,50+best.rate*40+Math.min(best.n,10)));
     trends.push({
       type:"matchup",
       conf:conf,
