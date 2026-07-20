@@ -9123,6 +9123,7 @@ function _trendActionLine(t){
   return "";
 }
 function _trendQualifies(t){
+  if((t.conf||0)<75) return false;
   if(t.type==='streak') return t.streak>=3;
   if(t.type==='linevalue') return (t.gapPct||0)>=20;
   if(t.type==='movement') return (t.bookCount||0)>=3;
