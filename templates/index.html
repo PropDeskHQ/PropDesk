@@ -9280,8 +9280,55 @@ function _trendsStatsSummaryHtml(data){
   return summaryCard+chartCard;
 }
 
+function _trendTypeBreakdownHtml(){
+  var ALL_TYPES=["PLAYER STREAK","HOME/AWAY SPLIT","LINE VALUE","SHARP MONEY",
+    "MATCHUP SYSTEM","TEAM SYSTEM","FIRST INNING","BULLPEN","GAME TOTAL"];
+  var plays=loadPlayHist().filter(function(e){
+    return e.source==='trend'&&(e.result==='hit'||e.result==='miss');
+  });
+  if(!plays.length) return '';
+  var byType={};
+  ALL_TYPES.forEach(function(t){ byType[t]=[]; });
+  plays.forEach(function(e){ if(byType[e.trendType]) byType[e.trendType].push(e); });
+  if(!ALL_TYPES.some(function(t){ return byType[t].length>0; })) return '';
+  var MIN=3;
+  var rows=ALL_TYPES.map(function(t){
+    var tp=byType[t]; var n=tp.length;
+    if(!n) return '';
+    if(n<MIN) return '<tr style="border-bottom:1px solid #0f0f0f">'
+      +'<td style="padding:7px 8px 7px 0;font-size:11px">'+t+'</td>'
+      +'<td colspan="4" style="text-align:center;color:#555;font-size:10px;font-style:italic;padding:7px 0">Not enough data ('+n+'/'+MIN+' min)</td></tr>';
+    var hits=tp.filter(function(e){return e.result==='hit';}).length;
+    var rate=Math.round(hits/n*100);
+    var roi=calcROI(tp);
+    var rCls=rate>=65?'ts-pos':rate<45?'ts-neg':'ts-neu';
+    var oCls=roi.roi>0?'ts-pos':roi.roi<0?'ts-neg':'ts-neu';
+    var uCls=roi.units>0?'ts-pos':roi.units<0?'ts-neg':'ts-neu';
+    return '<tr style="border-bottom:1px solid #0f0f0f">'
+      +'<td style="padding:7px 8px 7px 0;font-size:11px">'+t+'</td>'
+      +'<td class="'+rCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px">'+rate+'%</td>'
+      +'<td class="'+oCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px">'+(roi.roi>0?'+':'')+roi.roi+'%</td>'
+      +'<td class="'+uCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px">'+(roi.units>0?'+':'')+roi.units+'</td>'
+      +'<td style="text-align:right;padding:7px 0 7px 12px;color:var(--mut);font-size:11px">'+n+'</td></tr>';
+  }).join('');
+  if(!rows) return '';
+  return '<div class="ts-card" style="margin-bottom:14px">'
+    +'<div class="ts-card-hdr"><span class="ts-card-title">By Trend Type</span>'
+    +'<span style="font-size:10px;color:var(--mut2)">Tracked trends with resolved results</span></div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
+    +'<thead><tr style="border-bottom:1px solid #222">'
+    +'<th style="text-align:left;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px">Type</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px">Hit Rate</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px">ROI%</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px">Units</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px">Plays</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div></div>';
+}
+
 function renderTrends(trends){
   var mount=$("trendsMount"); if(!mount) return;
+  var breakdownHtml=_trendTypeBreakdownHtml();
   // Filter
   var visible=trends.filter(function(t){
     return _trendsFilter==="all"||t.type===_trendsFilter;
@@ -9335,9 +9382,9 @@ function renderTrends(trends){
     var emptyMsg=_trendsFilter==="all"
       ?"No trends found — check back as lines post closer to game time"
       :"No "+( FILTER_NAMES[_trendsFilter]||_trendsFilter)+" trends detected today — check back as lines move closer to game time";
-    mount.innerHTML=ctrlHtml+'<div class="tc-no-data"><div class="nd-icon">🔍</div><p>'+emptyMsg+'</p></div>';
+    mount.innerHTML=breakdownHtml+ctrlHtml+'<div class="tc-no-data"><div class="nd-icon">🔍</div><p>'+emptyMsg+'</p></div>';
   } else {
-    mount.innerHTML=ctrlHtml+
+    mount.innerHTML=breakdownHtml+ctrlHtml+
       '<div class="trend-grid">'+visible.map(function(t){var s=_sigInfo(t);return renderTrendCard(t,s.cls,s.label);}).join("")+'</div>'+
       '<p class="trends-empty-note">'+visible.length+' trend'+(visible.length!==1?"s":"")+'&nbsp;&nbsp;·&nbsp;&nbsp;Click any card for details&nbsp;&nbsp;·&nbsp;&nbsp;All data live</p>';
   }
