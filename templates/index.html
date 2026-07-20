@@ -7511,6 +7511,7 @@ async function resolveTrendPlay(play){
     if(!play||play.type!=='trend'||play.result!=='pending'||play.autoResolveLocked) return false;
     if(!_arPastGate(play.date)) return false;
     if(!play.teamId) return false;
+    if(play.sport!=='MLB') return false;
     var r=await fetch("https://statsapi.mlb.com/api/v1/schedule?date="+play.date+"&sportId=1&hydrate=linescore&teamId="+play.teamId,{signal:AbortSignal.timeout(8000)});
     if(!r.ok) return false;
     var d=await r.json();
@@ -8692,7 +8693,7 @@ async function calcTeamSituationalTrends(){
               detail:pVsOpp.length+" starts by "+(tp.myPitcherName||"today's pitcher")+" vs "+tp.oppName+". Win rate: "+Math.round(pRate*100)+"%. Avg R allowed: "+pRA.toFixed(2)+".",
               source:"MLB Stats API — 3 Season History",
               shareText:"PropDesk: "+(tp.myPitcherName||tp.name)+" vs "+tp.oppName+" "+pW+"-"+(pVsOpp.length-pW)+" ("+Math.round(pRate*100)+"%) | propdeskhq.netlify.app",
-              _game:gameStr,_market:"teamsit"
+              _game:gameStr,_market:"teamsit",teamId:tp.id
             });
           }
         }
@@ -8720,7 +8721,7 @@ async function calcTeamSituationalTrends(){
             detail:bTodayGms.length+" games "+bLocLbl+" over 3 seasons. Win rate "+bLocLbl+": "+Math.round(bTodayRate*100)+"% vs "+(tp.isHomeToday?"on road":"at home")+": "+Math.round(bOtherRate*100)+"%.",
             source:"MLB Stats API — 3 Season History",
             shareText:"PropDesk: "+tp.name+" "+bLocLbl+" "+Math.round(bTodayRate*100)+"% (L3 seasons) | propdeskhq.netlify.app",
-            _game:gameStr,_market:"teamsit"
+            _game:gameStr,_market:"teamsit",teamId:tp.id
           });
         }
       }
@@ -8751,7 +8752,7 @@ async function calcTeamSituationalTrends(){
               detail:cGmsList.length+" games in this rest situation over 3 seasons. Today: "+todayRest+" day(s) since last game.",
               source:"MLB Stats API — 3 Season History",
               shareText:"PropDesk: "+tp.name+" "+cRestLbl+" "+Math.round(cRate*100)+"% (L3 seasons) | propdeskhq.netlify.app",
-              _game:gameStr,_market:"teamsit"
+              _game:gameStr,_market:"teamsit",teamId:tp.id
             });
           }
         }
@@ -8781,7 +8782,7 @@ async function calcTeamSituationalTrends(){
             detail:dGmsList.length+" games vs "+dOppLbl+" over 3 seasons. Win rate: "+Math.round(dRate*100)+"% vs "+(oppIsGood?"sub-.500":"above-.500")+": "+Math.round(dOther*100)+"%.",
             source:"MLB Stats API — 3 Season History",
             shareText:"PropDesk: "+tp.name+" vs "+dOppLbl+" "+Math.round(dRate*100)+"% (L3 seasons) | propdeskhq.netlify.app",
-            _game:gameStr,_market:"teamsit"
+            _game:gameStr,_market:"teamsit",teamId:tp.id
           });
         }
       }
@@ -8809,7 +8810,7 @@ async function calcTeamSituationalTrends(){
             detail:eDNGms.length+" "+eDNLbl+" over 3 seasons.",
             source:"MLB Stats API — 3 Season History",
             shareText:"PropDesk: "+tp.name+" "+eDNLbl+" "+Math.round(eDNRate*100)+"% (L3 seasons) | propdeskhq.netlify.app",
-            _game:gameStr,_market:"teamsit"
+            _game:gameStr,_market:"teamsit",teamId:tp.id
           });
         }
       }
@@ -8830,7 +8831,7 @@ async function calcTeamSituationalTrends(){
             detail:openers.length+" series openers tracked over 3 seasons.",
             source:"MLB Stats API — 3 Season History",
             shareText:"PropDesk: "+tp.name+" as series opener "+Math.round(opR*100)+"% (L3 seasons) | propdeskhq.netlify.app",
-            _game:gameStr,_market:"teamsit"
+            _game:gameStr,_market:"teamsit",teamId:tp.id
           });
         }
       }
@@ -8852,7 +8853,7 @@ async function calcTeamSituationalTrends(){
             detail:h2h.length+" matchups over 3 seasons between "+tp.name+" and "+tp.oppName+".",
             source:"MLB Stats API — 3 Season History",
             shareText:"PropDesk: "+tp.name+" vs "+tp.oppName+" "+h2hW+"-"+(h2h.length-h2hW)+" (L3 seasons) | propdeskhq.netlify.app",
-            _game:gameStr,_market:"teamsit"
+            _game:gameStr,_market:"teamsit",teamId:tp.id
           });
         }
       }
