@@ -5693,6 +5693,7 @@ var _phAnalyticsSport="all";
 var _phAnalyticsMkt="all";
 var _histView="my";
 var _histSpecial="";
+var _histType="all";
 var _pdStatsCache=null;
 var _pdStatsSubView='props';
 var _mlPickFilter='all';
@@ -6489,7 +6490,9 @@ async function renderPlayHistory(){
   /* ── filters & sort ── */
   var searchLow=(_histSearch||"").toLowerCase();
   var filtered=all.filter(function(e){
-    if(e.type==='moneyline') return false;
+    if(_histType==='plays'&&(e.source==='trend'||e.type==='moneyline')) return false;
+    if(_histType==='trends'&&e.source!=='trend') return false;
+    if(_histType==='moneylines'&&e.type!=='moneyline') return false;
     if(_histFilters.sport!=="all"&&e.sport!==_histFilters.sport) return false;
     if(_histFilters.market!=="all"&&e.market!==_histFilters.market) return false;
     if(_histFilters.result!=="all"&&e.result!==_histFilters.result) return false;
@@ -6621,29 +6624,13 @@ async function renderPlayHistory(){
   /* ─── ANALYTICS PILLS + CHARTS ─── */
   html+=_phAnalyticsSection(all,_phAnalyticsSport,_phAnalyticsMkt);
 
-  /* ─── ROW 4: SPECIAL FILTERS ─── */
+  /* ─── ROW 4: TYPE FILTER ─── */
   html+='<div style="margin-bottom:16px"><div class="tabrow" style="gap:6px">';
-  html+='<button class="pill ph-special-btn'+(_histSpecial==="trends"?" active":"")+'" data-special="trends" style="padding:5px 14px;font-size:11px">Trends</button>';
-  html+='<button class="pill ph-special-btn'+(_histSpecial==="moneylines"?" active":"")+'" data-special="moneylines" style="padding:5px 14px;font-size:11px">Moneylines</button>';
+  html+='<button class="pill ph-type-btn'+(_histType==="all"?" active":"")+'" data-htype="all" style="padding:5px 14px;font-size:11px">All</button>';
+  html+='<button class="pill ph-type-btn'+(_histType==="plays"?" active":"")+'" data-htype="plays" style="padding:5px 14px;font-size:11px">Plays</button>';
+  html+='<button class="pill ph-type-btn'+(_histType==="moneylines"?" active":"")+'" data-htype="moneylines" style="padding:5px 14px;font-size:11px">Moneylines</button>';
+  html+='<button class="pill ph-type-btn'+(_histType==="trends"?" active":"")+'" data-htype="trends" style="padding:5px 14px;font-size:11px">Trends</button>';
   html+='</div></div>';
-  if(_histSpecial==="trends"){
-    html+='<div id="trendContentMount"></div></div>';
-    mount.innerHTML=html;
-    mount.querySelectorAll('[data-hist-view]').forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); _histSpecial=""; renderPlayHistory(); }; });
-    mount.querySelectorAll('.ph-a-sport').forEach(function(b){ b.onclick=function(){ _phAnalyticsSport=b.getAttribute('data-pha-sport'); _phAnalyticsMkt="all"; _histFilters.sport=b.getAttribute('data-pha-sport'); renderPlayHistory(); }; });
-    mount.querySelectorAll('.ph-special-btn').forEach(function(b){ b.onclick=function(){ _histSpecial=_histSpecial===b.getAttribute('data-special')?'':b.getAttribute('data-special'); renderPlayHistory(); }; });
-    _renderTrendPlayHistory($("trendContentMount"));
-    return;
-  }
-  if(_histSpecial==="moneylines"){
-    html+='<div id="mlContentMount"></div></div>';
-    mount.innerHTML=html;
-    mount.querySelectorAll('[data-hist-view]').forEach(function(b){ b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); _histSpecial=""; renderPlayHistory(); }; });
-    mount.querySelectorAll('.ph-a-sport').forEach(function(b){ b.onclick=function(){ _phAnalyticsSport=b.getAttribute('data-pha-sport'); _phAnalyticsMkt="all"; _histFilters.sport=b.getAttribute('data-pha-sport'); renderPlayHistory(); }; });
-    mount.querySelectorAll('.ph-special-btn').forEach(function(b){ b.onclick=function(){ _histSpecial=_histSpecial===b.getAttribute('data-special')?'':b.getAttribute('data-special'); renderPlayHistory(); }; });
-    _renderMLHistory($("mlContentMount"),all,_phAnalyticsSport);
-    return;
-  }
 
   /* ─── SECTION 1: OVERALL RECORD ─── */
   html+=_phSectionHdr("Overall Record");
@@ -6767,7 +6754,8 @@ async function renderPlayHistory(){
   }
 
   /* ─── FILTER ROW ─── */
-  html+=_phSectionHdr("All Plays ("+all.length+" total)");
+  var _htypeLabel=_histType==='plays'?'Plays':_histType==='moneylines'?'Moneylines':_histType==='trends'?'Trends':'All Plays';
+  html+=_phSectionHdr(_htypeLabel+" ("+filtered.length+" total)");
   html+='<div style="display:flex;gap:8px;margin-bottom:10px"><input id="phSearch" class="search" style="flex:1;min-width:120px;max-width:200px" placeholder="Search player…" value="'+esc(_histSearch||"")+'"></div>';
   html+='<div class="filterbar" style="flex-wrap:wrap;gap:6px;margin-bottom:14px">';
   html+='<span class="fb-lbl">Sport:</span>';
@@ -6837,8 +6825,9 @@ async function renderPlayHistory(){
       var summary=grp.length+' play'+(grp.length!==1?'s':'')+(parts.length?' · '+parts.join(' / '):'');
       var _dRes=grp.filter(function(g){return g.e.result==='hit'||g.e.result==='miss';});
       var _dRoiHtml='';
-      if(_dRes.length){
-        var _dRoi=calcROI(_dRes.map(function(g){return g.e;}));
+      var _dResProps=_dRes.filter(function(g){return g.e.source!=='trend'&&g.e.type!=='moneyline';});
+      if(_dResProps.length){
+        var _dRoi=calcROI(_dResProps.map(function(g){return g.e;}));
         var _dClr=_dRoi.units>0?'#00e87a':_dRoi.units<0?'#ff4f4f':'#666';
         _dRoiHtml=' · <span style="color:'+_dClr+'">'+(_dRoi.units>=0?'+':'')+_dRoi.units.toFixed(2)+'u '+(_dRoi.roi>=0?'+':'')+_dRoi.roi+'%</span>';
       }
@@ -7080,10 +7069,10 @@ async function renderPlayHistory(){
     };
   });
   mount.querySelectorAll('[data-hist-view]').forEach(function(b){
-    b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); _histSpecial=""; renderPlayHistory(); };
+    b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); };
   });
-  mount.querySelectorAll('.ph-special-btn').forEach(function(b){
-    b.onclick=function(){ _histSpecial=_histSpecial===b.getAttribute('data-special')?'':b.getAttribute('data-special'); renderPlayHistory(); };
+  mount.querySelectorAll('.ph-type-btn').forEach(function(b){
+    b.onclick=function(){ _histType=b.getAttribute('data-htype'); renderPlayHistory(); };
   });
 }
 
