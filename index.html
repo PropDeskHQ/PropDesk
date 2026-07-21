@@ -9214,7 +9214,7 @@ function renderTrendCard(t, sigCls, sigLabel){
   var _hitBarColor=(t.type==="nrfi"&&t.recordCls==="under")?"#f5a623":
     (t.type==="bullpen"&&t.lean==="HEAVILY FATIGUED")?"#e84040":
     (t.type==="bullpen")?"#f5a623":"";
-  var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%'+(_hitBarColor?';background:'+_hitBarColor:'')+'"></div></div><span class="tc-hitbar-pct"'+(_hitBarColor?' style="color:'+_hitBarColor+'"':'')+'>'+t.hitRate+'%</span></div>':'';
+  var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%'+(_hitBarColor?';background:'+_hitBarColor:'')+'"></div></div><span class="tc-hitbar-pct"'+(_hitBarColor?' style="color:'+_hitBarColor+'"':'')+'>'+t.hitRate+'%</span>'+(t.odds!=null?'<span style="font-size:10px;font-weight:600;color:var(--mut);margin-left:4px;white-space:nowrap">'+fmtOdds(t.odds)+'</span>':'')+'</div>':'';
   var signalHtml=sigLabel?'<span class="tc-signal-lbl tc-signal-'+sigCls.replace("tc-","")+'">'+sigLabel+'</span>':'<span></span>';
   return '<div class="tcard '+sigCls+'" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
     '<div class="tc-card-hdr">'+signalHtml+'<span class="tc-type">'+typeLabel+'</span></div>'+
