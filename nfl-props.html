@@ -7017,7 +7017,7 @@ async function renderPlayHistory(){
       if(btn.getAttribute('data-confirming')==='true'){
         var h=loadPlayHist().filter(function(e){return e.date!==d;});
         savePlayHist(h);
-        if(_supabase&&_authUser) _supabase.from('plays').delete().eq('user_id',_authUser.id).eq('date',d);
+        if(_supabase&&_authUser){ _supabase.from('plays').delete().eq('user_id',_authUser.id).eq('date',d); _histLastSbLoad=Date.now(); }
         renderPlayHistory();
       } else {
         btn.setAttribute('data-confirming','true');
