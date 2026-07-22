@@ -6819,11 +6819,12 @@ async function renderPlayHistory(){
       var summary=grp.length+' play'+(grp.length!==1?'s':'')+(parts.length?' · '+parts.join(' / '):'');
       var _dRes=grp.filter(function(g){return g.e.result==='hit'||g.e.result==='miss';});
       var _dRoiHtml='';
-      var _dResProps=_dRes.filter(function(g){return g.e.source!=='trend'&&g.e.type!=='moneyline';});
-      if(_dResProps.length){
-        var _dRoi=calcROI(_dResProps.map(function(g){return g.e;}));
+      var _dResWithOdds=_dRes.filter(function(g){return g.e.odds!=null;});
+      if(_dResWithOdds.length){
+        var _dRoi=calcROI(_dResWithOdds.map(function(g){return g.e;}));
         var _dClr=_dRoi.units>0?'#00e87a':_dRoi.units<0?'#ff4f4f':'#666';
-        _dRoiHtml=' · <span style="color:'+_dClr+'">'+(_dRoi.units>=0?'+':'')+_dRoi.units.toFixed(2)+'u '+(_dRoi.roi>=0?'+':'')+_dRoi.roi+'%</span>';
+        var _dNote=_dResWithOdds.length<_dRes.length?' <span style="font-size:9px;color:var(--mut)">('+_dResWithOdds.length+'/'+_dRes.length+' with odds)</span>':'';
+        _dRoiHtml=' · <span style="color:'+_dClr+'">'+(_dRoi.units>=0?'+':'')+_dRoi.units.toFixed(2)+'u '+(_dRoi.roi>=0?'+':'')+_dRoi.roi+'%</span>'+_dNote;
       }
       html+='<tr class="ph-date-hdr" data-date="'+esc(d)+'" style="cursor:pointer;background:var(--surf2);border-bottom:1px solid var(--bd)">';
       html+='<td colspan="'+colSpan+'" style="padding:7px 10px">';
