@@ -2005,7 +2005,7 @@ var CARD_PREVIEW_MKTS={
   americanfootball_nfl:["player_reception_yds","player_rush_yds"],
   icehockey_nhl:["player_shots_on_goal","player_goals"]
 };
-var _cardPreviewData={};  // { eventId: {bestPlay:prop|null, count85:N} }
+var _cardPreviewData={};  // { eventId: {bestPlay:prop|null, countQ:N} }
 var _bgPreviewToken=0;    // increment to cancel stale background preview runs
 var _sportGameCounts={};  // { sportKey: N } — cached game counts for sport pill badges
 var _sportNextDate={};    // { sportKey: "Jun 29" } — next event date when today count is 0
@@ -2887,8 +2887,8 @@ function _gameCardInner(ev){
       var lineStr=fmtLine(pd.bestPlay.pdLine!=null?pd.bestPlay.pdLine:pd.bestPlay.bestLine,pd.bestPlay.pdSide||pd.bestPlay.side||"Over");
       html+='<div class="gm-best"><span class="gm-best-pl">'+esc(pd.bestPlay.player||"")+'</span><span class="gm-best-line">'+esc(lineStr)+'</span><span class="t10-tier '+tierC+'">'+conf+'%</span></div>';
     }
-    if(pd.count85>0){
-      html+='<div class="gm-count">'+pd.count85+' play'+(pd.count85===1?'':'s')+' 85%+</div>';
+    if(pd.countQ>0){
+      html+='<div class="gm-count">'+pd.countQ+' play'+(pd.countQ===1?'':'s')+' qualified</div>';
     } else if(!pd.bestPlay){
       html+='<div class="gm-count" style="color:#3a3a3a">No high-conf plays</div>';
     }
@@ -2905,15 +2905,15 @@ function _updateGameCard(eventId){
 }
 function _buildPreviewFromCache(eventId){
   var cached=_gamePropsCache[eventId]; if(!cached) return;
-  var bestPlay=null, count85=0;
+  var bestPlay=null, countQ=0;
   Object.keys(cached).forEach(function(mk){
     (cached[mk]||[]).forEach(function(p){
       if(!p.enriched||p.pdNoValue||p.thinData||p.pdConfidence==null) return;
-      var conf=Math.round(p.pdConfidence*100);
-      if(conf>=85){ count85++; if(!bestPlay||conf>getEffectiveConf(bestPlay)) bestPlay=p; }
+      var conf=Math.round(calcOddsAdjustedConf(p.pdConfidence,p.bestOdds)*100);
+      if(conf>=75){ countQ++; if(!bestPlay||conf>Math.round(calcOddsAdjustedConf(bestPlay.pdConfidence,bestPlay.bestOdds)*100)) bestPlay=p; }
     });
   });
-  _cardPreviewData[eventId]={bestPlay:bestPlay,count85:count85};
+  _cardPreviewData[eventId]={bestPlay:bestPlay,countQ:countQ};
   _updateGameCard(eventId);
 }
 async function _startBgCardPreview(){
@@ -2933,7 +2933,7 @@ async function _startBgCardPreview(){
     try{
       var data=await fetchOdds(eventId,mktsStr);
       if(_bgPreviewToken!==token) return;
-      var bestPlay=null, count85=0;
+      var bestPlay=null, countQ=0;
       for(var mi=0;mi<mkts.length;mi++){
         var mk=mkts[mi];
         var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
@@ -2943,13 +2943,13 @@ async function _startBgCardPreview(){
           if(_bgPreviewToken!==token) return;
           try{await enrichWithConfidence(mkProps[pi]);}catch(e){}
           if(mkProps[pi].enriched&&!mkProps[pi].pdNoValue&&!mkProps[pi].thinData&&mkProps[pi].pdConfidence!=null){
-            var c=Math.round(mkProps[pi].pdConfidence*100);
-            if(c>=85){count85++;if(!bestPlay||c>getEffectiveConf(bestPlay)) bestPlay=mkProps[pi];}
+            var c=Math.round(calcOddsAdjustedConf(mkProps[pi].pdConfidence,mkProps[pi].bestOdds)*100);
+            if(c>=75){countQ++;if(!bestPlay||c>Math.round(calcOddsAdjustedConf(bestPlay.pdConfidence,bestPlay.bestOdds)*100)) bestPlay=mkProps[pi];}
           }
         }
       }
       if(_bgPreviewToken!==token) return;
-      _cardPreviewData[eventId]={bestPlay:bestPlay,count85:count85};
+      _cardPreviewData[eventId]={bestPlay:bestPlay,countQ:countQ};
       _updateGameCard(eventId);
     }catch(e){}
     if(i<events.length-1) await new Promise(function(r){setTimeout(r,500);});
