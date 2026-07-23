@@ -6135,90 +6135,59 @@ function _renderPdStatsData(mount,data){
     '<button class="pill'+(_pdStatsSubView==='moneyline'?' active':'')+'" onclick="_pdStatsSubView=\'moneyline\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">Moneyline</button>'+
     '</div>';
   if(_pdStatsSubView==='props'){
-  /* header banner */
-  html+='<div style="background:#111;border:1px solid #1e1e1e;border-left:3px solid #00e87a;border-radius:8px;padding:14px 16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
-  html+='<div><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-weight:800;font-size:15px;letter-spacing:-.3px">Prop<b style="color:#00e87a">Desk</b></span>';
-  html+='<span style="font-size:9px;font-weight:800;color:#00e87a;letter-spacing:.08em;text-transform:uppercase">Official Record</span></div>';
-  html+='<div style="font-size:11px;color:#888">Tracking since '+fmtD(rs)+'</div></div>';
-  html+='<div style="text-align:right"><div style="font-size:10px;color:#555">Last updated</div><div style="font-size:11px;color:#666">'+esc(lu)+'</div></div>';
-  html+='</div>';
-  /* overall record */
-  html+=_phSectionHdr("Overall Record");
+  /* ─── HERO CARD ─── */
+  var _pdVoid=plays.filter(function(e){ return e.result==="void"; }).length;
+  var _pdRoiData=allRes.filter(function(e){ return e.odds!=null; });
+  var _pdRoiR=_pdRoiData.length?calcROI(_pdRoiData):{roi:0,units:0};
+  html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-bottom:16px">';
   if(!allRes.length){
-    html+='<div style="margin-bottom:32px"><div style="font-size:28px;font-weight:800;color:var(--mut);margin-bottom:6px">–</div>';
-    html+='<div style="font-size:12px;color:var(--mut)">No resolved plays yet.</div></div>';
+    html+='<div style="font-size:30px;font-weight:800;color:var(--mut);margin-bottom:4px">–</div>';
+    html+='<div style="font-size:12px;color:var(--mut)">No resolved plays yet.</div>';
   } else {
     var rateColor=_phRateColor(allRate);
-    html+='<div style="margin-bottom:32px">';
-    html+='<div style="font-size:28px;font-weight:800;color:'+rateColor+';margin-bottom:2px">'+(allRate!==null?allRate+'%':'–')+'</div>';
-    var _pdRoi=calcROI(plays);var _pdRoiClr=_pdRoi.roi>0?'#00e87a':_pdRoi.roi<0?'#ff4f4f':'#777';var _pdUClr=_pdRoi.units>0?'#00e87a':_pdRoi.units<0?'#ff4f4f':'#777';
-    html+='<div style="display:flex;gap:16px;align-items:baseline;margin-bottom:2px"><div style="font-size:16px;font-weight:800;color:'+_pdRoiClr+'">'+(_pdRoi.roi>=0?'+':'')+_pdRoi.roi+'% ROI</div><div style="font-size:14px;font-weight:700;color:'+_pdUClr+'">'+(_pdRoi.units>=0?'+':'')+_pdRoi.units.toFixed(2)+'u</div></div>';
-    var _csrt=allRes.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:(a.loggedAt||0)-(b.loggedAt||0);});
-    var _cpts=[],_csum=0;
-    _csrt.forEach(function(e){var o=e.odds||-130;_csum+=(e.result==='hit'?(o>=0?o/100:100/Math.abs(o)):-1);_cpts.push(_csum);});
-    if(_cpts.length>=2){
-      var _cVW=400,_cVH=100,_cLp=34,_cRp=22,_cTp=8,_cBp=18;
-      var _cn=_cpts.length;
-      var _cmn=Math.min.apply(null,_cpts.concat([0])),_cmx=Math.max.apply(null,_cpts.concat([0]));
-      var _crng=_cmx-_cmn||1,_cChW=_cVW-_cLp-_cRp,_cChH=_cVH-_cTp-_cBp;
-      var _cxf=function(i){return _cLp+(_cn===1?_cChW/2:i*_cChW/(_cn-1));};
-      var _cyf=function(v){return _cTp+_cChH*(1-(v-_cmn)/_crng);};
-      var _cz=_cyf(0),_cpos=_csum>=0,_cclr=_cpos?'#00e87a':'#ff4f4f';
-      var _cln=_cpts.map(function(v,i){return _cxf(i).toFixed(1)+','+_cyf(v).toFixed(1);}).join(' ');
-      var _cfp=_cln+' '+_cxf(_cn-1).toFixed(1)+','+_cz.toFixed(1)+' '+_cxf(0).toFixed(1)+','+_cz.toFixed(1);
-      var _cTkSt=_crng>200?100:_crng>100?50:_crng>40?25:_crng>15?10:5;
-      var _cTks=[],_ctk;
-      for(_ctk=0;_ctk<=_cmx;_ctk+=_cTkSt)_cTks.push(_ctk);
-      for(_ctk=-_cTkSt;_ctk>=_cmn;_ctk-=_cTkSt)_cTks.push(_ctk);
-      var _cFmtD=function(d){if(!d)return'';var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];var p=(d+'').split(/[-\/]/);return p.length>=3?M[+p[1]-1]+' '+parseInt(p[2],10):'';};
-      var _cDIs=[0,Math.round(_cn/4),Math.round(_cn/2),Math.round(3*_cn/4),_cn-1].filter(function(v,i,a){return a.indexOf(v)===i;});
-      var _cSvg='<svg viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block;border-radius:6px;background:#0a0a0a">'
-        +'<defs><linearGradient id="pdRoiGrd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+_cclr+'" stop-opacity=".18"/><stop offset="100%" stop-color="'+_cclr+'" stop-opacity="0"/></linearGradient></defs>';
-      _cTks.forEach(function(tk){
-        var ty=_cyf(tk),isZ=tk===0;
-        _cSvg+='<line x1="'+_cLp+'" y1="'+ty.toFixed(1)+'" x2="'+(_cVW-_cRp)+'" y2="'+ty.toFixed(1)+'" stroke="'+(isZ?'#2a2a2a':'#1a1a1a')+'" stroke-width="1"'+(isZ?' stroke-dasharray="4,4"':'')+'"/>';
-        _cSvg+='<text x="'+(_cLp-3)+'" y="'+(ty+3).toFixed(1)+'" text-anchor="end" font-size="8" fill="#444" font-family="system-ui,sans-serif">'+(tk>0?'+':'')+tk+'u</text>';
-      });
-      _cSvg+='<polygon points="'+_cfp+'" fill="url(#pdRoiGrd)"/>';
-      _cSvg+='<polyline points="'+_cln+'" fill="none" stroke="'+_cclr+'" stroke-width="1.5" stroke-linejoin="round"/>';
-      _cSvg+='<circle cx="'+_cxf(_cn-1).toFixed(1)+'" cy="'+_cyf(_cpts[_cn-1]).toFixed(1)+'" r="3" fill="'+_cclr+'"/>';
-      _cDIs.forEach(function(idx){
-        var dx=_cxf(idx),anch=idx===0?'start':idx===_cn-1?'end':'middle';
-        _cSvg+='<text x="'+dx.toFixed(1)+'" y="96" text-anchor="'+anch+'" font-size="8" fill="#444" font-family="system-ui,sans-serif">'+_cFmtD(_csrt[idx].date)+'</text>';
-      });
-      _cSvg+='</svg>';
-      html+='<div style="margin:8px 0 6px">'+_cSvg+'</div>';
-    }
-    var _cDolNet=(_pdRoi.units>=0?'+$':'−$')+Math.abs(Math.round(_pdRoi.units*100));
-    html+='<div style="margin-bottom:8px">'
-      +'<button onclick="(function(b){var e=document.getElementById(\'pdRoiExp\');var o=e.style.maxHeight===\'0px\'||!e.style.maxHeight;e.style.maxHeight=o?\'400px\':\'0px\';b.querySelector(\'span\').textContent=o?\'▲\':\'▼\';})(this)" style="background:none;border:none;padding:0;cursor:pointer;font-size:11px;color:var(--mut);display:flex;align-items:center;gap:4px">'
-        +'How is ROI calculated? <span style="color:#00e87a;font-size:9px">▼</span>'
+    var _pdRoiClr=_pdRoiR.roi>0?'#00e87a':_pdRoiR.roi<0?'#ff4f4f':'#777';
+    var _pdUClr=_pdRoiR.units>0?'#00e87a':_pdRoiR.units<0?'#ff4f4f':'#777';
+    var _pdRoiNote=_pdRoiData.length<allRes.length?' <span style="font-size:10px;color:var(--mut2)">('+_pdRoiData.length+'/'+allRes.length+' with odds)</span>':'';
+    html+='<div style="font-size:30px;font-weight:800;color:'+rateColor+';margin-bottom:4px">'+(allRate!==null?allRate+'%':'–')+'</div>';
+    html+='<div style="font-size:12px;color:var(--mut);margin-bottom:12px">'+allHits+' hit · '+(allRes.length-allHits)+' miss · '+_pdVoid+' void</div>';
+    html+='<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px">';
+    html+='<span style="font-size:16px;font-weight:800;color:'+_pdRoiClr+'">'+(_pdRoiR.roi>=0?'+':'')+_pdRoiR.roi+'% ROI</span>';
+    html+='<span style="font-size:14px;font-weight:700;color:'+_pdUClr+'">'+(_pdRoiR.units>=0?'+':'')+_pdRoiR.units.toFixed(2)+'u</span>';
+    if(_pdRoiNote) html+=_pdRoiNote;
+    html+='</div>';
+    var _pdDolNet=(_pdRoiR.units>=0?'+$':'−$')+Math.abs(Math.round(_pdRoiR.units*100));
+    html+='<div style="margin-bottom:12px">'
+      +'<button onclick="(function(b){var e=document.getElementById(\'pdRoiExp\');var o=e.style.maxHeight===\'0px\'||!e.style.maxHeight;e.style.maxHeight=o?\'400px\':\'0px\';b.querySelector(\'span\').textContent=o?\'▲\':\'▼\';})(this)" style="background:none;border:none;padding:0;cursor:pointer;font-size:10px;color:var(--mut2);display:flex;align-items:center;gap:4px">'
+        +'How is ROI calculated? <span style="color:var(--accent);font-size:9px">▼</span>'
       +'</button>'
       +'<div id="pdRoiExp" style="max-height:0;overflow:hidden;transition:max-height .35s ease">'
         +'<div style="padding-top:8px;font-size:11px;color:var(--mut);line-height:1.6">'
-          +'<p style="margin:0 0 8px"><b>Return on Investment (ROI%)</b> measures profit per unit risked. A +'+Math.abs(_pdRoi.roi)+'% ROI means earning that percentage back on every dollar wagered — net units divided by total resolved plays.</p>'
-          +'<p style="margin:0 0 8px"><b>How it\'s calculated:</b> Each hit earns units scaled to the odds (−110 hit = +0.91u, +120 hit = +1.20u). Each miss costs −1 unit. Net total ÷ resolved plays × 100 = ROI%.</p>'
+          +'<p style="margin:0 0 8px"><b>Return on Investment (ROI%)</b> measures profit per unit risked. A '+(_pdRoiR.roi>=0?'+':'')+_pdRoiR.roi+'% ROI means earning that percentage back on every dollar wagered — net units divided by plays with tracked odds.</p>'
+          +'<p style="margin:0 0 8px"><b>How it\'s calculated:</b> Each hit earns units scaled to the odds (−110 hit = +0.91u, +120 hit = +1.20u). Each miss costs −1 unit. Net total ÷ plays with odds × 100 = ROI%.</p>'
           +'<p style="margin:0 0 8px"><b>Why it matters more than hit rate:</b> Standard −110 juice means you need to win 52.4% of plays just to break even — not 50%. ROI accounts for the vig that hit rate alone ignores.</p>'
-          +'<p style="margin:0"><b>In practice:</b> At $100/unit this record is worth '+_cDolNet+' net over '+allRes.length+' resolved plays. Plays logged before odds tracking was added default to −110.</p>'
+          +'<p style="margin:0"><b>In practice:</b> At $100/unit this record is worth '+_pdDolNet+' net over '+_pdRoiData.length+' plays with tracked odds.</p>'
         +'</div>'
       +'</div>'
     +'</div>';
-    html+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+allHits+' hits / '+allRes.length+' resolved</div>';
-    html+='<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px"><div style="background:'+rateColor+';width:'+(allRate||0)+'%;height:100%;border-radius:4px"></div></div>';
-    html+='<div style="display:flex;gap:24px">';
-    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 7 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate7)+'">'+_phRateStr(rate7)+'</div><div style="font-size:9px;color:var(--mut)">'+r7.length+' resolved</div></div>';
-    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate30)+'">'+_phRateStr(rate30)+'</div><div style="font-size:9px;color:var(--mut)">'+r30.length+' resolved</div></div>';
-    html+='</div></div>';
+    html+='<div style="display:flex;gap:20px;margin-bottom:16px">';
+    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 7D</div><div style="font-size:15px;font-weight:800;color:'+_phRateColor(rate7)+'">'+_phRateStr(rate7)+'</div><div style="font-size:9px;color:var(--mut)">'+r7.length+' resolved</div></div>';
+    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30D</div><div style="font-size:15px;font-weight:800;color:'+_phRateColor(rate30)+'">'+_phRateStr(rate30)+'</div><div style="font-size:9px;color:var(--mut)">'+r30.length+' resolved</div></div>';
+    html+='</div>';
   }
+  html+='<div style="border-top:1px solid var(--bd);padding-top:10px;display:flex;gap:16px;flex-wrap:wrap">';
+  html+='<span style="font-size:10px;color:var(--mut2)">Tracking since <span style="color:var(--mut)">'+fmtD(rs)+'</span></span>';
+  html+='<span style="font-size:10px;color:var(--mut2)">Last updated <span style="color:var(--mut)">'+esc(lu)+'</span></span>';
+  html+='</div>';
+  html+='</div>';
   /* by sport */
   var sportKeys=Object.keys(sportMap);
   if(sportKeys.length&&allRes.length){
     html+=_phSectionHdr("By Sport");
     html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate','ROI'],sportKeys.map(function(s){
       var m=sportMap[s], rate=_phRate(m.hits,m.hits+m.misses);
-      var _sr=(m.hits+m.misses)>0?calcROI(plays.filter(function(e){return e.sport===s;})):null;
+      var _sr=(m.hits+m.misses)>0?calcROI(plays.filter(function(e){return e.sport===s&&e.odds!=null;})):null;
       var _srStr=_sr?(_sr.roi>=0?'+':'')+_sr.roi+'%':'–';
-      var _srClr=_sr?(_sr.roi>0?'#00e87a':_sr.roi<0?'#ff4f4f':'var(--mut)'):'var(--mut)';
+      var _srClr=_sr?(_sr.roi>0?'var(--accent)':_sr.roi<0?'var(--red)':'var(--mut)'):'var(--mut)';
       return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+esc(s)+'</td><td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
         '<td style="padding:5px 8px;font-size:11px;color:var(--accent)">'+m.hits+'</td><td style="padding:5px 8px;font-size:11px;color:var(--red)">'+m.misses+'</td>'+
         '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+m.pending+'</td><td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td>'+
@@ -6242,9 +6211,9 @@ function _renderPdStatsData(mount,data){
     html+=_phSectionHdr("By Confidence Tier");
     html+=_phTbl(['Tier','Range','Plays','Hit Rate','ROI%','Units'],TIER_DEF.map(function(t){
       var tm=tierMap[t.label], rate=_phRate(tm.hits,tm.plays);
-      var _tr=tm.plays>0?calcROI(plays.filter(function(e){var c=e.confidence||0;return c>=t.min&&c<=t.max;})):null;
-      var _trRoiClr=_tr?(_tr.roi>0?'#00e87a':_tr.roi<0?'#ff4f4f':'var(--mut)'):'var(--mut)';
-      var _trUClr=_tr?(_tr.units>0?'#00e87a':_tr.units<0?'#ff4f4f':'var(--mut)'):'var(--mut)';
+      var _tr=tm.plays>0?calcROI(plays.filter(function(e){var c=e.confidence||0;return c>=t.min&&c<=t.max&&e.odds!=null;})):null;
+      var _trRoiClr=_tr?(_tr.roi>0?'var(--accent)':_tr.roi<0?'var(--red)':'var(--mut)'):'var(--mut)';
+      var _trUClr=_tr?(_tr.units>0?'var(--accent)':_tr.units<0?'var(--red)':'var(--mut)'):'var(--mut)';
       return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+t.label+'</td>'+
         '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+t.min+'–'+t.max+'%</td>'+
         '<td style="padding:5px 8px;font-size:11px">'+(tm.plays||'–')+'</td>'+
@@ -6279,21 +6248,14 @@ function _renderPdStatsData(mount,data){
     }
     html+='<div style="margin-bottom:16px"></div>';
   }
-  /* charts */
-  if(allRes.length){
-    var s1=_phChartTimelineSvg(allRes);
-    html+=_phSectionHdr("Hit Rate Over Time");
-    html+=chartCard("30-Day Rolling Hit Rate","Daily hit rate across all resolved PropDesk plays. Dashed line marks the 75% model target.",s1||ph("Need data from 3+ different days to render"));
-    var s2=_phChartCalibrationSvg(allRes);
-    html+=_phSectionHdr("Model Calibration");
-    html+=chartCard("Calibration by Confidence Tier","Actual hit rate vs expected per tier. Green = model accurate, red = overconfident.",s2||ph("Need 3+ plays per tier to render"));
-  }
+  /* player performance */
   var s3=_phChartPlayersHtml(plays);
   if(s3){
     html+=_phSectionHdr("Player Performance");
-    html+=chartCard("Top Performers","Players PropDesk has the strongest track record on (min 3 resolved plays).",s3);
+    html+=s3;
+    html+='<div style="margin-bottom:16px"></div>';
   }
-  html+='<div style="margin-top:16px;padding-bottom:8px;font-size:10px;color:var(--mut2)">'+plays.length+' tracked plays · data updated weekly</div>';
+  html+='<div style="padding-bottom:8px;font-size:10px;color:var(--mut2)">'+plays.length+' tracked plays · data updated weekly</div>';
   } else {
   /* ===== MONEYLINE VIEW ===== */
   var _mlRes=_mlAll.filter(function(e){return e.result==='hit'||e.result==='miss';});
