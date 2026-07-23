@@ -6494,7 +6494,6 @@ async function renderPlayHistory(){
     if(_histType==='trends'&&e.source!=='trend') return false;
     if(_histType==='moneylines'&&e.type!=='moneyline') return false;
     if(_histFilters.sport!=="all"&&e.sport!==_histFilters.sport) return false;
-    if(_histFilters.market!=="all"&&e.market!==_histFilters.market) return false;
     if(_histFilters.result!=="all"&&e.result!==_histFilters.result) return false;
     if(_histFilters.days!=="all"){
       var cutoff=new Date(); cutoff.setDate(cutoff.getDate()-parseInt(_histFilters.days));
@@ -6512,12 +6511,13 @@ async function renderPlayHistory(){
     return sd==="asc"?cmp:-cmp;
   });
 
-  /* ── sport+market-filtered stats dataset ── */
+  /* ── type+sport+period-filtered stats dataset ── */
   var statData=all.filter(function(e){
-    if(e.type==='moneyline') return false;
-    if(e.source==='trend') return false;
+    if(_histType==='plays'&&(e.source==='trend'||e.type==='moneyline')) return false;
+    if(_histType==='trends'&&e.source!=='trend') return false;
+    if(_histType==='moneylines'&&e.type!=='moneyline') return false;
     if(_histFilters.sport!=="all"&&e.sport!==_histFilters.sport) return false;
-    if(_histFilters.market!=="all"&&e.market!==_histFilters.market) return false;
+    if(_histFilters.days!=="all"){var _sdC=new Date();_sdC.setDate(_sdC.getDate()-parseInt(_histFilters.days));if(new Date(e.date)<_sdC) return false;}
     return true;
   });
 
@@ -6525,10 +6525,13 @@ async function renderPlayHistory(){
   var allRes=statData.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
   var allHits=allRes.filter(function(e){ return e.result==="hit"; }).length;
   var allRate=_phRate(allHits,allRes.length);
+  var allVoid=statData.filter(function(e){ return e.result==="void"; }).length;
+  var _heroPending=statData.filter(function(e){ return e.result==="pending"; }).length;
+  var _roiData=allRes.filter(function(e){ return e.odds!=null; });
+  var _roiR=_roiData.length?calcROI(_roiData):{roi:0,units:0};
 
   var d7=new Date(); d7.setDate(d7.getDate()-7);
   var d30=new Date(); d30.setDate(d30.getDate()-30);
-  var d1=new Date(); d1.setDate(1);
   var r7=allRes.filter(function(e){ return new Date(e.date)>=d7; });
   var r30=allRes.filter(function(e){ return new Date(e.date)>=d30; });
   var rate7=_phRate(r7.filter(function(e){ return e.result==="hit"; }).length,r7.length);
@@ -6566,8 +6569,6 @@ async function renderPlayHistory(){
   /* ── streaks ── */
   var resolvedAsc=allRes.slice().sort(function(a,b){ return (a.loggedAt||0)-(b.loggedAt||0); });
   var streaks=_phCalcStreaks(resolvedAsc);
-  var _resolvedDates={};resolvedAsc.forEach(function(e){_resolvedDates[e.date]=1;});
-  var _allSingleDay=Object.keys(_resolvedDates).length<=1;
 
   /* ── hot/cold markets (≥5 resolved) ── */
   var mktRanks=Object.keys(mktMap)
@@ -6577,16 +6578,6 @@ async function renderPlayHistory(){
   var hotMkts=mktRanks.slice(0,3);
   var _hotKeys={};hotMkts.forEach(function(m){_hotKeys[m.k]=1;});
   var coldMkts=mktRanks.filter(function(m){return !_hotKeys[m.k];}).slice(-3).reverse();
-
-  /* ── best/worst sport this month ── */
-  var monthSp={};
-  statData.filter(function(e){ return (e.result==="hit"||e.result==="miss")&&new Date(e.date)>=d1; }).forEach(function(e){
-    if(!monthSp[e.sport]) monthSp[e.sport]={hits:0,total:0};
-    monthSp[e.sport].total++; if(e.result==="hit") monthSp[e.sport].hits++;
-  });
-  var monthRanked=Object.keys(monthSp).filter(function(s){ return monthSp[s].total>=3; })
-    .map(function(s){ return {s:s,rate:_phRate(monthSp[s].hits,monthSp[s].total)}; })
-    .sort(function(a,b){ return b.rate-a.rate; });
 
   /* ── past-date pending ── */
   var pastPending=all.filter(function(e){ return e.result==="pending"&&e.date<today&&e.source!=='trend'; });
@@ -6601,7 +6592,6 @@ async function renderPlayHistory(){
   /* ════ BUILD HTML ════ */
   var allPending=all.filter(function(e){return e.result==="pending";}).length;
   var showTrendCols=Object.keys(pmMap).some(function(k){ return pmMap[k].length>1; });
-  var hasStreak=topMkts.some(function(k){return mktMap[k].bestStreak>0;});
   var html='<div style="padding:16px">';
   /* view pills */
   html+='<div class="tabrow" style="gap:6px;margin-bottom:8px">';
@@ -6621,156 +6611,56 @@ async function renderPlayHistory(){
 
   if(storeKB>3800) html+='<div style="background:#ffcc0022;border:1px solid var(--yellow);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--yellow);margin-bottom:12px">Storage nearing limit — consider exporting and clearing old history.</div>';
 
-  /* ─── ANALYTICS PILLS + CHARTS ─── */
-  html+=_phAnalyticsSection(all,_phAnalyticsSport,_phAnalyticsMkt);
+  /* ─── HERO SUMMARY ─── */
+  html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-bottom:16px">';
+  if(allRes.length===0){
+    html+='<div style="font-size:30px;font-weight:800;color:var(--mut);margin-bottom:4px">–</div>';
+    html+='<div style="font-size:12px;color:var(--mut)">'+(_heroPending>0?_heroPending+' pending · ':'')+'Resolve plays to see stats</div>';
+  } else {
+    var rateColor=_phRateColor(allRate);
+    var _roiClr=_roiR.roi>0?'#00e87a':_roiR.roi<0?'#ff4f4f':'#777';
+    var _unitsClr=_roiR.units>0?'#00e87a':_roiR.units<0?'#ff4f4f':'#777';
+    var _roiNote=_roiData.length<allRes.length?' <span style="font-size:10px;color:var(--mut2)">('+_roiData.length+'/'+allRes.length+' with odds)</span>':'';
+    html+='<div style="font-size:30px;font-weight:800;color:'+rateColor+';margin-bottom:4px">'+(allRate!==null?allRate+'%':'–')+'</div>';
+    html+='<div style="font-size:12px;color:var(--mut);margin-bottom:12px">'+allHits+' hit · '+(allRes.length-allHits)+' miss · '+allVoid+' void'+(_heroPending?' · '+_heroPending+' pending':'')+'</div>';
+    html+='<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px">';
+    html+='<span style="font-size:16px;font-weight:800;color:'+_roiClr+'">'+(_roiR.roi>=0?'+':'')+_roiR.roi+'% ROI</span>';
+    html+='<span style="font-size:14px;font-weight:700;color:'+_unitsClr+'">'+(_roiR.units>=0?'+':'')+_roiR.units.toFixed(2)+'u</span>';
+    if(_roiNote) html+=_roiNote;
+    html+='</div>';
+    html+='<div style="display:flex;gap:20px">';
+    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 7D</div><div style="font-size:15px;font-weight:800;color:'+_phRateColor(rate7)+'">'+_phRateStr(rate7)+'</div><div style="font-size:9px;color:var(--mut)">'+r7.length+' resolved</div></div>';
+    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30D</div><div style="font-size:15px;font-weight:800;color:'+_phRateColor(rate30)+'">'+_phRateStr(rate30)+'</div><div style="font-size:9px;color:var(--mut)">'+r30.length+' resolved</div></div>';
+    html+='</div>';
+  }
+  html+='</div>';
 
-  /* ─── ROW 4: TYPE FILTER ─── */
+  /* ─── TYPE FILTER ─── */
   html+='<div style="margin-bottom:16px"><div class="tabrow" style="gap:6px">';
   html+='<button class="pill ph-type-btn'+(_histType==="all"?" active":"")+'" data-htype="all" style="padding:5px 14px;font-size:11px">All</button>';
-  html+='<button class="pill ph-type-btn'+(_histType==="plays"?" active":"")+'" data-htype="plays" style="padding:5px 14px;font-size:11px">Plays</button>';
+  html+='<button class="pill ph-type-btn'+(_histType==="plays"?" active":"")+'" data-htype="plays" style="padding:5px 14px;font-size:11px">Props</button>';
   html+='<button class="pill ph-type-btn'+(_histType==="moneylines"?" active":"")+'" data-htype="moneylines" style="padding:5px 14px;font-size:11px">Moneylines</button>';
   html+='<button class="pill ph-type-btn'+(_histType==="trends"?" active":"")+'" data-htype="trends" style="padding:5px 14px;font-size:11px">Trends</button>';
   html+='</div></div>';
 
-  /* ─── SECTION 1: OVERALL RECORD ─── */
-  html+=_phSectionHdr("Overall Record");
-  if(allRes.length===0){
-    html+='<div style="margin-bottom:32px">';
-    html+='<div style="font-size:28px;font-weight:800;color:var(--mut);margin-bottom:6px">–</div>';
-    html+='<div style="font-size:12px;color:var(--mut)">'+(allPending>0?allPending+' pending · ':'')+'Resolve plays to see hit rate</div>';
-    html+='</div>';
-  } else {
-    var rateColor=_phRateColor(allRate), rateBarW=allRate!==null?allRate:0;
-    html+='<div style="margin-bottom:32px">';
-    html+='<div style="font-size:28px;font-weight:800;color:'+rateColor+';margin-bottom:2px">'+(allRate!==null?allRate+'%':'–')+'</div>';
-    var _roiR=calcROI(statData);var _roiClr=_roiR.roi>0?'#00e87a':_roiR.roi<0?'#ff4f4f':'#777';var _unitsClr=_roiR.units>0?'#00e87a':_roiR.units<0?'#ff4f4f':'#777';
-    html+='<div style="display:flex;gap:16px;align-items:baseline;margin-bottom:4px"><div style="font-size:16px;font-weight:800;color:'+_roiClr+'">'+(_roiR.roi>=0?'+':'')+_roiR.roi+'% ROI</div><div style="font-size:14px;font-weight:700;color:'+_unitsClr+'">'+(_roiR.units>=0?'+':'')+_roiR.units.toFixed(2)+'u</div></div>';
-    html+='<div style="font-size:11px;color:var(--mut);margin-bottom:8px">'+allHits+' hits / '+allRes.length+' resolved · '+allPending+' pending</div>';
-    html+='<div style="background:var(--bd);border-radius:4px;height:6px;overflow:hidden;margin-bottom:12px">';
-    html+='<div style="background:'+rateColor+';width:'+rateBarW+'%;height:100%;border-radius:4px"></div></div>';
-    html+='<div style="display:flex;gap:24px">';
-    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 7 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate7)+'">'+_phRateStr(rate7)+'</div><div style="font-size:9px;color:var(--mut)">'+r7.length+' resolved</div></div>';
-    html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em">LAST 30 DAYS</div><div style="font-size:16px;font-weight:800;color:'+_phRateColor(rate30)+'">'+_phRateStr(rate30)+'</div><div style="font-size:9px;color:var(--mut)">'+r30.length+' resolved</div></div>';
-    html+='</div></div>';
-  }
-
-  /* ─── ANALYTICS CHARTS (after Overall Record) ─── */
-  html+=_phAnalyticsCharts(all,_phAnalyticsSport,_phAnalyticsMkt);
-
-  /* ─── SECTION 2: BY SPORT ─── */
-  var sportKeys=Object.keys(sportMap);
-  if(sportKeys.length){
-    if(allRes.length===0){
-      html+='<div style="font-size:11px;color:var(--mut);margin-bottom:32px">Sport breakdown available once plays are resolved.</div>';
-    } else {
-      html+=_phSectionHdr("By Sport");
-      html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate'],
-        sportKeys.map(function(s){
-          var m=sportMap[s], rate=_phRate(m.hits,m.hits+m.misses);
-          return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+esc(s)+'</td>'+
-            '<td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
-            '<td style="padding:5px 8px;font-size:11px;color:var(--accent)">'+m.hits+'</td>'+
-            '<td style="padding:5px 8px;font-size:11px;color:var(--red)">'+m.misses+'</td>'+
-            '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+m.pending+'</td>'+
-            '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td></tr>';
-        }),true);
-      html+='<div style="margin-bottom:16px"></div>';
-    }
-  }
-
-  /* ─── SECTION 3: BY MARKET ─── */
-  if(topMkts.length){
-    html+=_phSectionHdr("By Market (Top 10 by Volume)");
-    var mktHdrs=['Market','Plays','Hit Rate','Avg Conf'];
-    if(hasStreak) mktHdrs.splice(3,0,'Best Streak');
-    html+=_phTbl(mktHdrs,
-      topMkts.map(function(k){
-        var m=mktMap[k], rate=_phRate(m.hits,m.hits+m.misses);
-        var rateCell=rate!==null
-          ?'<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+rate+'%</td>'
-          :'<td style="padding:5px 8px;font-size:11px;color:var(--mut)">–</td>';
-        var row='<tr><td style="padding:5px 8px;font-size:11px">'+esc(k)+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+rateCell;
-        if(hasStreak) row+='<td style="padding:5px 8px;font-size:11px">'+(m.bestStreak||'–')+'</td>';
-        row+='<td style="padding:5px 8px;font-size:11px">'+(m.plays>0?Math.round(m.confSum/m.plays)+'%':'–')+'</td></tr>';
-        return row;
-      }),true);
-    html+='<div style="margin-bottom:16px"></div>';
-  }
-
-  /* ─── SECTION 4: CONFIDENCE TIER CALIBRATION ─── */
-  if(allRes.length){
-    html+=_phSectionHdr("By Confidence Tier");
-    html+=_phTbl(['Tier','Range','Plays','Hit Rate','ROI%','Units'],
-      TIER_DEF.map(function(t){
-        var tm=tierMap[t.label], rate=_phRate(tm.hits,tm.plays);
-        var _tr=tm.plays>0?calcROI(statData.filter(function(e){var c=e.confidence||0;return c>=t.min&&c<=t.max;})):null;
-        var _trRoiClr=_tr?(_tr.roi>0?'#00e87a':_tr.roi<0?'#ff4f4f':'var(--mut)'):'var(--mut)';
-        var _trUClr=_tr?(_tr.units>0?'#00e87a':_tr.units<0?'#ff4f4f':'var(--mut)'):'var(--mut)';
-        return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+t.label+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;color:var(--mut)">'+t.min+'–'+t.max+'%</td>'+
-          '<td style="padding:5px 8px;font-size:11px">'+(tm.plays||'–')+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_phRateColor(rate)+'">'+_phRateStr(rate)+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;font-weight:800;color:'+_trRoiClr+'">'+(_tr?(_tr.roi>=0?'+':'')+_tr.roi+'%':'–')+'</td>'+
-          '<td style="padding:5px 8px;font-size:11px;font-weight:700;color:'+_trUClr+'">'+(_tr?(_tr.units>=0?'+':'')+_tr.units.toFixed(2)+'u':'–')+'</td></tr>';
-      }),true);
-    html+='<div style="margin-bottom:16px"></div>';
-  }
-
-  /* ─── SECTION 5: STREAKS & TRENDS ─── */
-  html+=_phSectionHdr("Streaks & Trends");
-  if(allRes.length<5){
-    html+='<div style="font-size:11px;color:var(--mut);margin-bottom:32px">Streak data available after 5 resolved plays.</div>';
-  } else {
-    var curS=streaks.cur, bH=streaks.bHit, bM=streaks.bMiss;
-    var curStr=curS.len?(curS.len+" "+(curS.dir?"hit":"miss")+" streak"):"—";
-    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px">';
-    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">CURRENT STREAK</div><div style="font-size:15px;font-weight:800;color:'+(curS.len?(curS.dir?"var(--accent)":"var(--red)"):"var(--mut)")+'">'+curStr+'</div></div>';
-    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST HIT STREAK</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(bH.len?bH.len+" hits":"–")+'</div>'+(bH.len?'<div style="font-size:9px;color:var(--mut)">'+bH.start+(bH.start!==bH.end?" → "+bH.end:"")+'</div>'+(bH.start===bH.end?'<div style="font-size:9px;color:var(--mut);font-style:italic">All from one day</div>':""):"")+'</div>';
-    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">WORST MISS STREAK</div><div style="font-size:15px;font-weight:800;color:var(--red)">'+(bM.len?bM.len+" misses":"–")+'</div>'+(bM.len?'<div style="font-size:9px;color:var(--mut)">'+bM.start+(bM.start!==bM.end?" → "+bM.end:"")+'</div>'+(bM.start===bM.end?'<div style="font-size:9px;color:var(--mut);font-style:italic">All from one day</div>':""):"")+'</div>';
-    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:4px">BEST SPORT (MONTH)</div><div style="font-size:15px;font-weight:800;color:var(--accent)">'+(monthRanked.length?monthRanked[0].s+" "+monthRanked[0].rate+"%":"–")+'</div></div>';
-    html+='</div>';
-    var _hotShow=hotMkts.length>=2,_coldShow=coldMkts.length>=2;
-    if(_hotShow||_coldShow){
-      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">';
-      html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">HOT MARKETS</div>';
-      if(_hotShow){hotMkts.forEach(function(m){html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--accent);font-weight:700">'+m.rate+'%</span></div>';});}
-      else{html+='<div style="font-size:10px;color:var(--mut);font-style:italic">Not enough market data yet</div>';}
-      html+='</div>';
-      html+='<div><div style="font-size:9px;color:var(--mut);font-weight:700;letter-spacing:.05em;margin-bottom:6px">COLD MARKETS</div>';
-      if(_coldShow){coldMkts.forEach(function(m){html+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--bd2);font-size:11px"><span>'+esc(m.k)+'</span><span style="color:var(--red);font-weight:700">'+m.rate+'%</span></div>';});}
-      else{html+='<div style="font-size:10px;color:var(--mut);font-style:italic">Not enough market data yet</div>';}
-      html+='</div>';
-      html+='</div>';
-    }
-    html+='<div style="margin-bottom:16px"></div>';
-  }
-
-  /* ─── SECTION 6: 30-DAY CHART ─── */
-  if(allRes.length){
-    html+=_phSectionHdr("Rolling 30-Day Hit Rate");
-    html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:8px;padding:12px 10px 8px;margin-bottom:4px">'+_ph30DayChartSvg(statData)+'</div>';
-    html+='<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mut);margin-bottom:32px"><span>30 days ago</span><span>Today</span></div>';
-  }
-
-  /* ─── FILTER ROW ─── */
-  var _htypeLabel=_histType==='plays'?'Plays':_histType==='moneylines'?'Moneylines':_histType==='trends'?'Trends':'All Plays';
-  html+=_phSectionHdr(_htypeLabel+" ("+filtered.length+" total)");
-  html+='<div style="display:flex;gap:8px;margin-bottom:10px"><input id="phSearch" class="search" style="flex:1;min-width:120px;max-width:200px" placeholder="Search player…" value="'+esc(_histSearch||"")+'"></div>';
-  html+='<div class="filterbar" style="flex-wrap:wrap;gap:6px;margin-bottom:14px">';
+  /* ─── COMPACT FILTER ROW ─── */
+  var _htypeLabel=_histType==='plays'?'Props':_histType==='moneylines'?'Moneylines':_histType==='trends'?'Trends':'All Plays';
+  html+='<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:14px">';
+  html+='<input id="phSearch" class="search" style="min-width:120px;max-width:180px;margin-right:2px" placeholder="Search player…" value="'+esc(_histSearch||"")+'">';
   html+='<span class="fb-lbl">Sport:</span>';
   [["all","All"],["MLB","MLB"],["NFL","NFL"],["NBA","NBA"],["NHL","NHL"]].forEach(function(p){
     html+='<button class="btn ph-flt'+(p[0]===_histFilters.sport?" on":"")+'" data-flt="sport" data-v="'+p[0]+'">'+p[1]+'</button>';
   });
-  html+='<span class="fb-lbl" style="margin-left:8px">Result:</span>';
+  html+='<span class="fb-lbl" style="margin-left:6px">Result:</span>';
   [["all","All"],["hit","Hit"],["miss","Miss"],["void","Void"],["pending","Pending"]].forEach(function(p){
     html+='<button class="btn ph-flt'+(p[0]===_histFilters.result?" on":"")+'" data-flt="result" data-v="'+p[0]+'">'+p[1]+'</button>';
   });
-  html+='<span class="fb-lbl" style="margin-left:8px">Period:</span>';
-  [["7","7d"],["30","30d"],["all","All Time"]].forEach(function(p){
+  html+='<span class="fb-lbl" style="margin-left:6px">Period:</span>';
+  [["7","7d"],["30","30d"],["all","All"]].forEach(function(p){
     html+='<button class="btn ph-flt'+(p[0]===_histFilters.days?" on":"")+'" data-flt="days" data-v="'+p[0]+'">'+p[1]+'</button>';
   });
   html+='</div>';
+  html+=_phSectionHdr(_htypeLabel+" ("+filtered.length+")");
 
   /* ─── PLAY TABLE ─── */
   if(!filtered.length){
@@ -7055,20 +6945,6 @@ async function renderPlayHistory(){
       if(still.length) _phBulkResolve(still);
     }).catch(function(){ _phBulkResolve(pastPending); });
   };
-  mount.querySelectorAll('.ph-a-sport').forEach(function(b){
-    b.onclick=function(){
-      var v=b.getAttribute('data-pha-sport');
-      _phAnalyticsSport=v; _histFilters.sport=v; _phAnalyticsMkt="all"; _histFilters.market="all";
-      renderPlayHistory();
-    };
-  });
-  mount.querySelectorAll('.ph-a-mkt').forEach(function(b){
-    b.onclick=function(){
-      var v=b.getAttribute('data-pha-mkt');
-      _phAnalyticsMkt=v; _histFilters.market=v;
-      renderPlayHistory();
-    };
-  });
   mount.querySelectorAll('[data-hist-view]').forEach(function(b){
     b.onclick=function(){ _histView=b.getAttribute('data-hist-view'); renderPlayHistory(); };
   });
