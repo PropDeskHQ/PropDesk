@@ -1073,6 +1073,7 @@ body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
         <div id="gameInfoStrip"></div>
         <div id="gameMLMount"></div>
         <div id="gameTop5Mount"></div>
+        <div id="gameTrendsMount"></div>
       </div>
 
       <div id="gameContentMount" style="display:none">
@@ -2989,6 +2990,7 @@ function clearBoard(){
   var gd=$("gameDetail"); if(gd) gd.style.display="none";
   var mlM=$("gameMLMount"); if(mlM) mlM.innerHTML="";
   var t5M=$("gameTop5Mount"); if(t5M) t5M.innerHTML="";
+  var gtM=$("gameTrendsMount"); if(gtM) gtM.innerHTML="";
   var giM=$("gameInfoStrip"); if(giM) giM.innerHTML="";
   var cm=$("gameContentMount"); if(cm) cm.style.display="none";
   $("filterBar").style.display="none";
@@ -10839,6 +10841,7 @@ function loadGameDetail(){
   if(mlM) mlM.innerHTML='';
   var t5M=$("gameTop5Mount");
   if(t5M) t5M.innerHTML='<div class="g5-hdr"><span class="g5-title">Best Plays</span></div><div style="text-align:center;color:var(--mut);padding:20px;font-size:13px">Scanning all markets…</div>';
+  var gtM=$("gameTrendsMount"); if(gtM) gtM.innerHTML="";
   loadMoneylineBoard();
   loadGameTop5();
   loadPropOfDay();
@@ -10885,6 +10888,7 @@ function updateBestPlaysDisplay(eventId,remaining){
     var m=$("gameTop5Mount"); if(m) m.appendChild(s);
   }
   if($("parlayModal")&&$("parlayModal").classList.contains("open")) _updateParlayQualCount();
+  renderGameTrends(computeGameTrends(eventId));
 }
 
 // Background enrichment — triggered on game select, not on Best Plays page visit.
@@ -10973,6 +10977,58 @@ function _g5TsHtml(eventId,isScanning){
   var hh=h%12||12,mm=m<10?"0"+m:String(m);
   return '<div class="g5-ts">Last updated: '+hh+':'+mm+' '+ampm+' \xb7 '+info.mkts+' market'+(info.mkts!==1?'s':'')+(info.mkts?' scanned':'')+'</div>';
 }
+
+function computeGameTrends(eventId){
+  var cached=_gamePropsCache[eventId]||{};
+  var seenP={};
+  var allProps=[];
+  Object.keys(cached).forEach(function(mk){
+    (cached[mk]||[]).forEach(function(p){
+      if(!p.enriched) return;
+      var k=(p.player||'').toLowerCase()+'|'+(p._market||mk);
+      if(!seenP[k]){ seenP[k]=1; allProps.push(p); }
+    });
+  });
+  if(!allProps.length) return [];
+  var _sv={sport:ST.sport,market:ST.market,props:ST.props,eventId:ST.eventId};
+  ST.props=allProps; ST.eventId=eventId;
+  var trends=[];
+  try{
+    trends=trends.concat(calcPlayerStreakTrends());
+    trends=trends.concat(calcPlayerHomeAwaySplitTrends());
+    trends=trends.concat(calcLineValueTrends());
+    trends=trends.concat(calcOddsMovementTrends());
+  }catch(e){ console.warn('[PropDesk] computeGameTrends error',e); }
+  ST.sport=_sv.sport; ST.market=_sv.market; ST.props=_sv.props; ST.eventId=_sv.eventId;
+  trends.sort(function(a,b){ return b.conf-a.conf; });
+  return trends.filter(_trendQualifies).slice(0,3);
+}
+function renderGameTrends(trends){
+  var mount=$("gameTrendsMount"); if(!mount) return;
+  if(!trends.length){ mount.innerHTML=""; return; }
+  var typeLabel=function(type){
+    return type==="streak"?"PLAYER STREAK":type==="homeway"?"HOME/AWAY SPLIT":
+      type==="linevalue"?"LINE VALUE":type==="movement"?"SHARP MONEY":"TREND";
+  };
+  var html='<div class="g5-hdr"><span class="g5-title">Top Trends</span><span class="g5-sub">\xb7 '+trends.length+' qualifying</span></div>';
+  trends.forEach(function(t){
+    var title=_trendCardTitle(t);
+    var streakBadge=(t.streak>=3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge">🔥 STREAK '+t.streak+'</span></div>':
+      (t.streak<=-3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge" style="background:rgba(255,80,80,.1);color:#ff5050;border-color:rgba(255,80,80,.2)">❄ COLD '+Math.abs(t.streak)+'</span></div>':'';
+    var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%"></div></div><span class="tc-hitbar-pct">'+t.hitRate+'%</span>'+(t.odds!=null?'<span style="font-size:10px;font-weight:600;color:var(--mut);margin-left:4px;white-space:nowrap">'+fmtOdds(t.odds)+'</span>':'')+'</div>':'';
+    html+='<div class="tcard tc-strong">'+
+      '<div class="tc-card-hdr"><span style="font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#00e87a;border:1px solid rgba(0,232,122,.25);background:rgba(0,232,122,.08);border-radius:5px;padding:3px 7px">✓ QUALIFIES</span><span class="tc-type">'+typeLabel(t.type)+'</span></div>'+
+      '<div class="tc-title-main">'+esc(title)+'</div>'+
+      (t.headline?'<div class="tc-sub-hl">'+esc(t.headline)+'</div>':'')+
+      streakBadge+
+      '<div class="tc-record'+(t.recordCls?' '+t.recordCls:'')+'">'+esc(t.record)+'</div>'+
+      hitBar+
+    '</div>';
+  });
+  html+='<div style="text-align:center;padding:4px 0 16px"><button class="pill" onclick="showPage(\'trends\');initTrends()">See all trends &rarr;</button></div>';
+  mount.innerHTML=html;
+}
+
 function renderGameTop5(picks,isScanning){
   var mount=$("gameTop5Mount"); if(!mount) return;
   var spLbls={americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL",baseball_mlb:"MLB"};
