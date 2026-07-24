@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5695,7 +5695,7 @@ var _histView="my";
 var _histSpecial="";
 var _histType="all";
 var _pdStatsCache=null;
-var _pdStatsSubView='props';
+var _pdStatsFilter='all';
 var _mlPickFilter='all';
 var _trackedThisSession={};
 var _mlCardData=null;
@@ -6071,7 +6071,18 @@ function _renderPdStatsData(mount,data){
   var plays=data.plays||[];
   var lu=data.lastUpdated||"", rs=data.recordStart||"";
   function fmtD(s){ if(!s) return "–"; var p=s.split('-'),M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return M[parseInt(p[1])-1]+' '+parseInt(p[2])+', '+p[0]; }
-  var allRes=plays.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
+  /* filter by active type */
+  var filteredPlays;
+  if(_pdStatsFilter==='props'){
+    filteredPlays=plays.filter(function(e){ return e.source!=='trend'&&e.type!=='trend'&&e.type!=='moneyline'&&e.market!=='moneyline'; });
+  } else if(_pdStatsFilter==='moneylines'){
+    filteredPlays=plays.filter(function(e){ return e.type==='moneyline'||e.market==='moneyline'; });
+  } else if(_pdStatsFilter==='trends'){
+    filteredPlays=plays.filter(function(e){ return e.source==='trend'||e.type==='trend'; });
+  } else {
+    filteredPlays=plays;
+  }
+  var allRes=filteredPlays.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
   var allHits=allRes.filter(function(e){ return e.result==="hit"; }).length;
   var allRate=_phRate(allHits,allRes.length);
   var d7=new Date(); d7.setDate(d7.getDate()-7);
@@ -6082,14 +6093,14 @@ function _renderPdStatsData(mount,data){
   var rate30=_phRate(r30.filter(function(e){ return e.result==="hit"; }).length,r30.length);
   /* by sport */
   var sportMap={};
-  plays.forEach(function(e){
+  filteredPlays.forEach(function(e){
     if(!sportMap[e.sport]) sportMap[e.sport]={plays:0,hits:0,misses:0,pending:0};
     var m=sportMap[e.sport]; m.plays++;
     if(e.result==="hit") m.hits++; else if(e.result==="miss") m.misses++; else if(e.result!=="void") m.pending++;
   });
   /* by market */
   var mktMap={};
-  plays.forEach(function(e){
+  filteredPlays.forEach(function(e){
     var k=e.marketDisplay||e.market||"";
     if(!mktMap[k]) mktMap[k]={plays:0,hits:0,misses:0,confSum:0,curStreak:0,bestStreak:0};
     var m=mktMap[k]; m.plays++; m.confSum+=(e.confidence||0);
@@ -6130,14 +6141,16 @@ function _renderPdStatsData(mount,data){
   _jsonML.forEach(function(e){var k=(e.player||'')+'|'+(e.date||'')+'|'+(e.game||'');if(!_mlSeen[k]){_mlSeen[k]=true;_mlAll.push(e);}});
   _lsML.forEach(function(e){var k=(e.player||'')+'|'+(e.date||'')+'|'+(e.game||'');if(!_mlSeen[k]){_mlSeen[k]=true;_mlAll.push(e);}});
   var html='<div style="padding:16px">'+
-    '<div style="display:flex;gap:6px;margin-bottom:16px">'+
-    '<button class="pill'+(_pdStatsSubView==='props'?' active':'')+'" onclick="_pdStatsSubView=\'props\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">Props</button>'+
-    '<button class="pill'+(_pdStatsSubView==='moneyline'?' active':'')+'" onclick="_pdStatsSubView=\'moneyline\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">Moneyline</button>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">'+
+    '<button class="pill'+(_pdStatsFilter==='all'?' active':'')+'" onclick="_pdStatsFilter=\'all\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">All</button>'+
+    '<button class="pill'+(_pdStatsFilter==='props'?' active':'')+'" onclick="_pdStatsFilter=\'props\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">Props</button>'+
+    '<button class="pill'+(_pdStatsFilter==='moneylines'?' active':'')+'" onclick="_pdStatsFilter=\'moneylines\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">Moneylines</button>'+
+    '<button class="pill'+(_pdStatsFilter==='trends'?' active':'')+'" onclick="_pdStatsFilter=\'trends\';_renderPdStats(document.getElementById(\'pdStatsMount\'))">Trends</button>'+
     '</div>';
-  if(_pdStatsSubView==='props'){
+  if(_pdStatsFilter!=='moneylines'){
   /* ─── HERO CARD ─── */
-  var _pdVoid=plays.filter(function(e){ return e.result==="void"; }).length;
-  var _pdRoiData=allRes.filter(function(e){ return e.odds!=null; });
+  var _pdVoid=filteredPlays.filter(function(e){ return e.result==="void"; }).length;
+  var _pdRoiData=allRes.filter(function(e){ return e.odds&&e.odds!==''; });
   var _pdRoiR=_pdRoiData.length?calcROI(_pdRoiData):{roi:0,units:0};
   html+='<div style="background:var(--surf);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-bottom:16px">';
   if(!allRes.length){
@@ -6185,7 +6198,7 @@ function _renderPdStatsData(mount,data){
     html+=_phSectionHdr("By Sport");
     html+=_phTbl(['Sport','Plays','Hits','Misses','Pending','Hit Rate','ROI'],sportKeys.map(function(s){
       var m=sportMap[s], rate=_phRate(m.hits,m.hits+m.misses);
-      var _sr=(m.hits+m.misses)>0?calcROI(plays.filter(function(e){return e.sport===s&&e.odds!=null;})):null;
+      var _sr=(m.hits+m.misses)>0?calcROI(filteredPlays.filter(function(e){return e.sport===s&&e.odds&&e.odds!=='';})):null;
       var _srStr=_sr?(_sr.roi>=0?'+':'')+_sr.roi+'%':'–';
       var _srClr=_sr?(_sr.roi>0?'var(--accent)':_sr.roi<0?'var(--red)':'var(--mut)'):'var(--mut)';
       return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+esc(s)+'</td><td style="padding:5px 8px;font-size:11px">'+m.plays+'</td>'+
@@ -6211,7 +6224,7 @@ function _renderPdStatsData(mount,data){
     html+=_phSectionHdr("By Confidence Tier");
     html+=_phTbl(['Tier','Range','Plays','Hit Rate','ROI%','Units'],TIER_DEF.map(function(t){
       var tm=tierMap[t.label], rate=_phRate(tm.hits,tm.plays);
-      var _tr=tm.plays>0?calcROI(plays.filter(function(e){var c=e.confidence||0;return c>=t.min&&c<=t.max&&e.odds!=null;})):null;
+      var _tr=tm.plays>0?calcROI(filteredPlays.filter(function(e){var c=e.confidence||0;return c>=t.min&&c<=t.max&&e.odds&&e.odds!=='';})):null;
       var _trRoiClr=_tr?(_tr.roi>0?'var(--accent)':_tr.roi<0?'var(--red)':'var(--mut)'):'var(--mut)';
       var _trUClr=_tr?(_tr.units>0?'var(--accent)':_tr.units<0?'var(--red)':'var(--mut)'):'var(--mut)';
       return '<tr><td style="padding:5px 8px;font-weight:700;font-size:11px">'+t.label+'</td>'+
@@ -6249,13 +6262,13 @@ function _renderPdStatsData(mount,data){
     html+='<div style="margin-bottom:16px"></div>';
   }
   /* player performance */
-  var s3=_phChartPlayersHtml(plays);
+  var s3=_phChartPlayersHtml(filteredPlays);
   if(s3){
     html+=_phSectionHdr("Player Performance");
     html+=s3;
     html+='<div style="margin-bottom:16px"></div>';
   }
-  html+='<div style="padding-bottom:8px;font-size:10px;color:var(--mut2)">'+plays.length+' tracked plays · data updated weekly</div>';
+  html+='<div style="padding-bottom:8px;font-size:10px;color:var(--mut2)">'+filteredPlays.length+' tracked plays · data updated weekly</div>';
   } else {
   /* ===== MONEYLINE VIEW ===== */
   var _mlRes=_mlAll.filter(function(e){return e.result==='hit'||e.result==='miss';});
