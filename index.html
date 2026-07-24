@@ -11041,6 +11041,7 @@ function renderGameTrends(trends){
   hdr.className="g5-hdr";
   hdr.innerHTML='<span class="g5-title">Top Trends</span><span class="g5-sub">\xb7 '+trends.length+' qualifying</span>';
   mount.appendChild(hdr);
+  var cardBtns=[];
   trends.forEach(function(t){
     var title=_trendCardTitle(t);
     var streakBadge=(t.streak>=3)
@@ -11068,6 +11069,7 @@ function renderGameTrends(trends){
         if(btn.disabled) return;
         _trackGameTrend(t,btn);
       };
+      cardBtns.push({t:t,btn:btn});
     }
     card.onclick=function(e){
       if(e.target.classList.contains("tc-trk-game")) return;
@@ -11075,6 +11077,21 @@ function renderGameTrends(trends){
     };
     mount.appendChild(card);
   });
+  if(cardBtns.length){
+    var taBtn=document.createElement("button");
+    taBtn.className="mini trk-btn";
+    taBtn.style.cssText="margin-left:auto";
+    taBtn.textContent="Track All";
+    taBtn.onclick=function(){
+      if(taBtn.disabled) return;
+      cardBtns.forEach(function(pair){ if(!pair.btn.disabled) _trackGameTrend(pair.t,pair.btn); });
+      taBtn.textContent="✓ All Tracked";
+      taBtn.disabled=true;
+      taBtn.classList.add("trk-done");
+      setTimeout(function(){ taBtn.textContent="Track All"; taBtn.disabled=false; taBtn.classList.remove("trk-done"); },1500);
+    };
+    hdr.appendChild(taBtn);
+  }
   var footer=document.createElement("div");
   footer.style.cssText="text-align:center;padding:4px 0 16px";
   var seeAll=document.createElement("button");
