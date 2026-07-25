@@ -6499,11 +6499,25 @@ async function renderPlayHistory(){
   });
 
   /* ── aggregate stats ── */
-  var allRes=statData.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
+  /* dedup by player+market+date when viewing all sources —
+     same bet tracked from both Best Plays and Top Trends counts once */
+  var statsData=statData;
+  if(_histType!=='plays'&&_histType!=='trends'&&_histType!=='moneylines'){
+    var _dSeen={};
+    statsData=statData.slice().sort(function(a,b){
+      var aT=a.source==='trend'?1:0,bT=b.source==='trend'?1:0;
+      return aT!==bT?aT-bT:(a.loggedAt||0)-(b.loggedAt||0);
+    }).filter(function(e){
+      var k=(e.player||'')+'|'+(e.market||'')+'|'+(e.date||'');
+      if(_dSeen[k]) return false; _dSeen[k]=true; return true;
+    });
+  }
+
+  var allRes=statsData.filter(function(e){ return e.result==="hit"||e.result==="miss"; });
   var allHits=allRes.filter(function(e){ return e.result==="hit"; }).length;
   var allRate=_phRate(allHits,allRes.length);
-  var allVoid=statData.filter(function(e){ return e.result==="void"; }).length;
-  var _heroPending=statData.filter(function(e){ return e.result==="pending"; }).length;
+  var allVoid=statsData.filter(function(e){ return e.result==="void"; }).length;
+  var _heroPending=statsData.filter(function(e){ return e.result==="pending"; }).length;
   var _roiData=allRes.filter(function(e){ return e.odds!=null; });
   var _roiR=_roiData.length?calcROI(_roiData):{roi:0,units:0};
 
@@ -6516,7 +6530,7 @@ async function renderPlayHistory(){
 
   /* ── by sport ── */
   var sportMap={};
-  statData.forEach(function(e){
+  statsData.forEach(function(e){
     if(!sportMap[e.sport]) sportMap[e.sport]={plays:0,hits:0,misses:0,pending:0};
     var m=sportMap[e.sport]; m.plays++;
     if(e.result==="hit") m.hits++; else if(e.result==="miss") m.misses++; else if(e.result!=="void") m.pending++;
@@ -6524,7 +6538,7 @@ async function renderPlayHistory(){
 
   /* ── by market ── */
   var mktMap={};
-  statData.forEach(function(e){
+  statsData.forEach(function(e){
     var k=e.marketDisplay||e.market||"";
     if(!mktMap[k]) mktMap[k]={plays:0,hits:0,misses:0,confSum:0,curStreak:0,bestStreak:0};
     var m=mktMap[k]; m.plays++; m.confSum+=(e.confidence||0);
