@@ -3925,7 +3925,9 @@ function _normLine(s){
   if(s==null||s===''||s==='\u2014') return '';
   var n=String(s).replace(/^(over|under)\s*/i,'').trim();
   var f=parseFloat(n);
-  return isNaN(f)?n.toLowerCase():String(f);
+  if(isNaN(f)) return n.toLowerCase();
+  if(f%1===0.5&&f<20) return String(Math.ceil(f));
+  return String(f);
 }
 function _isBetDuplicate(player,market,line,date,h){
   var nl=_normLine(line);
@@ -8186,7 +8188,7 @@ function calcPlayerStreakTrends(){
       source:"ESPN / MLB Game Log",
       shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" | "+hits+"-"+misses+" L"+bestN+" ("+Math.round(best*100)+"%) | "+mktLbl+" | propdeskhq.netlify.app",
       _rawVals:vals.slice(0,15),
-      _rawLine:line,
+      _rawLine:isThresh?threshLabel(line,p._market):line,
       _rawIsOver:isOver,
       _rawMarket:mktLbl,
       _r5:r5, _r10:r10, _r15:r15, _rawN:vals.length,
@@ -8263,7 +8265,7 @@ function calcPlayerHomeAwaySplitTrends(){
       shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" | "+Math.round(homeRate*100)+"% home / "+
         Math.round(awayRate*100)+"% away (L"+n+") | "+mktLbl+" | propdeskhq.netlify.app",
       _rawVals:vals.slice(0,n),
-      _rawLine:line,
+      _rawLine:isThresh?threshLabel(line,p._market):line,
       _rawIsOver:isOver,
       _rawMarket:mktLbl,
       _rawN:n,
@@ -8307,7 +8309,7 @@ function calcLineValueTrends(){
           source:"Season Stats",
           shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct.toFixed(0)+"% below season avg of "+fmtStat(sznAvg)+" ("+mktLbl+") → Over value | propdeskhq.netlify.app",
           _rawVals:p._vals?p._vals.slice(0,15):null,
-          _rawLine:line, _rawIsOver:true, _rawMarket:mktLbl,
+          _rawLine:isThreshProp(p)?threshLabel(line,p._market):line, _rawIsOver:true, _rawMarket:mktLbl,
           _game:p._game||"", _market:p._market||"", gapPct:Math.round(gapPct), playerId:p._playerId||null, odds:p.bestOdds||null
         });
       }
@@ -8333,7 +8335,7 @@ function calcLineValueTrends(){
           source:"L5 Game Log",
           shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct2.toFixed(0)+"% above L5 avg of "+fmtStat(l5Avg)+" ("+mktLbl+") → Under value | propdeskhq.netlify.app",
           _rawVals:p._vals?p._vals.slice(0,15):null,
-          _rawLine:line, _rawIsOver:false, _rawMarket:mktLbl,
+          _rawLine:isThreshProp(p)?threshLabel(line,p._market):line, _rawIsOver:false, _rawMarket:mktLbl,
           _game:p._game||"", _market:p._market||"", gapPct:Math.round(gapPct2), playerId:p._playerId||null, odds:p.bestOdds||null
         });
       }
@@ -8370,7 +8372,7 @@ function calcOddsMovementTrends(){
         detail:"Line rose at "+upBooks.join(", ")+" since loading — suggests sharp money on the Under or market adjustment. Betting into a rising line reduces Over value.",
         source:"Live Line Movement",
         shareText:"PropDesk Trend: Sharp signal on "+p.player+" Under — line moved up at "+upBooks.length+" books | propdeskhq.netlify.app",
-        _game:p._game||"", _market:p._market||"", bookCount:upBooks.length, _rawLine:p.bestLine||null, _rawIsOver:false, playerId:p._playerId||null, odds:p.bestOdds||null
+        _game:p._game||"", _market:p._market||"", bookCount:upBooks.length, _rawLine:isThreshProp(p)&&p.bestLine?threshLabel(p.bestLine,p._market):p.bestLine||null, _rawIsOver:false, playerId:p._playerId||null, odds:p.bestOdds||null
       });
     }
     if(downBooks.length>=2){
@@ -8388,7 +8390,7 @@ function calcOddsMovementTrends(){
         detail:"Line dropped at "+downBooks.join(", ")+" since loading — suggests sharp money on the Over or news adjustment. Falling line improves Over value.",
         source:"Live Line Movement",
         shareText:"PropDesk Trend: Sharp signal on "+p.player+" Over — line dropped at "+downBooks.length+" books | propdeskhq.netlify.app",
-        _game:p._game||"", _market:p._market||"", bookCount:downBooks.length, _rawLine:p.bestLine||null, _rawIsOver:true, playerId:p._playerId||null, odds:p.bestOdds||null
+        _game:p._game||"", _market:p._market||"", bookCount:downBooks.length, _rawLine:isThreshProp(p)&&p.bestLine?threshLabel(p.bestLine,p._market):p.bestLine||null, _rawIsOver:true, playerId:p._playerId||null, odds:p.bestOdds||null
       });
     }
   });
@@ -8410,7 +8412,7 @@ function calcOddsMovementTrends(){
         detail:p.player+" has a "+sp+"-point spread across "+p.bookCount+" sportsbooks in "+marketName(ST.market)+". Wide disagreement signals sharp positioning — take the best number available.",
         source:"Cross-Book Analysis",
         shareText:"PropDesk Trend: "+p.player+" has "+sp+"pt spread across "+p.bookCount+" books in "+marketName(ST.market)+" — sharp split | propdeskhq.netlify.app",
-        _game:p._game||"", _market:p._market||"", bookCount:p.bookCount, _rawLine:p.bestLine||null, _rawIsOver:null, playerId:p._playerId||null, odds:p.bestOdds||null
+        _game:p._game||"", _market:p._market||"", bookCount:p.bookCount, _rawLine:isThreshProp(p)&&p.bestLine?threshLabel(p.bestLine,p._market):p.bestLine||null, _rawIsOver:null, playerId:p._playerId||null, odds:p.bestOdds||null
       });
     });
   return trends;
@@ -8577,7 +8579,7 @@ async function calcPlayerMatchupTrends(){
       detail:"Real per-game matchup data from MLB boxscores — "+best.n+" games this season matched this exact situation ("+best.label+"). "+best.hits+" hits, "+(best.n-best.hits)+" misses.",
       source:"MLB Stats API — Boxscore Matchup Data",
       shareText:"PropDesk Trend: "+p.player+" "+best.label+" → "+lineLabel+" "+best.hits+"-"+(best.n-best.hits)+" ("+Math.round(best.rate*100)+"%) | propdeskhq.netlify.app",
-      _game:p._game||"", _market:p._market||"", _rawLine:line, _rawIsOver:isOver, playerId:p._playerId||null, odds:p.bestOdds||null
+      _game:p._game||"", _market:p._market||"", _rawLine:isThresh?threshLabel(line,p._market):line, _rawIsOver:isOver, playerId:p._playerId||null, odds:p.bestOdds||null
     });
   }
   return trends;
