@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PropDesk Content Studio</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#e8e8e8;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:14px;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button,input,textarea,select{font-family:inherit;cursor:pointer}
+input,textarea{cursor:text}
+
+/* Gate */
+#gate{position:fixed;inset:0;background:#0d0d0d;display:flex;align-items:center;justify-content:center;z-index:999}
+.gate-card{background:#1a1a1a;border:1px solid #252525;border-radius:16px;padding:32px 28px;width:300px;text-align:center}
+#pwInput{width:100%;background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#e8e8e8;font-size:14px;outline:none;margin-bottom:10px;cursor:text}
+#pwInput:focus{border-color:#00e87a55}
+
+/* Layout */
+#main{display:none;max-width:1140px;margin:0 auto;padding:24px 16px 64px}
+.cs-layout{display:grid;grid-template-columns:1fr 500px;gap:24px;align-items:start}
+@media(max-width:920px){.cs-layout{grid-template-columns:1fr}}
+@media(max-width:480px){
+  #main{padding:14px 10px 48px}
+  .panel{padding:12px}
+  .picks-wrap{max-height:220px}
+}
+
+/* Panels */
+.panel{background:#141414;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:12px}
+.panel:last-child{margin-bottom:0}
+.slabel{font-size:10px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;display:block}
+
+/* Pills */
+.pill{border-radius:20px;padding:5px 13px;font-size:12px;font-weight:600;border:1px solid #252525;background:transparent;color:#555;transition:.12s;white-space:nowrap}
+.pill.on{background:#0e1e0e;color:#00e87a;border-color:#00e87a44}
+.pill:hover:not(.on){color:#aaa;border-color:#333}
+
+/* Buttons */
+.btn{border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;border:1px solid #2a2a2a;background:#1a1a1a;color:#888;transition:.12s}
+.btn:hover:not(:disabled){color:#e8e8e8;border-color:#444}
+.btn:disabled{opacity:.35;cursor:default}
+.btn.accent{background:#00e87a;color:#000;border-color:transparent}
+.btn.accent:hover:not(:disabled){background:#00d068}
+.btn.sm{padding:4px 9px;font-size:11px}
+.fmt-btn{border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;border:1px solid #252525;background:transparent;color:#555;transition:.12s}
+.fmt-btn.on{background:#1a1a1a;color:#e8e8e8;border-color:#444}
+
+/* Pick list */
+.picks-wrap{max-height:300px;overflow-y:auto;margin-top:6px}
+.pick-row{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid #1b1b1b;cursor:pointer;transition:background .1s}
+.pick-row:last-child{border-bottom:none}
+.pick-row:hover{background:#1a1a1a}
+.pick-row.sel{background:#0a1a0a}
+.pick-row input[type=checkbox]{accent-color:#00e87a;width:14px;height:14px;flex-shrink:0;cursor:pointer}
+.p-name{font-size:13px;font-weight:600;color:#ddd;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.p-line{font-size:12px;color:#00e87a;white-space:nowrap;flex-shrink:0}
+.p-conf{font-size:11px;color:#555;white-space:nowrap;flex-shrink:0;min-width:30px;text-align:right}
+.p-res{font-size:9px;font-weight:800;padding:2px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0;text-transform:uppercase;letter-spacing:.04em}
+.p-res.hit{background:#0e2818;color:#22c55e}
+.p-res.miss{background:#2e0e0e;color:#ef4444}
+.p-res.pending{background:#1a1a1a;color:#444}
+
+/* Sync bar */
+.sync-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#111;border:1px solid #1a1a1a;border-radius:8px;margin-top:8px}
+
+/* Preview */
+.prev-outer{background:#0e0e0e;border:1px solid #1a1a1a;border-radius:10px;display:flex;align-items:flex-start;justify-content:center;padding:20px;transition:min-height .2s;overflow:hidden}
+.prev-container{position:relative;overflow:hidden;flex-shrink:0}
+#prev-inner{position:absolute;top:0;left:0;transform-origin:top left}
+
+/* Caption */
+.cap-ta{width:100%;background:#111;border:1px solid #252525;border-radius:8px;padding:11px 12px;color:#e0e0e0;font-size:13px;line-height:1.65;resize:vertical;outline:none;min-height:86px;margin-top:6px}
+.cap-ta:focus{border-color:#00e87a44}
+
+/* Misc */
+.cs-empty{color:#333;font-size:12px;text-align:center;padding:32px 0}
+#act-status{font-size:11px;color:#00e87a;text-align:center;min-height:16px;margin-top:6px}
+</style>
+</head>
+<body>
+
+<!-- ═══ GATE ══════════════════════════════════════════════════════ -->
+<div id="gate">
+  <div class="gate-card">
+    <div style="font-size:19px;font-weight:800;color:#fff;margin-bottom:3px">PROP<span style="color:#00e87a">DESK</span></div>
+    <div style="font-size:11px;color:#444;margin-bottom:24px;letter-spacing:.08em;text-transform:uppercase">Content Studio</div>
+    <input id="pwInput" type="password" placeholder="Password" autocomplete="current-password">
+    <button onclick="checkPw()" style="width:100%;background:#00e87a;color:#000;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:700">Enter</button>
+    <div id="pwErr" style="font-size:12px;color:#ef4444;margin-top:8px;display:none">Incorrect password</div>
+  </div>
+</div>
+
+<!-- ═══ MAIN ═══════════════════════════════════════════════════════ -->
+<div id="main">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px">
+    <div>
+      <h1 style="font-size:20px;font-weight:800;color:#fff">PROP<span style="color:#00e87a">DESK</span> <span style="font-size:13px;font-weight:400;color:#444">Content Studio</span></h1>
+      <p style="font-size:12px;color:#333;margin-top:2px">Generate branded social graphics from your tracked picks</p>
+    </div>
+    <a href="index.html" style="font-size:12px;color:#444;padding:6px 12px;border:1px solid #252525;border-radius:6px">&#8592; Back to PropDesk</a>
+  </div>
+
+  <div class="cs-layout">
+
+    <!-- ─── LEFT ─────────────────────────────────────────────────── -->
+    <div>
+      <!-- Date filter -->
+      <div class="panel">
+        <span class="slabel">Date Filter</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="date-pills">
+          <button class="pill on" data-f="today" onclick="setDateFilter('today',this)">Today</button>
+          <button class="pill" data-f="yesterday" onclick="setDateFilter('yesterday',this)">Yesterday</button>
+          <button class="pill" data-f="week" onclick="setDateFilter('week',this)">Last 7 Days</button>
+          <button class="pill" data-f="all" onclick="setDateFilter('all',this)">All</button>
+        </div>
+        <div class="sync-bar">
+          <span id="sync-status" style="font-size:11px;color:#3a3a3a;flex:1">Local storage</span>
+          <span id="sync-count" style="font-size:11px;color:#555;white-space:nowrap"></span>
+          <button class="btn sm" id="sync-btn" onclick="syncSupabase()">Sync Supabase</button>
+        </div>
+      </div>
+
+      <!-- Template selector -->
+      <div class="panel">
+        <span class="slabel">Post Type</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px" id="tmpl-pills"></div>
+        <div id="tmpl-hint" style="font-size:11px;color:#3a3a3a;margin-top:7px"></div>
+      </div>
+
+      <!-- Pick list -->
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+          <span class="slabel" style="margin:0">Select Picks</span>
+          <div style="display:flex;gap:5px">
+            <button class="btn sm" onclick="selectAll()">All</button>
+            <button class="btn sm" onclick="selectNone()">None</button>
+          </div>
+        </div>
+        <div id="pick-count" style="font-size:11px;color:#3a3a3a;margin-bottom:4px"></div>
+        <div class="picks-wrap" id="pick-list"><div class="cs-empty">Loading&hellip;</div></div>
+      </div>
+    </div>
+
+    <!-- ─── RIGHT ────────────────────────────────────────────────── -->
+    <div>
+      <!-- Preview -->
+      <div class="panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span class="slabel" style="margin:0">Preview</span>
+          <div style="display:flex;gap:4px">
+            <button class="fmt-btn on" data-fmt="square" onclick="setFormat('square',this)">1080&times;1080</button>
+            <button class="fmt-btn" data-fmt="wide" onclick="setFormat('wide',this)">1080&times;600</button>
+          </div>
+        </div>
+        <div class="prev-outer" id="prev-outer">
+          <div class="prev-container" id="prev-container">
+            <div id="prev-inner"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Caption -->
+      <div class="panel">
+        <span class="slabel">Caption</span>
+        <textarea class="cap-ta" id="cap-ta" placeholder="Select a pick to generate a caption&hellip;" spellcheck="false"></textarea>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:8px">
+        <button id="dl-btn" class="btn accent" style="flex:1" onclick="downloadPNG()">&darr; Download PNG</button>
+        <button class="btn" style="flex:1" onclick="copyCaption()">&#10063; Copy Caption</button>
+      </div>
+      <div id="act-status"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Off-screen capture target for html2canvas -->
+<div id="card-render" style="position:absolute;left:-9999px;top:0;width:540px;height:540px;overflow:hidden"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
+
+/* ─── Config ──────────────────────────────────────────────────────────────── */
+var PLAY_HIST_KEY = 'propdesk_user_plays';
+var SUPABASE_URL  = 'https://xwmvkfhlfntjgouibftt.supabase.co';
+var SUPABASE_KEY  = 'sb_publishable_RKjp7WAmXRR7YXxyu1zHIQ_MEBWPDQw';
+var PASSWORD      = 'propdeskowner1';
+var BRAND_URL     = 'thepropdesk.org';
+
+/* ─── State ───────────────────────────────────────────────────────────────── */
+var allPicks      = [];
+var filteredPicks = [];
+var selectedIds   = new Set();
+var activeTmplId  = 'single-pick';
+var activeFormat  = 'square';
+var dateFilter    = 'today';
+var _sb           = null;
+
+/* ─── Util helpers ────────────────────────────────────────────────────────── */
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function yesterdayISO(){ return new Date(Date.now()-86400000).toISOString().slice(0,10); }
+
+function fmtDateShort(iso){
+  if(!iso) return '';
+  var d=new Date(iso+'T12:00:00');
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+}
+
+function tierColors(tier){
+  var m={ELITE:{bg:'#1e1040',c:'#a78bfa'},GREAT:{bg:'#0e2818',c:'#22c55e'},GOOD:{bg:'#0e1e38',c:'#3b82f6'},VALUE:{bg:'#2a1e08',c:'#f59e0b'}};
+  return m[tier]||{bg:'#1a1a1a',c:'#666'};
+}
+
+function trendAccentColor(pick){
+  var raw=(pick.trendType||pick.trendSystem||'').toLowerCase();
+  if(raw==='linevalue'||raw==='line value') return '#06b6d4';
+  if(raw==='streak') return '#f59e0b';
+  if(raw==='homeway'||raw==='home/away split'||raw==='home/away') return '#f472b6';
+  if(raw==='movement'||raw==='sharp money') return '#84cc16';
+  if(raw==='matchup'||raw==='matchup system') return '#a78bfa';
+  if(raw==='bullpen'||raw==='bullpen fatigue') return '#ef4444';
+  if(raw==='nrfi'||raw==='first inning') return '#fb923c';
+  if(raw==='game total') return '#38bdf8';
+  if(raw==='team system') return '#818cf8';
+  return '#00e87a';
+}
+
+function trendTypeLabel(pick){
+  var MAP={
+    streak:'STREAK',homeway:'HOME/AWAY',linevalue:'LINE VALUE',
+    movement:'SHARP MONEY',matchup:'MATCHUP',
+    'streak':'STREAK','home/away split':'HOME/AWAY','line value':'LINE VALUE',
+    'sharp money':'SHARP MONEY','bullpen fatigue':'BULLPEN','bullpen':'BULLPEN',
+    'team system':'TEAM SYSTEM','first inning':'NRFI','game total':'GAME TOTAL',nrfi:'NRFI',
+    'matchup system':'MATCHUP'
+  };
+  var raw=((pick.trendType||pick.trendSystem)||'trend').toLowerCase();
+  return (MAP[raw]||raw.toUpperCase()).slice(0,18);
+}
+
+/* ─── Card sub-elements (inline styles only — no CSS vars) ───────────────── */
+function _wordmark(sz){
+  var s=sz||13;
+  return '<span style="font-size:'+s+'px;font-weight:800;letter-spacing:.12em;color:#00e87a;text-transform:uppercase">PROP<span style="color:#fff">DESK</span></span>';
+}
+
+function _tierBadge(tier){
+  if(!tier) return '';
+  var t=tierColors(tier);
+  return '<span style="background:'+t.bg+';color:'+t.c+';font-size:9px;font-weight:800;padding:3px 7px;border-radius:4px;letter-spacing:.06em;text-transform:uppercase">'+esc(tier)+'</span>';
+}
+
+function _sportBadge(sport){
+  if(!sport) return '';
+  return '<span style="background:#1a1a1a;color:#555;font-size:9px;font-weight:700;padding:3px 7px;border-radius:4px;letter-spacing:.06em;border:1px solid #2a2a2a">'+esc(sport)+'</span>';
+}
+
+function _confBar(conf, barW){
+  var pct=Math.min(100,Math.max(0,conf||0));
+  var filled=Math.round(pct*(barW||476)/100);
+  var c=pct>=80?'#00e87a':pct>=65?'#f59e0b':'#ef4444';
+  return '<div style="height:5px;width:'+(barW||476)+'px;background:#222;border-radius:3px;overflow:hidden"><div style="height:5px;width:'+filled+'px;background:'+c+';border-radius:3px"></div></div>';
+}
+
+/* ─── Empty card ──────────────────────────────────────────────────────────── */
+function _emptyCard(fmt){
+  var h=fmt==='wide'?300:540;
+  return '<div style="width:540px;height:'+h+'px;background:#0a0a0a;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif"><div style="text-align:center;color:#2a2a2a"><div style="font-size:26px;margin-bottom:8px">&#128241;</div><div style="font-size:12px">No pick selected</div></div></div>';
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   TEMPLATE REGISTRY
+
+   To add a new post type:
+   1. Write a definition object (see interface below)
+   2. Call registerTemplate(def) — the UI discovers it automatically at init()
+
+   Interface:
+   {
+     id:       string   — unique kebab-case key
+     label:    string   — shown in pill selector
+     icon:     string   — emoji prefix on pill
+     minPicks: number   — minimum picks required (0 = autoLoad templates)
+     maxPicks: number   — maximum selectable picks
+     autoLoad: boolean  — if true, render() receives all date-filtered picks,
+                          bypassing checkbox selection (used by Recap)
+     formats:  string[] — subset of ['square','wide'] this template supports
+     render:   function(picks, format) → HTML string (inline styles ONLY)
+     caption:  function(picks) → string
+   }
+   ──────────────────────────────────────────────────────────────────────────── */
+var TEMPLATES = {};
+function registerTemplate(def){ TEMPLATES[def.id]=def; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEMPLATE MODULES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Single Pick ─────────────────────────────────────────────────────── */
+registerTemplate({
+  id:'single-pick', label:'Single Pick', icon:'🎯',
+  minPicks:1, maxPicks:1, autoLoad:false, formats:['square','wide'],
+
+  render: function(picks, fmt){
+    var p=picks[0]; if(!p) return _emptyCard(fmt);
+    var iw=(fmt==='wide'), W=540, H=iw?300:540;
+    var tc=tierColors(p.tier);
+    var nameSz=iw?28:42, lineSz=iw?20:30, barW=iw?380:476;
+    var topPad=iw?19:31;
+
+    return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;position:relative;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
+      '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00e87a"></div>'+
+      '<div style="padding:'+(topPad+3)+'px 32px 0;display:flex;justify-content:space-between;align-items:center">'+
+        _wordmark(iw?11:13)+
+        '<div style="display:flex;gap:5px;align-items:center">'+_tierBadge(p.tier)+_sportBadge(p.sport)+'</div>'+
+      '</div>'+
+      '<div style="padding:'+(iw?12:22)+'px 32px 0;font-size:'+nameSz+'px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+'</div>'+
+      '<div style="padding:'+(iw?5:8)+'px 32px 0;font-size:'+lineSz+'px;font-weight:700;color:#00e87a;letter-spacing:-.2px">'+esc(p.line||'')+'</div>'+
+      '<div style="padding:'+(iw?12:22)+'px 32px 0">'+
+        '<div style="background:#111;border:1px solid #1a1a1a;border-radius:10px;padding:'+(iw?10:14)+'px 16px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px">'+
+            '<span style="font-size:10px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:.08em">Confidence</span>'+
+            '<span style="font-size:'+(iw?22:30)+'px;font-weight:800;color:#fff;line-height:1">'+(p.confidence||'&mdash;')+'%</span>'+
+          '</div>'+
+          _confBar(p.confidence, barW)+
+        '</div>'+
+      '</div>'+
+      '<div style="padding:'+(iw?8:14)+'px 32px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+        (p.game?'<span style="font-size:12px;color:#555">'+esc(p.game)+'</span><span style="color:#1e1e1e">&middot;</span>':'')+
+        (p.odds?'<span style="font-size:13px;font-weight:700;color:#888">'+esc(p.odds)+'</span><span style="color:#1e1e1e">&middot;</span>':'')+
+        '<span style="font-size:11px;color:#444">'+esc(p.marketDisplay||p.market||'')+'</span>'+
+      '</div>'+
+      '<div style="position:absolute;bottom:0;left:0;right:0;background:#0a0a0a;padding:'+(iw?10:12)+'px 32px '+(iw?14:18)+'px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-size:10px;color:#252525;letter-spacing:.06em;text-transform:uppercase">'+BRAND_URL+'</span>'+
+        '<span style="font-size:10px;color:#252525">'+(p.date||todayISO())+'</span>'+
+      '</div>'+
+    '</div>';
+  },
+
+  caption: function(picks){
+    var p=picks[0]; if(!p) return '';
+    var parts=[];
+    parts.push((p.tier?p.tier+' PLAY: ':'PLAY: ')+p.player+' \u2014 '+(p.line||''));
+    if(p.marketDisplay||p.market) parts[0]+=' ('+(p.marketDisplay||p.market)+')';
+    var det=[];
+    if(p.game) det.push(p.game);
+    if(p.confidence) det.push(p.confidence+'% confidence');
+    if(p.odds) det.push(p.odds);
+    if(det.length) parts.push(det.join(' | '));
+    parts.push('\nWe show our work. \ud83d\udcca');
+    parts.push('#PropDesk #SportsProps'+(p.sport?' #'+p.sport:''));
+    return parts.join('\n');
+  }
+});
+
+/* ── 2. Multi-Pick Board ────────────────────────────────────────────────── */
+registerTemplate({
+  id:'multi-board', label:'Multi Board', icon:'📋',
+  minPicks:2, maxPicks:5, autoLoad:false, formats:['square'],
+
+  render: function(picks, fmt){
+    if(!picks.length) return _emptyCard(fmt);
+    var W=540, H=540;
+    var sports={};
+    picks.forEach(function(p){ if(p.sport) sports[p.sport]=(sports[p.sport]||0)+1; });
+    var sport=Object.keys(sports).sort(function(a,b){return sports[b]-sports[a];})[0]||'';
+
+    var rows=picks.slice(0,5).map(function(p){
+      var tc=tierColors(p.tier);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #141414">'+
+        '<div style="width:6px;height:6px;border-radius:50%;background:#00e87a;flex-shrink:0"></div>'+
+        '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+'</div>'+
+        '<div style="font-size:12px;color:#00e87a;white-space:nowrap;flex-shrink:0">'+esc(p.line||'')+'</div>'+
+        '<div style="font-size:11px;font-weight:700;color:#aaa;white-space:nowrap;flex-shrink:0">'+(p.confidence||'&mdash;')+'%</div>'+
+        '<div style="background:'+tc.bg+';color:'+tc.c+';font-size:8px;font-weight:800;padding:2px 5px;border-radius:3px;letter-spacing:.05em;flex-shrink:0">'+esc(p.tier||'')+'</div>'+
+      '</div>';
+    }).join('');
+
+    return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;position:relative;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
+      '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00e87a"></div>'+
+      '<div style="padding:34px 32px 0;display:flex;justify-content:space-between;align-items:center">'+
+        _wordmark(13)+
+        '<div style="display:flex;gap:5px;align-items:center">'+
+          '<span style="background:#111;border:1px solid #252525;color:#00e87a;font-size:9px;font-weight:800;padding:3px 7px;border-radius:4px;letter-spacing:.04em">'+picks.length+' PLAYS</span>'+
+          _sportBadge(sport)+
+        '</div>'+
+      '</div>'+
+      '<div style="padding:20px 32px 0">'+
+        '<div style="font-size:11px;font-weight:800;color:#444;text-transform:uppercase;letter-spacing:.12em;margin-bottom:2px">Today\'s Board</div>'+
+        '<div style="height:1px;background:#1a1a1a;margin:10px 0 0"></div>'+
+        rows+
+      '</div>'+
+      '<div style="position:absolute;bottom:0;left:0;right:0;background:#0a0a0a;padding:12px 32px 18px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-size:10px;color:#252525;letter-spacing:.06em;text-transform:uppercase">'+BRAND_URL+'</span>'+
+        '<span style="font-size:10px;color:#252525">'+todayISO()+'</span>'+
+      '</div>'+
+    '</div>';
+  },
+
+  caption: function(picks){
+    var sport=picks[0]&&picks[0].sport||'';
+    var lines=picks.slice(0,5).map(function(p){
+      return (p.player||p.team||'')+' '+esc(p.line||'')+' ('+(p.confidence||'?')+'%)';
+    });
+    return '\ud83d\udccb TODAY\'S BOARD ('+picks.length+' plays)'+( sport?' | '+sport:'')+'\n\n'+lines.join('\n')+'\n\nAll picks backed by data. \ud83d\udcca\n\n#PropDesk'+(sport?' #'+sport:'');
+  }
+});
+
+/* ── 3. Recap ───────────────────────────────────────────────────────────── */
+registerTemplate({
+  id:'recap', label:'Recap', icon:'📊',
+  minPicks:0, maxPicks:99, autoLoad:true, formats:['square','wide'],
+
+  render: function(picks, fmt){
+    var iw=(fmt==='wide'), W=540, H=iw?300:540;
+    var yest=yesterdayISO();
+    var dated=picks.filter(function(p){ return p.date===yest; });
+    var graded=dated.filter(function(p){ return p.result==='hit'||p.result==='miss'; });
+    var hits=graded.filter(function(p){ return p.result==='hit'; }).length;
+    var total=graded.length;
+    var rate=total>0?Math.round(hits/total*100):null;
+
+    if(!dated.length){
+      return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif"><div style="text-align:center;color:#2a2a2a;font-size:13px">No plays found for yesterday</div></div>';
+    }
+
+    var topHits=dated.filter(function(p){ return p.result==='hit'; }).slice(0,iw?2:3).map(function(p){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #141414">'+
+        '<div style="width:5px;height:5px;border-radius:50%;background:#00e87a;flex-shrink:0"></div>'+
+        '<div style="flex:1;font-size:11px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+' '+esc(p.line||'')+'</div>'+
+        '<div style="font-size:10px;font-weight:800;color:#00e87a">HIT &#10003;</div>'+
+      '</div>';
+    }).join('');
+
+    return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;position:relative;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
+      '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00e87a"></div>'+
+      '<div style="padding:'+(iw?19:31)+'px 32px 0;display:flex;justify-content:space-between;align-items:center">'+
+        _wordmark(iw?11:13)+
+        '<span style="font-size:10px;font-weight:700;color:#3a3a3a;text-transform:uppercase;letter-spacing:.08em">'+fmtDateShort(yest)+'</span>'+
+      '</div>'+
+      '<div style="padding:'+(iw?10:16)+'px 32px 0;font-size:'+(iw?10:11)+'px;font-weight:800;color:#3a3a3a;text-transform:uppercase;letter-spacing:.12em">Yesterday\'s Results</div>'+
+      '<div style="padding:'+(iw?10:16)+'px 32px 0;display:flex;align-items:flex-end;gap:20px">'+
+        '<div>'+
+          '<div style="font-size:'+(iw?52:68)+'px;font-weight:900;color:#fff;line-height:1;letter-spacing:-2px">'+hits+'-'+(total-hits)+'</div>'+
+          '<div style="font-size:10px;color:#3a3a3a;margin-top:4px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Record</div>'+
+        '</div>'+
+        (rate!==null?
+          '<div style="padding-bottom:'+(iw?4:10)+'px">'+
+            '<div style="font-size:'+(iw?28:38)+'px;font-weight:800;color:#00e87a;line-height:1">'+rate+'%</div>'+
+            '<div style="font-size:10px;color:#3a3a3a;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Win Rate</div>'+
+          '</div>'
+        :'')+
+      '</div>'+
+      (topHits?'<div style="padding:'+(iw?8:14)+'px 32px 0">'+topHits+'</div>':'')+
+      '<div style="position:absolute;bottom:0;left:0;right:0;background:#0a0a0a;padding:'+(iw?10:12)+'px 32px '+(iw?12:18)+'px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-size:10px;color:#252525;letter-spacing:.06em;text-transform:uppercase">'+BRAND_URL+'</span>'+
+        '<span style="font-size:10px;color:#252525">'+todayISO()+'</span>'+
+      '</div>'+
+    '</div>';
+  },
+
+  caption: function(picks){
+    var yest=yesterdayISO();
+    var graded=picks.filter(function(p){ return p.date===yest&&(p.result==='hit'||p.result==='miss'); });
+    var hits=graded.filter(function(p){ return p.result==='hit'; }).length;
+    var miss=graded.length-hits;
+    var rate=graded.length>0?Math.round(hits/graded.length*100):null;
+    return '\ud83d\udcca Yesterday\'s board: '+hits+'-'+miss+(rate!==null?' ('+rate+'% win rate)':'')+'\n\nProps over gut picks. Every play is backed by data and numbers.\n\n#PropDesk #SportsProps';
+  }
+});
+
+/* ── 4. Streak Spotlight ────────────────────────────────────────────────── */
+registerTemplate({
+  id:'streak-spotlight', label:'Streak Spotlight', icon:'🔥',
+  minPicks:1, maxPicks:1, autoLoad:false, formats:['square'],
+
+  render: function(picks, fmt){
+    var p=picks[0]; if(!p) return _emptyCard(fmt);
+    var W=540, H=540;
+    var tc=tierColors(p.tier);
+    var rec=p.trendRecord||'';
+    var wr=p.trendWinRate!=null?Math.round(p.trendWinRate*100):null;
+    var samp=p.trendSampleSize||null;
+    var recMatch=rec.match(/^(\d+)-(\d+)/);
+    var recBig=recMatch?recMatch[0]:rec;
+    var recSub=recMatch&&samp?'L'+samp+' GAMES':'';
+
+    return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;position:relative;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
+      '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#f59e0b"></div>'+
+      '<div style="padding:34px 32px 0;display:flex;justify-content:space-between;align-items:center">'+
+        _wordmark(13)+
+        '<div style="display:flex;gap:5px;align-items:center">'+
+          '<span style="background:#2a1808;color:#f59e0b;font-size:9px;font-weight:800;padding:3px 7px;border-radius:4px;letter-spacing:.06em">&#128293; STREAK</span>'+
+          _sportBadge(p.sport)+
+        '</div>'+
+      '</div>'+
+      '<div style="padding:22px 32px 0;font-size:40px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+'</div>'+
+      '<div style="padding:7px 32px 0;font-size:24px;font-weight:700;color:#00e87a;letter-spacing:-.2px">'+esc(p.line||'')+'</div>'+
+      '<div style="padding:24px 32px 0;display:flex;align-items:flex-end;gap:24px">'+
+        '<div>'+
+          '<div style="font-size:58px;font-weight:900;color:#fff;line-height:1;letter-spacing:-1.5px">'+esc(recBig)+'</div>'+
+          (recSub?'<div style="font-size:11px;font-weight:700;color:#3a3a3a;letter-spacing:.1em;text-transform:uppercase;margin-top:5px">'+esc(recSub)+'</div>':'')+
+        '</div>'+
+        (wr!==null?
+          '<div style="padding-bottom:8px">'+
+            '<div style="font-size:34px;font-weight:800;color:#f59e0b;line-height:1">'+wr+'%</div>'+
+            '<div style="font-size:10px;color:#3a3a3a;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Hit Rate</div>'+
+          '</div>'
+        :'')+
+      '</div>'+
+      '<div style="padding:20px 32px 0">'+
+        _confBar(p.confidence,476)+
+        '<div style="display:flex;justify-content:space-between;margin-top:6px;align-items:center">'+
+          '<span style="font-size:11px;color:#3a3a3a">Confidence: '+(p.confidence||'&mdash;')+'%'+(p.odds?' &middot; '+esc(p.odds):'')+'</span>'+
+          '<span style="background:'+tc.bg+';color:'+tc.c+';font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;letter-spacing:.05em">'+esc(p.tier||'')+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="position:absolute;bottom:0;left:0;right:0;background:#0a0a0a;padding:12px 32px 18px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-size:10px;color:#252525;letter-spacing:.06em;text-transform:uppercase">'+BRAND_URL+'</span>'+
+        '<span style="font-size:10px;color:#252525">'+(p.date||todayISO())+'</span>'+
+      '</div>'+
+    '</div>';
+  },
+
+  caption: function(picks){
+    var p=picks[0]; if(!p) return '';
+    var wr=p.trendWinRate!=null?Math.round(p.trendWinRate*100):null;
+    var samp=p.trendSampleSize||null;
+    return '\ud83d\udd25 STREAK: '+(p.player||p.team||'')+' \u2014 '+(p.line||'')+
+      '\n'+(p.trendRecord||'')+(samp?' in the last '+samp+' games':'')+
+      (wr!==null?' ('+wr+'% hit rate)':'')+
+      '\n\nThe data doesn\'t lie. \ud83d\udcca\n\n#PropDesk'+(p.sport?' #'+p.sport:'');
+  }
+});
+
+/* ── 5. Trends ──────────────────────────────────────────────────────────────
+   Handles ANY trendType: streak, homeway, linevalue, movement, matchup,
+   BULLPEN, NRFI, GAME TOTAL, TEAM SYSTEM, etc.
+   Layout: top bar color-coded by type · type badge inside description panel ·
+           player + market · description text · record tile · conf bar + footer
+   ─────────────────────────────────────────────────────────────────────────── */
+registerTemplate({
+  id:'trends', label:'Trends', icon:'📈',
+  minPicks:1, maxPicks:1, autoLoad:false, formats:['square','wide'],
+
+  render: function(picks, fmt){
+    var p=picks[0]; if(!p) return _emptyCard(fmt);
+    var iw=(fmt==='wide'), W=540, H=iw?300:540;
+    var accent=trendAccentColor(p);
+    var typeLabel=trendTypeLabel(p);
+    var tc=tierColors(p.tier);
+    var nameSz=iw?26:36;
+    var barW=iw?380:476;
+    var topPad=iw?19:31;
+    var descMax=iw?90:165;
+    var rawDesc=p.trendDescription||p.trendSignal||'';
+    var desc=rawDesc.length>descMax?rawDesc.slice(0,descMax-1)+'\u2026':rawDesc;
+    var rec=p.trendRecord||'';
+    var wr=p.trendWinRate!=null?Math.round(p.trendWinRate*100):null;
+    var samp=p.trendSampleSize||null;
+    var market=p.marketDisplay||p.market||'';
+
+    var recSection=rec?
+      '<div style="margin:'+(iw?8:14)+'px 32px 0;background:#111;border:1px solid #1a1a1a;border-radius:8px;padding:'+(iw?9:12)+'px 16px;display:flex;align-items:center;justify-content:space-between">'+
+        '<div>'+
+          '<div style="font-size:9px;font-weight:700;color:#3a3a3a;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">Record</div>'+
+          '<div style="font-size:'+(iw?14:18)+'px;font-weight:800;color:#fff">'+esc(rec)+'</div>'+
+        '</div>'+
+        (wr!==null?
+          '<div style="text-align:right">'+
+            '<div style="font-size:9px;font-weight:700;color:#3a3a3a;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">Hit Rate</div>'+
+            '<div style="font-size:'+(iw?14:18)+'px;font-weight:800;color:'+accent+'">'+wr+'%</div>'+
+          '</div>'
+        :(samp?'<div style="font-size:11px;color:#555">'+samp+' games</div>':''))+
+      '</div>'
+    :'';
+
+    return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;position:relative;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
+      '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+accent+'"></div>'+
+      '<div style="padding:'+(topPad+3)+'px 32px 0;display:flex;justify-content:space-between;align-items:center">'+
+        _wordmark(iw?11:13)+
+        '<div style="display:flex;gap:5px;align-items:center">'+_tierBadge(p.tier)+_sportBadge(p.sport)+'</div>'+
+      '</div>'+
+      '<div style="padding:'+(iw?10:18)+'px 32px 0">'+
+        '<div style="font-size:'+nameSz+'px;font-weight:800;color:#fff;letter-spacing:-.4px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+'</div>'+
+        (market?'<div style="font-size:'+(iw?12:14)+'px;color:#555;margin-top:3px;font-weight:400">'+esc(market)+'</div>':'')+
+      '</div>'+
+      '<div style="margin:'+(iw?8:14)+'px 32px 0;background:'+accent+'14;border:1px solid '+accent+'28;border-radius:10px;padding:'+(iw?10:14)+'px">'+
+        '<div style="display:inline-block;background:'+accent+'22;border:1px solid '+accent+'44;color:'+accent+';font-size:8px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:'+(iw?5:8)+'px">'+esc(typeLabel)+'</div>'+
+        (desc?'<div style="font-size:'+(iw?11:13)+'px;color:#ccc;line-height:1.5;font-weight:400">'+esc(desc)+'</div>':'<div style="font-size:11px;color:#333;font-style:italic">No description available</div>')+
+      '</div>'+
+      recSection+
+      '<div style="padding:'+(iw?8:12)+'px 32px 0">'+
+        _confBar(p.confidence,barW)+
+        '<div style="display:flex;justify-content:space-between;margin-top:5px;align-items:center">'+
+          '<span style="font-size:10px;color:#3a3a3a">'+(p.confidence||'&mdash;')+'% confidence'+(p.odds?' &middot; '+esc(p.odds):'')+'</span>'+
+          '<span style="background:'+tc.bg+';color:'+tc.c+';font-size:8px;font-weight:800;padding:2px 5px;border-radius:3px;letter-spacing:.05em">'+esc(p.tier||'')+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="position:absolute;bottom:0;left:0;right:0;background:#0a0a0a;padding:'+(iw?10:12)+'px 32px '+(iw?12:18)+'px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-size:10px;color:#252525;letter-spacing:.06em;text-transform:uppercase">'+BRAND_URL+'</span>'+
+        '<span style="font-size:10px;color:#252525">'+(p.date||todayISO())+'</span>'+
+      '</div>'+
+    '</div>';
+  },
+
+  caption: function(picks){
+    var p=picks[0]; if(!p) return '';
+    var typeLabel=trendTypeLabel(p);
+    var market=p.marketDisplay||p.market||'';
+    var rec=p.trendRecord||'';
+    var rawDesc=p.trendDescription||p.trendSignal||'';
+    var firstSent=rawDesc.split('.')[0];
+    return '\ud83d\udcc8 '+typeLabel+': '+(p.player||p.team||'')+(market?' ('+market+')':'')+
+      (firstSent?'\n'+firstSent:'')+
+      '\n'+(p.confidence||'&mdash;')+'% confidence'+(rec?' | Record: '+rec:'')+
+      '\n\nData-driven picks, every day. \ud83d\udcca\n\n#PropDesk'+(p.sport?' #'+p.sport:'');
+  }
+});
+
+/* ── 6. Moneyline ───────────────────────────────────────────────────────── */
+registerTemplate({
+  id:'moneyline', label:'Moneyline', icon:'💰',
+  minPicks:1, maxPicks:1, autoLoad:false, formats:['square','wide'],
+
+  render: function(picks, fmt){
+    var p=picks[0]; if(!p) return _emptyCard(fmt);
+    var iw=(fmt==='wide'), W=540, H=iw?300:540;
+    var tc=tierColors(p.tier);
+    var team=p.player||p.team||'';
+    var opponent=(p.game||'').replace(new RegExp(team.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'),'').replace(/^\s*vs\.?\s*/i,'').trim();
+    var odds=p.odds||'';
+    var oddsNum=parseInt((odds||'').replace(/[^0-9\-+]/g,''),10);
+    var oddsColor=(!isNaN(oddsNum)&&oddsNum>0)?'#00e87a':'#e8e8e8';
+
+    return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;position:relative;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
+      '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00e87a"></div>'+
+      '<div style="padding:'+(iw?19:31)+'px 32px 0;display:flex;justify-content:space-between;align-items:center">'+
+        _wordmark(iw?11:13)+
+        '<div style="display:flex;gap:5px;align-items:center">'+
+          '<span style="background:#111;border:1px solid #252525;color:#888;font-size:9px;font-weight:800;padding:3px 7px;border-radius:4px;letter-spacing:.06em">ML</span>'+
+          _sportBadge(p.sport)+
+        '</div>'+
+      '</div>'+
+      '<div style="padding:'+(iw?14:26)+'px 32px 0">'+
+        '<div style="font-size:11px;font-weight:700;color:#3a3a3a;text-transform:uppercase;letter-spacing:.12em;margin-bottom:'+(iw?8:10)+'px">Moneyline</div>'+
+        '<div style="font-size:'+(iw?30:44)+'px;font-weight:900;color:#fff;letter-spacing:-.8px;line-height:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(team)+'</div>'+
+        (opponent?'<div style="font-size:'+(iw?13:15)+'px;color:#3a3a3a;margin-top:8px">vs '+esc(opponent)+'</div>':'')+
+      '</div>'+
+      '<div style="padding:'+(iw?14:24)+'px 32px 0">'+
+        '<div style="font-size:'+(iw?54:76)+'px;font-weight:900;color:'+oddsColor+';line-height:1;letter-spacing:-2px">'+esc(odds)+'</div>'+
+      '</div>'+
+      '<div style="padding:'+(iw?10:18)+'px 32px 0">'+
+        _confBar(p.confidence,iw?380:476)+
+        '<div style="display:flex;justify-content:space-between;margin-top:5px">'+
+          '<span style="font-size:10px;color:#3a3a3a">'+(p.confidence||'&mdash;')+'% confidence</span>'+
+          '<span style="background:'+tc.bg+';color:'+tc.c+';font-size:8px;font-weight:800;padding:2px 5px;border-radius:3px;letter-spacing:.05em">'+esc(p.tier||'')+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="position:absolute;bottom:0;left:0;right:0;background:#0a0a0a;padding:'+(iw?10:12)+'px 32px '+(iw?12:18)+'px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-size:10px;color:#252525;letter-spacing:.06em;text-transform:uppercase">'+BRAND_URL+'</span>'+
+        '<span style="font-size:10px;color:#252525">'+(p.date||todayISO())+'</span>'+
+      '</div>'+
+    '</div>';
+  },
+
+  caption: function(picks){
+    var p=picks[0]; if(!p) return '';
+    var team=p.player||p.team||'';
+    return '\ud83d\udcb0 MONEYLINE: '+team+' '+(p.odds||'')+
+      (p.game?'\n'+p.game:'')+
+      '\n'+(p.confidence||'&mdash;')+'% confidence'+(p.tier?' | '+p.tier:'')+
+      '\n\n#PropDesk'+(p.sport?' #'+p.sport:'');
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATA LAYER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function loadLocalPicks(){
+  try{ return JSON.parse(localStorage.getItem(PLAY_HIST_KEY)||'[]'); }
+  catch(e){ return []; }
+}
+
+function syncSupabase(){
+  var btn=document.getElementById('sync-btn');
+  var stat=document.getElementById('sync-status');
+  if(btn){btn.disabled=true;btn.textContent='Syncing\u2026';}
+  stat.textContent='Connecting\u2026';
+
+  if(!_sb){
+    try{ _sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY); }
+    catch(e){ stat.textContent='Supabase unavailable'; if(btn){btn.disabled=false;btn.textContent='Sync Supabase';} return; }
+  }
+
+  _sb.auth.getSession().then(function(res){
+    var session=res&&res.data&&res.data.session;
+    if(!session){
+      stat.textContent='No active session \u2014 open PropDesk and sign in first.';
+      if(btn){btn.disabled=false;btn.textContent='Sync Supabase';}
+      return;
+    }
+    var uid=session.user.id;
+    _sb.from('plays').select('*').eq('user_id',uid).order('logged_at',{ascending:false}).then(function(res2){
+      if(res2.error){ stat.textContent='Sync failed: '+(res2.error.message||'unknown'); if(btn){btn.disabled=false;btn.textContent='Sync Supabase';} return; }
+      var rows=(res2.data||[]).map(_sbMap);
+      localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(rows));
+      allPicks=rows;
+      document.getElementById('sync-count').textContent=rows.length+' picks';
+      stat.textContent='Synced from Supabase';
+      applyDateFilter();
+      if(btn){btn.disabled=false;btn.textContent='Sync Supabase';}
+    });
+  });
+}
+
+function _sbMap(r){
+  return {
+    date:r.date||'',player:r.player||'',market:r.market||'',
+    marketDisplay:r.market_display||null,sport:r.sport||null,
+    line:r.line||null,confidence:r.confidence||null,tier:r.tier||null,
+    result:r.result||'pending',game:r.game||null,type:r.type||null,
+    odds:r.odds||null,source:r.source||'manual',
+    trendType:r.trend_type||null,trendSignal:r.trend_signal||null,
+    trendRecord:r.trend_record||null,trendWinRate:r.trend_win_rate||null,
+    trendSystem:r.trend_system||null,trendDescription:r.trend_description||null,
+    trendSampleSize:r.trend_sample_size||null,loggedAt:r.logged_at
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI STATE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function setDateFilter(f, btn){
+  dateFilter=f;
+  document.querySelectorAll('#date-pills .pill').forEach(function(b){ b.classList.toggle('on',b.dataset.f===f); });
+  applyDateFilter();
+}
+
+function applyDateFilter(){
+  var t=todayISO(), y=yesterdayISO();
+  var w7iso=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  filteredPicks=allPicks.filter(function(p){
+    if(dateFilter==='today') return p.date===t;
+    if(dateFilter==='yesterday') return p.date===y;
+    if(dateFilter==='week') return p.date>=w7iso;
+    return true;
+  });
+  renderPickList();
+  updatePreview();
+}
+
+function setTemplate(id){
+  activeTmplId=id;
+  selectedIds.clear();
+  document.querySelectorAll('#tmpl-pills .pill').forEach(function(b){ b.classList.toggle('on',b.dataset.tmpl===id); });
+  var tmpl=TEMPLATES[id];
+  var hint=document.getElementById('tmpl-hint');
+  if(tmpl){
+    if(tmpl.autoLoad) hint.textContent='Auto-populates from yesterday\'s tracked picks \u2014 no selection needed.';
+    else if(tmpl.maxPicks===1) hint.textContent='Select 1 pick from the list below.';
+    else hint.textContent='Select '+tmpl.minPicks+'\u2013'+tmpl.maxPicks+' picks from the list below.';
+  }
+  renderPickList();
+  updatePreview();
+}
+
+function setFormat(fmt, btn){
+  activeFormat=fmt;
+  document.querySelectorAll('.fmt-btn').forEach(function(b){ b.classList.toggle('on',b.dataset.fmt===fmt); });
+  var render=document.getElementById('card-render');
+  render.style.height=(fmt==='wide'?300:540)+'px';
+  updatePreview();
+}
+
+function getSelectedPicks(){
+  if(!selectedIds.size) return [];
+  return filteredPicks.filter(function(p){ return selectedIds.has(p.loggedAt); });
+}
+
+function renderPickList(){
+  var el=document.getElementById('pick-list');
+  var countEl=document.getElementById('pick-count');
+  var tmpl=TEMPLATES[activeTmplId];
+
+  if(tmpl&&tmpl.autoLoad){
+    var yest=yesterdayISO();
+    var yd=allPicks.filter(function(p){ return p.date===yest; });
+    el.innerHTML='<div style="padding:12px 4px;color:#3a3a3a;font-size:12px;text-align:center">'+
+      'Recap auto-loads yesterday\'s picks.<br>('+yd.length+' found for '+fmtDateShort(yest)+')'+
+    '</div>';
+    countEl.textContent='';
+    return;
+  }
+
+  if(!filteredPicks.length){
+    el.innerHTML='<div class="cs-empty">No picks for this date range</div>';
+    countEl.textContent='';
+    return;
+  }
+
+  countEl.textContent=filteredPicks.length+' pick'+(filteredPicks.length!==1?'s':'')+' \u00b7 '+selectedIds.size+' selected';
+
+  el.innerHTML=filteredPicks.map(function(p){
+    var sel=selectedIds.has(p.loggedAt);
+    var res=p.result||'pending';
+    var resLabel=res==='hit'?'HIT \u2713':res==='miss'?'MISS \u2717':'PENDING';
+    var isTrend=p.source==='trend'||p.type==='trend';
+    var tag=isTrend?' <span style="font-size:9px;color:#3a3a3a">['+trendTypeLabel(p)+']</span>':'';
+    return '<div class="pick-row'+(sel?' sel':'')+'" onclick="togglePick('+p.loggedAt+')">'+
+      '<input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation();togglePick('+p.loggedAt+')">'+
+      '<div class="p-name">'+esc(p.player||p.team||'\u2014')+tag+'</div>'+
+      '<div class="p-line">'+esc(p.line||'')+'</div>'+
+      '<div class="p-conf">'+(p.confidence||'?')+'%</div>'+
+      '<div class="p-res '+res+'">'+resLabel+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+function togglePick(loggedAt){
+  var tmpl=TEMPLATES[activeTmplId];
+  var max=tmpl?tmpl.maxPicks:1;
+  if(selectedIds.has(loggedAt)){
+    selectedIds.delete(loggedAt);
+  } else {
+    if(selectedIds.size>=max){
+      if(max===1){ selectedIds.clear(); } else { return; }
+    }
+    selectedIds.add(loggedAt);
+  }
+  renderPickList();
+  updatePreview();
+}
+
+function selectAll(){
+  var tmpl=TEMPLATES[activeTmplId];
+  if(tmpl&&tmpl.autoLoad) return;
+  var max=tmpl?tmpl.maxPicks:1;
+  selectedIds.clear();
+  filteredPicks.slice(0,max).forEach(function(p){ selectedIds.add(p.loggedAt); });
+  renderPickList();
+  updatePreview();
+}
+
+function selectNone(){
+  selectedIds.clear();
+  renderPickList();
+  updatePreview();
+}
+
+function updatePreview(){
+  var tmpl=TEMPLATES[activeTmplId];
+  if(!tmpl) return;
+  var picks=tmpl.autoLoad?allPicks:getSelectedPicks();
+  var html=tmpl.render(picks,activeFormat);
+  var cardH=activeFormat==='wide'?300:540;
+
+  // Update off-screen render target
+  var render=document.getElementById('card-render');
+  render.style.width='540px';
+  render.style.height=cardH+'px';
+  render.innerHTML=html;
+
+  // Update visible preview
+  var outer=document.getElementById('prev-outer');
+  var container=document.getElementById('prev-container');
+  var inner=document.getElementById('prev-inner');
+  var availW=Math.max(200, outer.clientWidth-40);
+  var scale=Math.min(1, availW/540);
+  var sw=Math.round(540*scale), sh=Math.round(cardH*scale);
+
+  container.style.width=sw+'px';
+  container.style.height=sh+'px';
+  inner.style.width='540px';
+  inner.style.height=cardH+'px';
+  inner.style.transform='scale('+scale+')';
+  inner.innerHTML=html;
+  outer.style.minHeight=(sh+40)+'px';
+
+  // Update caption
+  document.getElementById('cap-ta').value=tmpl.caption(picks);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXPORT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function downloadPNG(){
+  var render=document.getElementById('card-render');
+  if(!render.firstElementChild){ showStatus('Select a pick first'); return; }
+  var dlBtn=document.getElementById('dl-btn');
+  if(dlBtn){dlBtn.disabled=true;dlBtn.innerHTML='&#8987; Generating\u2026';}
+  showStatus('');
+  setTimeout(function(){
+    html2canvas(render.firstElementChild,{
+      scale:2,
+      useCORS:false,
+      allowTaint:true,
+      logging:false
+    }).then(function(canvas){
+      if(canvas.width<500||canvas.height<200){
+        throw new Error('Render incomplete ('+canvas.width+'\u00d7'+canvas.height+'px) \u2014 scroll up to show the preview and try again');
+      }
+      var tmpl=TEMPLATES[activeTmplId];
+      var picks=tmpl&&tmpl.autoLoad?allPicks:getSelectedPicks();
+      var nameBase=(picks[0]&&(picks[0].player||picks[0].team)||'propdesk-card')
+        .toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
+      var link=document.createElement('a');
+      link.download='propdesk-'+nameBase+'-'+todayISO()+'.png';
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+      showStatus('Downloaded \u2713');
+      if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML='&darr; Download PNG';}
+    }).catch(function(e){
+      showStatus('Export failed: '+(e&&e.message||String(e)),true);
+      if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML='&darr; Download PNG';}
+    });
+  },160);
+}
+
+function copyCaption(){
+  var txt=document.getElementById('cap-ta').value;
+  if(!txt){ showStatus('No caption'); return; }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){showStatus('Copied \u2713');}).catch(function(){ fallbackCopy(txt); });
+  } else { fallbackCopy(txt); }
+}
+
+function fallbackCopy(txt){
+  var ta=document.createElement('textarea');
+  ta.value=txt; ta.style.cssText='position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+  document.body.removeChild(ta); showStatus('Copied \u2713');
+}
+
+function showStatus(msg,withRetry){
+  var el=document.getElementById('act-status');
+  if(withRetry){
+    el.innerHTML='<span style="color:#f5a623">'+esc(msg)+'</span>'+
+      ' <button class="btn sm" onclick="downloadPNG()" style="margin-left:6px;border-color:#f5a62355;color:#f5a623">Retry</button>';
+  } else {
+    el.textContent=msg||'';
+    if(msg){ var snap=msg; setTimeout(function(){ if(el.textContent===snap) el.textContent=''; },3000); }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+document.getElementById('pwInput').addEventListener('keydown',function(e){ if(e.key==='Enter') checkPw(); });
+
+function checkPw(){
+  if(document.getElementById('pwInput').value===PASSWORD){
+    document.getElementById('gate').style.display='none';
+    document.getElementById('main').style.display='block';
+    init();
+  } else {
+    document.getElementById('pwErr').style.display='block';
+    document.getElementById('pwInput').value='';
+  }
+}
+
+function init(){
+  // Build template pills
+  var pillsEl=document.getElementById('tmpl-pills');
+  Object.values(TEMPLATES).forEach(function(tmpl){
+    var btn=document.createElement('button');
+    btn.className='pill'+(tmpl.id===activeTmplId?' on':'');
+    btn.dataset.tmpl=tmpl.id;
+    btn.textContent=tmpl.icon+' '+tmpl.label;
+    btn.onclick=function(){ setTemplate(tmpl.id); };
+    pillsEl.appendChild(btn);
+  });
+
+  // Load picks
+  allPicks=loadLocalPicks();
+  var cnt=document.getElementById('sync-count');
+  if(cnt) cnt.textContent=allPicks.length+' picks';
+
+  // Initial template hint
+  document.getElementById('tmpl-hint').textContent='Select 1 pick from the list below.';
+
+  // Init Supabase client (no auth yet — only used on sync)
+  try{ _sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY); }catch(e){}
+
+  // Apply state
+  applyDateFilter();
+  setTemplate(activeTmplId);
+}
+</script>
+</body>
+</html>
