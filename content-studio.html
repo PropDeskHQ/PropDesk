@@ -240,6 +240,24 @@ function trendAccentColor(pick){
   return '#00e87a';
 }
 
+/* Normalize "A vs B" / "B vs A" to a canonical sorted form so game filter
+   matches regardless of which tracking path stored home/away first. */
+function normalizeGame(g){
+  if(!g) return '';
+  var m=g.match(/^(.+?)\s+vs\.?\s+(.+)$/i);
+  if(!m) return g.trim();
+  var a=m[1].trim(), b=m[2].trim();
+  return (a<b?a+' vs '+b:b+' vs '+a);
+}
+
+/* Resolved confidence: prop picks store p.confidence; trend picks store
+   confidence:null and use trendWinRate instead. */
+function _resolveConf(p){
+  if(p.confidence!=null) return p.confidence;
+  if(p.trendWinRate!=null) return Math.round(p.trendWinRate*100);
+  return null;
+}
+
 function trendTypeLabel(pick){
   var MAP={
     streak:'STREAK',homeway:'HOME/AWAY',linevalue:'LINE VALUE',
@@ -380,32 +398,49 @@ registerTemplate({
     picks.forEach(function(p){ if(p.sport) sports[p.sport]=(sports[p.sport]||0)+1; });
     var sport=Object.keys(sports).sort(function(a,b){return sports[b]-sports[a];})[0]||'';
 
+    var confVals=picks.map(function(p){ return _resolveConf(p); }).filter(function(v){ return v!=null; });
+    var avgConf=confVals.length?Math.round(confVals.reduce(function(s,v){return s+v;},0)/confVals.length):null;
+
     var rows=picks.slice(0,5).map(function(p){
       var tc=tierColors(p.tier);
-      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #141414">'+
+      var conf=_resolveConf(p);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #1a1a1a">'+
         '<div style="width:6px;height:6px;border-radius:50%;background:#00e87a;flex-shrink:0"></div>'+
         '<div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#e0e0e0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+'</div>'+
         '<div style="font-size:12px;color:#00e87a;white-space:nowrap;flex-shrink:0">'+esc(p.line||'')+'</div>'+
-        '<div style="font-size:11px;font-weight:700;color:#aaa;white-space:nowrap;flex-shrink:0">'+(p.confidence||'&mdash;')+'%</div>'+
+        '<div style="font-size:11px;font-weight:700;color:#aaa;white-space:nowrap;flex-shrink:0">'+(conf!=null?conf:'—')+'%</div>'+
         '<div style="background:'+tc.bg+';color:'+tc.c+';font-size:8px;font-weight:800;padding:2px 5px;border-radius:3px;letter-spacing:.05em;flex-shrink:0">'+esc(p.tier||'')+'</div>'+
       '</div>';
     }).join('');
 
-    return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;position:relative;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
-      '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00e87a"></div>'+
-      '<div style="padding:34px 32px 0;display:flex;justify-content:space-between;align-items:center">'+
+    var summaryBlock=avgConf!=null?
+      '<div style="margin-top:auto;padding-top:18px">'+
+        _confBar(avgConf,476)+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:7px">'+
+          '<span style="font-size:10px;color:#333;text-transform:uppercase;letter-spacing:.08em;font-weight:700">Avg Confidence</span>'+
+          '<span style="font-size:13px;font-weight:800;color:#00e87a">'+avgConf+'%</span>'+
+        '</div>'+
+      '</div>':
+      '<div style="margin-top:auto;padding-top:16px;text-align:center">'+
+        '<span style="font-size:10px;color:#222;letter-spacing:.1em;text-transform:uppercase;font-weight:700">Data-Driven Picks</span>'+
+      '</div>';
+
+    return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;overflow:hidden;display:flex;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
+      '<div style="height:3px;background:#00e87a;flex-shrink:0"></div>'+
+      '<div style="padding:31px 32px 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">'+
         _wordmark(13)+
         '<div style="display:flex;gap:5px;align-items:center">'+
           '<span style="background:#111;border:1px solid #252525;color:#00e87a;font-size:9px;font-weight:800;padding:3px 7px;border-radius:4px;letter-spacing:.04em">'+picks.length+' PLAYS</span>'+
           _sportBadge(sport)+
         '</div>'+
       '</div>'+
-      '<div style="padding:20px 32px 0">'+
+      '<div style="padding:20px 32px 20px;flex:1;display:flex;flex-direction:column;min-height:0">'+
         '<div style="font-size:11px;font-weight:800;color:#444;text-transform:uppercase;letter-spacing:.12em;margin-bottom:2px">Today\'s Board</div>'+
         '<div style="height:1px;background:#1a1a1a;margin:10px 0 0"></div>'+
         rows+
+        summaryBlock+
       '</div>'+
-      '<div style="position:absolute;bottom:0;left:0;right:0;background:#0a0a0a;padding:12px 32px 18px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center">'+
+      '<div style="padding:12px 32px 18px;border-top:1px solid #141414;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">'+
         '<span style="font-size:10px;color:#252525;letter-spacing:.06em;text-transform:uppercase">'+BRAND_URL+'</span>'+
         '<span style="font-size:10px;color:#252525">'+todayISO()+'</span>'+
       '</div>'+
@@ -757,13 +792,14 @@ function setDateFilter(f, btn){
 function setGameFilter(g){
   gameFilter=g;
   selectedIds.clear();
+  rebuildGamePills();
   renderPickList();
   updatePreview();
 }
 
 function rebuildGamePills(){
   var seen={};
-  filteredPicks.forEach(function(p){ if(p.game) seen[p.game]=true; });
+  filteredPicks.forEach(function(p){ if(p.game) seen[normalizeGame(p.game)]=true; });
   var games=Object.keys(seen).sort();
 
   if(gameFilter!=='all'&&!seen[gameFilter]) gameFilter='all';
@@ -832,7 +868,7 @@ function getSelectedPicks(){
 
 function gameFiltered(){
   if(gameFilter==='all') return filteredPicks;
-  return filteredPicks.filter(function(p){ return p.game===gameFilter; });
+  return filteredPicks.filter(function(p){ return normalizeGame(p.game)===gameFilter; });
 }
 
 function renderPickList(){
@@ -869,7 +905,7 @@ function renderPickList(){
       '<input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation();togglePick('+p.loggedAt+')">'+
       '<div class="p-name">'+esc(p.player||p.team||'\u2014')+tag+'</div>'+
       '<div class="p-line">'+esc(p.line||'')+'</div>'+
-      '<div class="p-conf">'+(p.confidence||'?')+'%</div>'+
+      '<div class="p-conf">'+(_resolveConf(p)!=null?_resolveConf(p):'—')+'%</div>'+
       '<div class="p-res '+res+'">'+resLabel+'</div>'+
     '</div>';
   }).join('');
