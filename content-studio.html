@@ -868,7 +868,18 @@ function getSelectedPicks(){
 
 function gameFiltered(){
   if(gameFilter==='all') return filteredPicks;
-  return filteredPicks.filter(function(p){ return normalizeGame(p.game)===gameFilter; });
+  var teams=gameFilter.split(' vs ');
+  return filteredPicks.filter(function(p){
+    if(!p.game) return false;
+    if(normalizeGame(p.game)===gameFilter) return true;
+    // Fallback: both team names appear anywhere in the game string
+    // (handles encoding/casing edge cases the normalization might miss)
+    if(teams.length===2){
+      var gl=p.game.toLowerCase();
+      return gl.indexOf(teams[0].toLowerCase())!==-1 && gl.indexOf(teams[1].toLowerCase())!==-1;
+    }
+    return false;
+  });
 }
 
 function renderPickList(){
