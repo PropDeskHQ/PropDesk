@@ -887,13 +887,25 @@ function renderPickList(){
   }
 
   var viewPicks=gameFiltered();
+
+  // When a specific game is active, log excluded picks so the game field is visible in console
+  if(gameFilter!=='all'){
+    var excluded=filteredPicks.filter(function(p){ return !viewPicks.includes(p); });
+    if(excluded.length){
+      console.log('[ContentStudio] Game filter "'+gameFilter+'" excluded '+excluded.length+' pick(s):');
+      excluded.forEach(function(p){ console.log('  '+esc(p.player||p.team||'?')+' | p.game='+JSON.stringify(p.game)); });
+    }
+  }
+
   if(!viewPicks.length){
     el.innerHTML='<div class="cs-empty">'+(gameFilter==='all'?'No picks for this date range':'No picks for this game')+'</div>';
     countEl.textContent='';
     return;
   }
 
-  countEl.textContent=viewPicks.length+' pick'+(viewPicks.length!==1?'s':'')+' \u00b7 '+selectedIds.size+' selected';
+  var noGameCount=gameFilter==='all'?0:filteredPicks.filter(function(p){ return !p.game; }).length;
+  var noGameNote=noGameCount?' \u00b7 <span title="These picks have no game field stored \u2014 re-track them to assign a game" style="color:#555;font-style:italic">'+noGameCount+' no-game-data</span>':'';
+  countEl.innerHTML=viewPicks.length+' pick'+(viewPicks.length!==1?'s':'')+' \u00b7 '+selectedIds.size+' selected'+noGameNote;
 
   el.innerHTML=viewPicks.map(function(p){
     var sel=selectedIds.has(p.loggedAt);
