@@ -129,6 +129,12 @@ input,textarea{cursor:text}
         <div id="tmpl-hint" style="font-size:11px;color:#3a3a3a;margin-top:7px"></div>
       </div>
 
+      <!-- Game filter (shown only when filtered picks contain game data) -->
+      <div class="panel" id="game-filter-panel" style="display:none">
+        <span class="slabel">Filter by Game</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="game-pills"></div>
+      </div>
+
       <!-- Pick list -->
       <div class="panel">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
@@ -200,6 +206,7 @@ var selectedIds   = new Set();
 var activeTmplId  = 'single-pick';
 var activeFormat  = 'square';
 var dateFilter    = 'today';
+var gameFilter    = 'all';
 var _sb           = null;
 
 /* ─── Util helpers ────────────────────────────────────────────────────────── */
@@ -747,6 +754,40 @@ function setDateFilter(f, btn){
   applyDateFilter();
 }
 
+function setGameFilter(g){
+  gameFilter=g;
+  selectedIds.clear();
+  renderPickList();
+  updatePreview();
+}
+
+function rebuildGamePills(){
+  var seen={};
+  filteredPicks.forEach(function(p){ if(p.game) seen[p.game]=true; });
+  var games=Object.keys(seen).sort();
+
+  if(gameFilter!=='all'&&!seen[gameFilter]) gameFilter='all';
+
+  var el=document.getElementById('game-pills');
+  var panel=document.getElementById('game-filter-panel');
+  if(!el) return;
+
+  if(!games.length){ if(panel) panel.style.display='none'; return; }
+  if(panel) panel.style.display='';
+  el.innerHTML='';
+
+  [['all','All Games']].concat(games.map(function(g){ return [g,g]; }))
+    .forEach(function(pair){
+      var g=pair[0], label=pair[1];
+      var btn=document.createElement('button');
+      btn.className='pill'+(gameFilter===g?' on':'');
+      btn.dataset.g=g;
+      btn.textContent=label;
+      btn.onclick=function(){ setGameFilter(g); };
+      el.appendChild(btn);
+    });
+}
+
 function applyDateFilter(){
   var t=todayISO(), y=yesterdayISO();
   var w7iso=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
@@ -756,6 +797,7 @@ function applyDateFilter(){
     if(dateFilter==='week') return p.date>=w7iso;
     return true;
   });
+  rebuildGamePills();
   renderPickList();
   updatePreview();
 }
@@ -788,6 +830,11 @@ function getSelectedPicks(){
   return filteredPicks.filter(function(p){ return selectedIds.has(p.loggedAt); });
 }
 
+function gameFiltered(){
+  if(gameFilter==='all') return filteredPicks;
+  return filteredPicks.filter(function(p){ return p.game===gameFilter; });
+}
+
 function renderPickList(){
   var el=document.getElementById('pick-list');
   var countEl=document.getElementById('pick-count');
@@ -803,15 +850,16 @@ function renderPickList(){
     return;
   }
 
-  if(!filteredPicks.length){
-    el.innerHTML='<div class="cs-empty">No picks for this date range</div>';
+  var viewPicks=gameFiltered();
+  if(!viewPicks.length){
+    el.innerHTML='<div class="cs-empty">'+(gameFilter==='all'?'No picks for this date range':'No picks for this game')+'</div>';
     countEl.textContent='';
     return;
   }
 
-  countEl.textContent=filteredPicks.length+' pick'+(filteredPicks.length!==1?'s':'')+' \u00b7 '+selectedIds.size+' selected';
+  countEl.textContent=viewPicks.length+' pick'+(viewPicks.length!==1?'s':'')+' \u00b7 '+selectedIds.size+' selected';
 
-  el.innerHTML=filteredPicks.map(function(p){
+  el.innerHTML=viewPicks.map(function(p){
     var sel=selectedIds.has(p.loggedAt);
     var res=p.result||'pending';
     var resLabel=res==='hit'?'HIT \u2713':res==='miss'?'MISS \u2717':'PENDING';
@@ -847,7 +895,7 @@ function selectAll(){
   if(tmpl&&tmpl.autoLoad) return;
   var max=tmpl?tmpl.maxPicks:1;
   selectedIds.clear();
-  filteredPicks.slice(0,max).forEach(function(p){ selectedIds.add(p.loggedAt); });
+  gameFiltered().slice(0,max).forEach(function(p){ selectedIds.add(p.loggedAt); });
   renderPickList();
   updatePreview();
 }
