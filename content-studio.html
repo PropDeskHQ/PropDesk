@@ -994,7 +994,7 @@ function setFormat(fmt, btn){
 
 function getSelectedPicks(){
   if(!selectedIds.size) return [];
-  return filteredPicks.filter(function(p){ return selectedIds.has(p.loggedAt); });
+  return filteredPicks.filter(function(p){ return selectedIds.has(p._pid); });
 }
 
 function gameFiltered(){
@@ -1045,14 +1045,14 @@ function renderPickList(){
   var noGameNote=noGameCount?' \u00b7 <span title="These picks have no game field stored \u2014 re-track them to assign a game" style="color:#555;font-style:italic">'+noGameCount+' no-game-data</span>':'';
   countEl.innerHTML=viewPicks.length+' pick'+(viewPicks.length!==1?'s':'')+' \u00b7 '+selectedIds.size+' selected'+noGameNote;
 
-  el.innerHTML=viewPicks.map(function(p){
-    var sel=selectedIds.has(p.loggedAt);
+  el.innerHTML=viewPicks.map(function(p,i){
+    var sel=selectedIds.has(p._pid);
     var res=p.result||'pending';
     var resLabel=res==='hit'?'HIT \u2713':res==='miss'?'MISS \u2717':'PENDING';
     var isTrend=p.source==='trend'||p.type==='trend';
     var tag=isTrend?' <span style="font-size:9px;color:#3a3a3a">['+trendTypeLabel(p)+']</span>':'';
-    return '<div class="pick-row'+(sel?' sel':'')+'" onclick="togglePick('+p.loggedAt+')">'+
-      '<input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation();togglePick('+p.loggedAt+')">'+
+    return '<div class="pick-row'+(sel?' sel':'')+'" onclick="togglePick('+p._pid+')">'+
+      '<input type="checkbox" '+(sel?'checked':'')+' onclick="event.stopPropagation();togglePick('+p._pid+')">'+
       '<div class="p-name">'+esc(p.player||p.team||'\u2014')+tag+'</div>'+
       '<div class="p-line">'+esc(p.line||'')+'</div>'+
       '<div class="p-conf">'+(_resolveConf(p)!=null?_resolveConf(p):'—')+'%</div>'+
@@ -1061,16 +1061,16 @@ function renderPickList(){
   }).join('');
 }
 
-function togglePick(loggedAt){
+function togglePick(pid){
   var tmpl=TEMPLATES[activeTmplId];
   var max=tmpl?tmpl.maxPicks:1;
-  if(selectedIds.has(loggedAt)){
-    selectedIds.delete(loggedAt);
+  if(selectedIds.has(pid)){
+    selectedIds.delete(pid);
   } else {
     if(selectedIds.size>=max){
       if(max===1){ selectedIds.clear(); } else { return; }
     }
-    selectedIds.add(loggedAt);
+    selectedIds.add(pid);
   }
   renderPickList();
   updatePreview();
@@ -1081,7 +1081,7 @@ function selectAll(){
   if(tmpl&&tmpl.autoLoad) return;
   var max=tmpl?tmpl.maxPicks:1;
   selectedIds.clear();
-  gameFiltered().slice(0,max).forEach(function(p){ selectedIds.add(p.loggedAt); });
+  gameFiltered().slice(0,max).forEach(function(p){ selectedIds.add(p._pid); });
   renderPickList();
   updatePreview();
 }
@@ -1234,6 +1234,7 @@ function init(){
 
   // Load picks
   allPicks=loadLocalPicks();
+  allPicks.forEach(function(p,i){ p._pid=i; });
   var cnt=document.getElementById('sync-count');
   if(cnt) cnt.textContent=allPicks.length+' picks';
 
@@ -1250,8 +1251,9 @@ function init(){
 
   // Select the handed-off pick and render
   if(_handoffPick&&_handoffTmpl){
-    selectedIds.add(Number(_handoffPick));
-    updatePreview();
+    var _handoffLat=Number(_handoffPick);
+    var _handoffFound=filteredPicks.find(function(p){ return p.loggedAt===_handoffLat; });
+    if(_handoffFound){ selectedIds.add(_handoffFound._pid); updatePreview(); }
   }
 }
 </script>
