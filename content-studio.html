@@ -257,6 +257,17 @@ function _resolveConf(p){
   if(p.trendWinRate!=null) return Math.round(p.trendWinRate*100);
   return null;
 }
+function _resolveTier(p){
+  var stored=p.tier;
+  if(stored) return stored;
+  var c=_resolveConf(p);
+  if(c==null) return null;
+  if(c>=90) return 'ELITE';
+  if(c>=80) return 'GREAT';
+  if(c>=70) return 'GOOD';
+  if(c>=60) return 'VALUE';
+  return null;
+}
 
 function trendTypeLabel(pick){
   var MAP={
@@ -769,17 +780,25 @@ registerTemplate({
     var shown=picks.slice(0,maxRows);
     var extra=picks.length-shown.length;
 
-    var rows=shown.map(function(p){
+    var rows=shown.map(function(p,i){
       var conf=_resolveConf(p);
-      var tc=tierColors(p.tier);
-      return '<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid #111">'+
+      var tier=_resolveTier(p);
+      var tc=tierColors(tier);
+      var isEven=i%2===1;
+      var isLast=i===shown.length-1&&!extra;
+      return '<div style="flex:1;display:flex;align-items:center;padding:0 32px;'+
+        (isEven?'background:rgba(255,255,255,0.02);':'')+
+        (!isLast?'border-bottom:1px solid #1a1a1a;':'')+'">'+
         '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:12px;font-weight:700;color:#e8e8e8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+'</div>'+
-          '<div style="font-size:10px;color:#3a3a3a;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.marketDisplay||p.market||'')+' '+esc(p.line||'')+'</div>'+
+          '<div style="font-size:13px;font-weight:700;color:#e8e8e8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+'</div>'+
+          '<div style="font-size:10px;color:#555;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.marketDisplay||p.market||'')+' '+esc(p.line||'')+'</div>'+
+          '<div style="margin-top:7px;width:72px;height:3px;background:#111;border-radius:2px;overflow:hidden">'+
+            (conf!==null?'<div style="height:100%;background:#00e87a;width:'+conf+'%"></div>':'')+
+          '</div>'+
         '</div>'+
         '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
-          (conf!==null?'<div style="font-size:11px;font-weight:800;color:#00e87a">'+conf+'%</div>':'')+
-          (p.tier?'<span style="background:'+tc.bg+';color:'+tc.c+';font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;letter-spacing:.04em">'+esc(p.tier)+'</span>':'')+
+          (conf!==null?'<div style="font-size:13px;font-weight:800;color:#00e87a">'+conf+'%</div>':'')+
+          (tier?'<span style="background:'+tc.bg+';color:'+tc.c+';font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;letter-spacing:.04em">'+esc(tier)+'</span>':'')+
         '</div>'+
       '</div>';
     }).join('');
@@ -796,14 +815,14 @@ registerTemplate({
       '<div style="padding:14px 32px 0;flex-shrink:0">'+
         '<div style="display:flex;align-items:center;gap:10px">'+
           '<div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(team1)+'</div>'+
-          '<div style="font-size:10px;font-weight:800;color:#252525;flex-shrink:0;letter-spacing:.08em">VS</div>'+
+          '<div style="font-size:10px;font-weight:800;color:#3a3a3a;flex-shrink:0;letter-spacing:.08em">VS</div>'+
           '<div style="font-size:20px;font-weight:900;color:#fff;letter-spacing:-.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right">'+esc(team2)+'</div>'+
         '</div>'+
         '<div style="height:1px;background:#1a1a1a;margin-top:12px"></div>'+
       '</div>'+
-      '<div style="padding:0 32px;flex:1;min-height:0;overflow:hidden">'+
+      '<div style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">'+
         rows+
-        (extra?'<div style="font-size:10px;color:#333;padding-top:6px">+'+extra+' more</div>':'')+
+        (extra?'<div style="padding:4px 32px;font-size:10px;color:#333">+'+extra+' more</div>':'')+
       '</div>'+
       '<div style="padding:10px 32px;border-top:1px solid #141414;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'+
         '<span style="font-size:10px;font-weight:700;color:#3a3a3a;letter-spacing:.06em;text-transform:uppercase">'+picks.length+' PICK'+(picks.length!==1?'S':'')+'</span>'+
