@@ -560,6 +560,7 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .tc-title-main{font-size:16px;font-weight:800;color:var(--text);line-height:1.35;margin-bottom:5px}
 /* Subtitle — the original descriptive sentence, now smaller */
 .tc-sub-hl{font-size:12px;color:var(--mut);line-height:1.55;margin-bottom:8px}
+.tc-bet-label{font-size:11px;font-weight:700;color:var(--text);margin:0 0 9px;padding-top:8px;border-top:1px solid #1e1e1e}
 /* Action line */
 .tc-action{font-size:12px;font-style:italic;color:#888;margin-top:8px;line-height:1.4;padding-top:8px;border-top:1px solid #1e1e1e}
 /* Sort/filter controls above grid */
@@ -8188,6 +8189,7 @@ function calcPlayerStreakTrends(){
       source:"ESPN / MLB Game Log",
       shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" | "+hits+"-"+misses+" L"+bestN+" ("+Math.round(best*100)+"%) | "+mktLbl+" | propdeskhq.netlify.app",
       _rawVals:vals.slice(0,15),
+      _rawLineNum:line,
       _rawLine:isThresh?threshLabel(line,p._market):line,
       _rawIsOver:isOver,
       _rawMarket:mktLbl,
@@ -8265,6 +8267,7 @@ function calcPlayerHomeAwaySplitTrends(){
       shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" | "+Math.round(homeRate*100)+"% home / "+
         Math.round(awayRate*100)+"% away (L"+n+") | "+mktLbl+" | propdeskhq.netlify.app",
       _rawVals:vals.slice(0,n),
+      _rawLineNum:line,
       _rawLine:isThresh?threshLabel(line,p._market):line,
       _rawIsOver:isOver,
       _rawMarket:mktLbl,
@@ -8309,7 +8312,7 @@ function calcLineValueTrends(){
           source:"Season Stats",
           shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct.toFixed(0)+"% below season avg of "+fmtStat(sznAvg)+" ("+mktLbl+") → Over value | propdeskhq.netlify.app",
           _rawVals:p._vals?p._vals.slice(0,15):null,
-          _rawLine:isThreshProp(p)?threshLabel(line,p._market):line, _rawIsOver:true, _rawMarket:mktLbl,
+          _rawLineNum:line, _rawLine:isThreshProp(p)?threshLabel(line,p._market):line, _rawIsOver:true, _rawMarket:mktLbl,
           _game:p._game||"", _market:p._market||"", gapPct:Math.round(gapPct), playerId:p._playerId||null, odds:p.bestOdds||null
         });
       }
@@ -8335,7 +8338,7 @@ function calcLineValueTrends(){
           source:"L5 Game Log",
           shareText:"PropDesk Trend: "+p.player+" book line "+line+" is "+gapPct2.toFixed(0)+"% above L5 avg of "+fmtStat(l5Avg)+" ("+mktLbl+") → Under value | propdeskhq.netlify.app",
           _rawVals:p._vals?p._vals.slice(0,15):null,
-          _rawLine:isThreshProp(p)?threshLabel(line,p._market):line, _rawIsOver:false, _rawMarket:mktLbl,
+          _rawLineNum:line, _rawLine:isThreshProp(p)?threshLabel(line,p._market):line, _rawIsOver:false, _rawMarket:mktLbl,
           _game:p._game||"", _market:p._market||"", gapPct:Math.round(gapPct2), playerId:p._playerId||null, odds:p.bestOdds||null
         });
       }
@@ -9092,17 +9095,29 @@ function renderTrendCard(t, sigCls, sigLabel, alreadyTracked){
   var systemName=t.systemName?'<div class="tc-system-name">'+esc(t.systemName)+'</div>':'';
   var streakBadge=(t.streak>=3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge">🔥 STREAK '+t.streak+'</span></div>':
     (t.streak<=-3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge" style="background:rgba(255,80,80,.1);color:#ff5050;border-color:rgba(255,80,80,.2)">❄ COLD '+Math.abs(t.streak)+'</span></div>':'';
-  var spark=(t._rawVals&&t._rawVals.length>=3&&t._rawLine!=null)?renderSparkline(t._rawVals,t._rawLine,t._rawIsOver!==false):'';
+  var spark=(t._rawVals&&t._rawVals.length>=3&&(t._rawLineNum!=null||t._rawLine!=null))?renderSparkline(t._rawVals,t._rawLineNum!=null?t._rawLineNum:t._rawLine,t._rawIsOver!==false):'';
   var _hitBarColor=(t.type==="nrfi"&&t.recordCls==="under")?"#f5a623":
     (t.type==="bullpen"&&t.lean==="HEAVILY FATIGUED")?"#e84040":
     (t.type==="bullpen")?"#f5a623":"";
   var hitBar=t.hitRate!=null?'<div class="tc-hitbar"><div class="tc-hitbar-track"><div class="tc-hitbar-fill" style="width:'+Math.min(100,t.hitRate)+'%'+(_hitBarColor?';background:'+_hitBarColor:'')+'"></div></div><span class="tc-hitbar-pct"'+(_hitBarColor?' style="color:'+_hitBarColor+'"':'')+'>'+t.hitRate+'%</span>'+(t.odds!=null?'<span style="font-size:10px;font-weight:600;color:var(--mut);margin-left:4px;white-space:nowrap">'+fmtOdds(t.odds)+'</span>':'')+'</div>':'';
   var signalHtml=sigLabel?'<span class="tc-signal-lbl tc-signal-'+sigCls.replace("tc-","")+'">'+sigLabel+'</span>':'<span></span>';
+  var _betLineStr=(function(){
+    if(t._rawLine!=null){
+      var l=t._rawLine;
+      if(typeof l==='string') return l;
+      return (t._rawIsOver===false?'Under ':'Over ')+l;
+    }
+    return t._rawMarket||marketName(t._market||'');
+  })();
+  var propBet='<div class="tc-bet-label">'+esc(t.player||t.team||'')+' &middot; '+esc(_betLineStr)+
+    (t.odds!=null?' &middot; <span style="color:var(--mut);font-weight:600">'+fmtOdds(t.odds)+'</span>':'')+
+  '</div>';
   return '<div class="tcard '+sigCls+'" data-tidx="'+esc(String(_trendsData.indexOf(t)))+'">'+
     '<div class="tc-card-hdr">'+signalHtml+'<span class="tc-type">'+typeLabel+'</span></div>'+
     systemName+
     '<div class="tc-title-main">'+esc(title)+'</div>'+
     '<div class="tc-sub-hl">'+esc(t.headline||"")+'</div>'+
+    propBet+
     streakBadge+
     (spark?'<div>'+spark+'</div>':'')+
     '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
