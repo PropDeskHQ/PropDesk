@@ -396,7 +396,8 @@ registerTemplate({
   render: function(picks, fmt){
     var p=picks[0]; if(!p) return _emptyCard(fmt);
     var iw=(fmt==='wide'), W=540, H=iw?300:540;
-    var tc=tierColors(p.tier);
+    var conf=_resolveConf(p);
+    var tc=tierColors(_resolveTier(p));
     var nameSz=iw?28:42, lineSz=iw?20:30, barW=iw?380:476;
     var topPad=iw?19:31;
 
@@ -404,7 +405,7 @@ registerTemplate({
       '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00e87a"></div>'+
       '<div style="padding:'+(topPad+3)+'px 32px 0;display:flex;justify-content:space-between;align-items:center">'+
         _wordmark(iw?11:13)+
-        '<div style="display:flex;gap:5px;align-items:center">'+_tierBadge(p.tier)+_sportBadge(p.sport)+'</div>'+
+        '<div style="display:flex;gap:5px;align-items:center">'+_tierBadge(_resolveTier(p))+_sportBadge(p.sport)+'</div>'+
       '</div>'+
       '<div style="padding:'+(iw?12:22)+'px 32px 0;font-size:'+nameSz+'px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.player||p.team||'')+'</div>'+
       '<div style="padding:'+(iw?5:8)+'px 32px 0;font-size:'+lineSz+'px;font-weight:700;color:#00e87a;letter-spacing:-.2px">'+esc(p.line||'')+'</div>'+
@@ -412,9 +413,9 @@ registerTemplate({
         '<div style="background:#111;border:1px solid #1a1a1a;border-radius:10px;padding:'+(iw?10:14)+'px 16px">'+
           '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px">'+
             '<span style="font-size:10px;font-weight:700;color:#444;text-transform:uppercase;letter-spacing:.08em">Confidence</span>'+
-            '<span style="font-size:'+(iw?22:30)+'px;font-weight:800;color:#fff;line-height:1">'+(p.confidence||'&mdash;')+'%</span>'+
+            '<span style="font-size:'+(iw?22:30)+'px;font-weight:800;color:#fff;line-height:1">'+(conf!=null?conf:'&mdash;')+'%</span>'+
           '</div>'+
-          _confBar(p.confidence, barW)+
+          _confBar(conf, barW)+
         '</div>'+
       '</div>'+
       '<div style="padding:'+(iw?8:14)+'px 32px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
@@ -1489,7 +1490,7 @@ function renderDashboard(){
   var displayPicks=_showAllPicks?picks.slice().sort(function(a,b){ return _scoreIntriguing(b)-_scoreIntriguing(a); }):top5;
   out+='<div class="dash-section">'+
     '<div class="dash-section-hd"><span class="dash-section-title">Today\'s Picks</span>'+
-    '<span class="dash-section-meta">'+(picks.length?picks.length+' pick'+(picks.length!==1?'s':''):'none yet')+'</span></div>';
+    '<span class="dash-section-meta">'+(picks.length?(picks.length>5&&!_showAllPicks?'Top 5 of '+picks.length+' tracked today':picks.length+' pick'+(picks.length!==1?'s':'')):'none yet')+'</span></div>';
   if(picks.length){
     out+='<div class="card-grid">';
     displayPicks.forEach(function(p){
@@ -1537,20 +1538,18 @@ function renderDashboard(){
     out+='</div></div>';
   }
 
-  // Recap
+  // Recap (template internally filters for yesterdayISO(), so pass allPicks not allToday)
+  var yest=yesterdayISO();
+  var yesterdayGraded=allPicks.filter(function(p){ return p.date===yest&&(p.result==='hit'||p.result==='miss'); });
   out+='<div class="dash-section">'+
-    '<div class="dash-section-hd"><span class="dash-section-title">Today\'s Recap</span>'+
-    '<span class="dash-section-meta">'+(allToday.length?allToday.length+' total pick'+(allToday.length!==1?'s':''):'no picks yet')+'</span></div>';
-  if(allToday.length){
-    var rTmpl=TEMPLATES['recap'];
-    var rHtml=rTmpl?rTmpl.render(allToday,'square'):_emptyCard('square');
-    var rCap=rTmpl?rTmpl.caption(allToday):'';
-    var rIdx=_dashCards.length;
-    _dashCards.push({html:rHtml,height:540,filename:'propdesk-recap-'+today+'.png',caption:rCap});
-    out+='<div class="card-grid">'+_dashCardHtml(rHtml,rCap,rIdx)+'</div>';
-  } else {
-    out+='<div class="dash-empty">Track picks to see your daily recap</div>';
-  }
+    '<div class="dash-section-hd"><span class="dash-section-title">Yesterday\'s Recap</span>'+
+    '<span class="dash-section-meta">'+(yesterdayGraded.length?yesterdayGraded.length+' graded pick'+(yesterdayGraded.length!==1?'s':''):'no graded picks yet')+'</span></div>';
+  var rTmpl=TEMPLATES['recap'];
+  var rHtml=rTmpl?rTmpl.render(allPicks,'square'):_emptyCard('square');
+  var rCap=rTmpl?rTmpl.caption(allPicks):'';
+  var rIdx=_dashCards.length;
+  _dashCards.push({html:rHtml,height:540,filename:'propdesk-recap-'+today+'.png',caption:rCap});
+  out+='<div class="card-grid">'+_dashCardHtml(rHtml,rCap,rIdx)+'</div>';
   out+='</div>';
 
   document.getElementById('dashboard').innerHTML=out;
