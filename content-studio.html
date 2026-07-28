@@ -1368,6 +1368,7 @@ function showStatus(msg,withRetry){
    ═══════════════════════════════════════════════════════════════════════════ */
 
 var _dashCards=[];
+var _showAllPicks=false;
 var _lastHash='';
 
 function _pickHash(picks){
@@ -1401,6 +1402,43 @@ function _dashCardHtml(cardHtml,cap,idx){
       '<button class="btn sm" style="flex:1" onclick="copyCardCaption('+idx+')">&#10063; Caption</button>'+
     '</div>'+
   '</div>';
+}
+
+function _scoreIntriguing(p){
+  var conf=_resolveConf(p)||0;
+  var score=conf*0.5;
+  score+=({ELITE:20,GREAT:15,GOOD:10,VALUE:5}[_resolveTier(p)]||0);
+  var ss=p.trendSampleSize||0;
+  if(ss>=20) score+=15; else if(ss>=15) score+=10; else if(ss>=10) score+=7; else if(ss>=5) score+=4;
+  var wr=p.trendWinRate;
+  if(wr!=null){ if(wr>=0.9) score+=10; else if(wr>=0.8) score+=6; else if(wr>=0.7) score+=3; }
+  return score;
+}
+
+function _getTop5Picks(pool){
+  var scored=pool.map(function(p){ return {p:p,s:_scoreIntriguing(p)}; });
+  scored.sort(function(a,b){ return b.s-a.s; });
+  var out=[],playerCount={},typeCount={};
+  for(var i=0;i<scored.length&&out.length<5;i++){
+    var p=scored[i].p;
+    var pk=p.player||p.team||'';
+    var tk=p.trendType||p.source||'';
+    if((playerCount[pk]||0)>=2) continue;
+    if((typeCount[tk]||0)>=2){
+      var remaining=scored.slice(i+1).map(function(x){ return x.p.trendType||x.p.source||''; });
+      var hasOtherTypes=remaining.some(function(t){ return t!==tk&&(typeCount[t]||0)<2; });
+      if(hasOtherTypes) continue;
+    }
+    out.push(p);
+    playerCount[pk]=(playerCount[pk]||0)+1;
+    typeCount[tk]=(typeCount[tk]||0)+1;
+  }
+  return out;
+}
+
+function toggleShowAllPicks(){
+  _showAllPicks=!_showAllPicks;
+  renderDashboard();
 }
 
 function renderDashboard(){
@@ -1446,13 +1484,15 @@ function renderDashboard(){
   }
   out+='</div>';
 
-  // Picks
+  // Picks (top 5 by intriguing score, with show-all toggle)
+  var top5=_getTop5Picks(picks);
+  var displayPicks=_showAllPicks?picks.slice().sort(function(a,b){ return _scoreIntriguing(b)-_scoreIntriguing(a); }):top5;
   out+='<div class="dash-section">'+
     '<div class="dash-section-hd"><span class="dash-section-title">Today\'s Picks</span>'+
     '<span class="dash-section-meta">'+(picks.length?picks.length+' pick'+(picks.length!==1?'s':''):'none yet')+'</span></div>';
   if(picks.length){
     out+='<div class="card-grid">';
-    picks.forEach(function(p){
+    displayPicks.forEach(function(p){
       var tmpl=TEMPLATES['single-pick'];
       var cHtml=tmpl?tmpl.render([p],'square'):_emptyCard('square');
       var cap=tmpl?tmpl.caption([p]):'';
@@ -1461,10 +1501,41 @@ function renderDashboard(){
       out+=_dashCardHtml(cHtml,cap,idx);
     });
     out+='</div>';
+    if(picks.length>5){
+      out+='<button class="btn sm" style="margin-top:10px" onclick="toggleShowAllPicks()">'+(_showAllPicks?'Show top 5 only':'+ Show all '+picks.length+' picks')+'</button>';
+    }
   } else {
     out+='<div class="dash-empty">No picks tracked today yet</div>';
   }
   out+='</div>';
+
+  // Game Boards (one card per game, grouped by normalizeGame key, ≥2 picks)
+  var boardGames={};
+  allToday.forEach(function(p){
+    if(!p.game) return;
+    var k=normalizeGame(p.game);
+    if(!boardGames[k]){ boardGames[k]={picks:[],display:p.game}; }
+    boardGames[k].picks.push(p);
+  });
+  var boardKeys=Object.keys(boardGames).filter(function(k){ return boardGames[k].picks.length>=2; });
+  if(boardKeys.length){
+    out+='<div class="dash-section">'+
+      '<div class="dash-section-hd"><span class="dash-section-title">Today\'s Game Boards</span>'+
+      '<span class="dash-section-meta">'+boardKeys.length+' game'+(boardKeys.length!==1?'s':'')+'</span></div>'+
+      '<div class="card-grid">';
+    boardKeys.forEach(function(k){
+      var gd=boardGames[k];
+      var gPicks=gd.picks.slice().sort(function(a,b){ return (_resolveConf(b)||0)-(_resolveConf(a)||0); });
+      var tmpl=TEMPLATES['game-board'];
+      var cHtml=tmpl?tmpl.render(gPicks,'square'):_emptyCard('square');
+      var cap=tmpl?tmpl.caption(gPicks):'';
+      var idx=_dashCards.length;
+      var safeName=gd.display.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
+      _dashCards.push({html:cHtml,height:540,filename:'propdesk-board-'+safeName+'-'+today+'.png',caption:cap});
+      out+=_dashCardHtml(cHtml,cap,idx);
+    });
+    out+='</div></div>';
+  }
 
   // Recap
   out+='<div class="dash-section">'+
