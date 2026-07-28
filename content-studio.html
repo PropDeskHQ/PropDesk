@@ -372,6 +372,18 @@ function _emptyCard(fmt){
 var TEMPLATES = {};
 function registerTemplate(def){ TEMPLATES[def.id]=def; }
 
+/* ─── Caption variant selector ──────────────────────────────────────────── */
+var _lastCaptionIdx={};
+function _rcv(id,fns){
+  var last=_lastCaptionIdx[id];
+  var pool=[];
+  for(var i=0;i<fns.length;i++){ if(i!==last) pool.push(i); }
+  if(!pool.length) pool=[0];
+  var idx=pool[Math.floor(Math.random()*pool.length)];
+  _lastCaptionIdx[id]=idx;
+  return fns[idx]();
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    TEMPLATE MODULES
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -419,17 +431,28 @@ registerTemplate({
 
   caption: function(picks){
     var p=picks[0]; if(!p) return '';
-    var parts=[];
-    parts.push((p.tier?p.tier+' PLAY: ':'PLAY: ')+p.player+' \u2014 '+(p.line||''));
-    if(p.marketDisplay||p.market) parts[0]+=' ('+(p.marketDisplay||p.market)+')';
+    var player=p.player||p.team||'';
+    var line=p.line||'';
+    var mkt=p.marketDisplay||p.market||'';
+    var tierPfx=p.tier?p.tier+' PLAY: ':'PLAY: ';
+    var conf=_resolveConf(p);
+    var confStr=conf!==null?conf+'% confidence':'';
     var det=[];
     if(p.game) det.push(p.game);
-    if(p.confidence) det.push(p.confidence+'% confidence');
+    if(confStr) det.push(confStr);
     if(p.odds) det.push(p.odds);
-    if(det.length) parts.push(det.join(' | '));
-    parts.push('\nWe show our work. \ud83d\udcca');
-    parts.push('#PropDesk #SportsProps'+(p.sport?' #'+p.sport:''));
-    return parts.join('\n');
+    var row2=det.join(' | ');
+    var sportTag=p.sport?' #'+p.sport:'';
+    var odds=p.odds||'';
+    return _rcv('single-pick',[
+      function(){ return tierPfx+player+' \u2014 '+line+(mkt?' ('+mkt+')':'')+'\n'+(row2?row2+'\n':'')+'\nWe show our work. \ud83d\udcca\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'Backing '+player+' on '+line+(mkt?' ('+mkt+')':'')+'.\n\n'+(confStr?confStr+'. ':'')+(odds?odds+'.':'')+'\nWe show our work. \ud83d\udcca\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'LOCKED: '+player+' '+line+(mkt?' \u2014 '+mkt:'')+'.\n\n'+(p.game?p.game+'\n':'')+(confStr?confStr+'.':'')+(odds?' '+odds+'.':'')+'\n\nNumbers back it. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return 'Is '+player+'\'s '+line+' a lock tonight'+(p.game?' in '+p.game:'')+'?\n\nThe data says yes.'+(confStr?'\n'+confStr+'.':'')+(odds?' '+odds+'.':'')+'\n\n\ud83d\udcca #PropDesk #SportsProps'+sportTag; },
+      function(){ return tierPfx+player+' \u2014 '+line+(mkt?' ('+mkt+')':(p.game?' | '+p.game:''))+'.\n\n'+(confStr?confStr+'. ':'')+(odds?odds+'. ':'')+'Backed by the numbers.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return player+' on '+line+(mkt?' ('+mkt+')':'')+(p.game?' \u2014 '+p.game:'')+'.\n\n'+(confStr?confStr+'.\n':'')+(odds?odds+'\n':'')+'Data is clear. We\'re in.\n\n\ud83d\udcca #PropDesk'+sportTag; },
+      function(){ return 'What does '+player+'\'s '+line+' look like today'+(p.game?' vs '+p.game:'')+'?\n\n'+(confStr?confStr+'. ':'')+(odds?odds+'. ':'')+'Props over gut, every time.\n\n\ud83d\udcca #PropDesk #SportsProps'+sportTag; }
+    ]);
   }
 });
 
@@ -496,10 +519,30 @@ registerTemplate({
 
   caption: function(picks){
     var sport=picks[0]&&picks[0].sport||'';
-    var lines=picks.slice(0,5).map(function(p){
-      return (p.player||p.team||'')+' '+esc(p.line||'')+' ('+(p.confidence||'?')+'%)';
+    var sportTag=sport?' #'+sport:'';
+    var total=picks.length;
+    var linesFull=picks.slice(0,5).map(function(p){
+      var conf=_resolveConf(p);
+      return (p.player||p.team||'')+' '+(p.line||'')+(conf!==null?' ('+conf+'%)':'');
     });
-    return '\ud83d\udccb TODAY\'S BOARD ('+picks.length+' plays)'+( sport?' | '+sport:'')+'\n\n'+lines.join('\n')+'\n\nAll picks backed by data. \ud83d\udcca\n\n#PropDesk'+(sport?' #'+sport:'');
+    var linesShort=picks.slice(0,3).map(function(p){
+      var conf=_resolveConf(p);
+      return '\u2022 '+(p.player||p.team||'')+' '+(p.line||'')+(conf!==null?' \u2014 '+conf+'%':'');
+    });
+    return _rcv('multi-board',[
+      function(){ return '\ud83d\udccb TODAY\'S BOARD ('+total+' plays)'+(sport?' | '+sport:'')+'\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nAll picks backed by data. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return total+' plays on the board today'+(sport?' \u2014 '+sport:'')+'.\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nWe show our work. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return '\ud83d\udccb PROP BOARD \u2014 '+total+' plays'+(sport?' | '+sport:'')+'\n\n'+linesShort.join('\n')+'\n\nNumbers-first. Every time.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'Today\'s props ('+total+' plays)'+(sport?' | '+sport:'')+':\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nBacked by the numbers.\n\n#PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcca FULL CARD \u2014 '+total+' plays today'+(sport?' | '+sport:'')+'\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nData over gut, every day.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'Confidence rankings on today\'s board'+(sport?' ('+sport+')':'')+':\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nWe show our work. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return total+' props. All data-backed'+(sport?' \u2014 '+sport:'')+'.\n\n'+linesShort.join('\n')+'\n\nProps over gut picks.\n\n\ud83d\udcca #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udccb TODAY\'S CARD ('+total+' plays)'+(sport?' | '+sport:'')+'\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nThe data leads. We follow.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'Full prop slate is up'+(sport?' \u2014 '+sport:'')+':\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nConfidence listed on every play.\n\n\ud83d\udcca #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcca PLAYS OF THE DAY \u2014 '+total+(sport?' '+sport:'')+'\n\n'+linesShort.join('\n')+'\n\nAll picks backed by the numbers.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'Board is set. '+total+' plays today'+(sport?' | '+sport:'')+':\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nNumbers first, always. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return '\ud83d\udccb DAILY BOARD ('+total+' plays)'+(sport?' \u2014 '+sport:'')+'\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nWe show our work.\n\n#PropDesk #SportsProps'+sportTag; }
+    ]);
   }
 });
 
@@ -561,8 +604,26 @@ registerTemplate({
     var graded=picks.filter(function(p){ return p.date===yest&&(p.result==='hit'||p.result==='miss'); });
     var hits=graded.filter(function(p){ return p.result==='hit'; }).length;
     var miss=graded.length-hits;
-    var rate=graded.length>0?Math.round(hits/graded.length*100):null;
-    return '\ud83d\udcca Yesterday\'s board: '+hits+'-'+miss+(rate!==null?' ('+rate+'% win rate)':'')+'\n\nProps over gut picks. Every play is backed by data and numbers.\n\n#PropDesk #SportsProps';
+    var total=graded.length;
+    var rate=total>0?Math.round(hits/total*100):null;
+    var rec=hits+'-'+miss;
+    var rateStr=rate!==null?' ('+rate+'% win rate)':'';
+    var rateShort=rate!==null?rate+'%':null;
+    return _rcv('recap',[
+      function(){ return '\ud83d\udcca Yesterday\'s board: '+rec+rateStr+'\n\nProps over gut picks. Every play is backed by data and numbers.\n\n#PropDesk #SportsProps'; },
+      function(){ return '\ud83d\udcca RECAP: '+rec+rateStr+'\n\nThe data drove every pick. We show our work.\n\n#PropDesk #SportsProps'; },
+      function(){ return 'Yesterday: '+rec+(rateShort?' \u2014 '+rateShort+' hit rate':'')+'\n\nWe track everything. Good days and bad.\n\n\ud83d\udcca #PropDesk #SportsProps'; },
+      function(){ return '\ud83d\udcca FINAL: '+rec+(rateShort?'\n\n'+rateShort+' on yesterday\'s card.':'')+'\n\nNo gut calls. No excuses. Just the numbers.\n\n#PropDesk #SportsProps'; },
+      function(){ return 'Prop results from yesterday: '+rec+rateStr+'\n\nTransparency is the point. We post every result.\n\n\ud83d\udcca #PropDesk #SportsProps'; },
+      function(){ return '\ud83d\udcca BOARD RECAP \u2014 '+rec+'\n\n'+(rateShort?rateShort+' on graded plays. ':'')+total+' total.\n\nWe show our work, win or lose.\n\n#PropDesk #SportsProps'; },
+      function(){ return 'Yesterday\'s card closed '+rec+rateStr+'.\n\nData-backed picks. Full transparency.\n\n\ud83d\udcca #PropDesk #SportsProps'; },
+      function(){ return '\ud83d\udcca '+rec+(rateShort?' \u2014 '+rateShort:'')+'.\n\nEvery pick posted before the game. Results posted after.\n\nThat\'s how we do it.\n\n#PropDesk #SportsProps'; },
+      function(){ return 'Final line on yesterday: '+rec+rateStr+'.\n\nGood number or bad, we track it all.\n\n\ud83d\udcca #PropDesk #SportsProps'; },
+      function(){ return '\ud83d\udcca RESULTS: '+rec+(rateShort?'\n\n'+rateShort+' hit rate on '+total+' graded plays.':'\n\n'+total+' graded plays.')+'\n\nProps over gut picks, every day.\n\n#PropDesk #SportsProps'; },
+      function(){ return 'Yesterday locked in at '+rec+rateStr+'.\n\nThe numbers led every call.\n\n\ud83d\udcca #PropDesk #SportsProps'; },
+      function(){ return '\ud83d\udcca Daily recap: '+rec+rateStr+'.\n\nNo guesses. No gut. Data only.\n\n#PropDesk #SportsProps'; },
+      function(){ return 'Board closed '+rec+(rateShort?' ('+rateShort+')':'')+'. '+(total>0?total+' plays graded.':'')+'\n\nFull transparency, every single day.\n\n\ud83d\udcca #PropDesk #SportsProps'; }
+    ]);
   }
 });
 
@@ -622,12 +683,43 @@ registerTemplate({
 
   caption: function(picks){
     var p=picks[0]; if(!p) return '';
+    var player=p.player||p.team||'';
+    var line=p.line||'';
     var wr=p.trendWinRate!=null?Math.round(p.trendWinRate*100):null;
     var samp=p.trendSampleSize||null;
-    return '\ud83d\udd25 STREAK: '+(p.player||p.team||'')+' \u2014 '+(p.line||'')+
-      '\n'+(p.trendRecord||'')+(samp?' in the last '+samp+' games':'')+
-      (wr!==null?' ('+wr+'% hit rate)':'')+
-      '\n\nThe data doesn\'t lie. \ud83d\udcca\n\n#PropDesk'+(p.sport?' #'+p.sport:'');
+    var rec=p.trendRecord||'';
+    var conf=_resolveConf(p);
+    var sportTag=p.sport?' #'+p.sport:'';
+    var odds=p.odds||'';
+    var wrPct=wr!==null?wr+'%':'';
+    var lN=samp?'L'+samp:'';
+    var recFull=rec+(samp?' in '+lN:'')+(wr!==null?' ('+wrPct+' hit rate)':'');
+    var confToday=conf!==null?conf+'% confidence today':'';
+    return _rcv('streak-spotlight',[
+      function(){ return '\ud83d\udd25 STREAK: '+player+' \u2014 '+line+'\n'+rec+(samp?' in the last '+samp+' games':'')+(wr!==null?' ('+wrPct+' hit rate)':'')+'\n\nThe data doesn\'t lie. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return '\ud83d\udd25 HOT STREAK: '+player+' on '+line+'.\n\n'+(recFull?recFull+'.\n':'')+(confToday?confToday+'. ':'')+(odds?odds+'.':'')+'\n\nWe show our work. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return player+' is trending. '+line+(samp?' \u2014 '+wrPct+' in the last '+samp+' games':'')+'.\n\n'+(confToday?confToday+'. ':'')+(odds?odds+'.':'')+'\n\nNumbers-first. \ud83d\udcca\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'Is this the hottest streak in '+(p.sport||'sports')+' right now?\n\n'+player+' on '+line+(recFull?'\n'+recFull:'')+'\n\n'+(confToday?confToday+'.':'')+'\n\n\ud83d\udd25 #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udd25 '+player.toUpperCase()+' \u2014 '+line+'\n\n'+(recFull?recFull+'.':rec)+(confToday?'\n'+confToday+'.':'')+'\n\nThe trend is the play.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'STREAK PLAY: '+player+' '+line+'.\n\n'+(recFull?recFull+'.':'')+'\n\n'+(confToday?confToday+'. ':'')+(odds?odds+'. ':'')+'Backed by the numbers.\n\n\ud83d\udcca #PropDesk'+sportTag; },
+      function(){ return player+' on '+line+(lN?' \u2014 '+wrPct+' hit rate in '+lN:'')+'.\n\n'+(confToday?confToday+'. ':'')+(odds?odds+'.':'')+'\n\nData-driven. No gut.\n\n\ud83d\udd25 #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udd25 STREAK ALERT: '+player+'\n\n'+(recFull||rec||'Tracking this line.')+(confToday?'\n\n'+confToday+'.':'')+'\n\nWe show our work.\n\n\ud83d\udcca #PropDesk'+sportTag; },
+      function(){ return 'TREND: '+player+' on '+line+(samp?' \u2014 '+samp+' game window':'')+'.\n\n'+(wrPct?wrPct+' hit rate. ':'')+(confToday?confToday+'.':'')+'\n\nNumbers lead every pick.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return '\ud83d\udcca STREAK PLAY\n\n'+player+' \u2014 '+line+'\n'+(recFull||rec)+'\n\n'+(confToday?confToday+'. ':'')+(odds?odds+'.':'')+'\n\n#PropDesk'+sportTag; },
+      function(){
+        if(wr!==null&&samp){
+          return wrPct+' on '+line+' over the last '+samp+' games \u2014 '+player+' is on one.\n\n'+(rec?rec+'. ':'')+(confToday?confToday+'. ':'')+(odds?odds+'.':'')+'\n\nBacked by the numbers. \ud83d\udcca\n\n#PropDesk'+sportTag;
+        }
+        return player+' on '+line+(rec?' \u2014 '+rec:'')+( confToday?'\n\n'+confToday+'.':'')+(odds?'\n'+odds+'.':'')+'\n\nBacked by the numbers. \ud83d\udcca\n\n#PropDesk'+sportTag;
+      },
+      function(){
+        if(samp&&wr!==null){
+          return wrPct+' on '+player+'\'s '+line+' over the last '+samp+' games?\n\n'+(rec?rec+'. ':'')+' The data is clear.'+(confToday?'\n\n'+confToday+'.':'')+(odds?' '+odds+'.':'')+'\n\n\ud83d\udcca #PropDesk'+sportTag;
+        }
+        return player+' on '+line+(recFull?' \u2014 '+recFull:'')+'.\n\nThe data is clear.'+(confToday?'\n\n'+confToday+'.':'')+(odds?' '+odds+'.':'')+'\n\n\ud83d\udcca #PropDesk'+sportTag;
+      },
+      function(){ return 'Track record: '+player+' on '+line+(rec?' \u2014 '+rec+(lN?' in '+lN:''):'')+( wrPct?' ('+wrPct+')':'')+'.\n\n'+(confToday?confToday+'. ':'')+(odds?odds+'. ':'')+'\nWe show our work. \ud83d\udcca\n\n#PropDesk'+sportTag; }
+    ]);
   }
 });
 
@@ -719,15 +811,29 @@ registerTemplate({
   caption: function(picks){
     var p=picks[0]; if(!p) return '';
     var typeLabel=trendTypeLabel(p);
+    var player=p.player||p.team||'';
     var market=p.marketDisplay||p.market||'';
     var rec=p.trendRecord||'';
     var rawDesc=p.trendDescription||p.trendSignal||'';
     var firstSent=rawDesc.split('.')[0];
     var conf=_resolveConf(p);
-    return '\ud83d\udcc8 '+typeLabel+': '+(p.player||p.team||'')+(market?' ('+market+')':'')+
-      (firstSent?'\n'+firstSent:'')+
-      '\n'+(conf!==null?conf:'\u2014')+'% confidence'+(rec?' | Record: '+rec:'')+
-      '\n\nData-driven picks, every day. \ud83d\udcca\n\n#PropDesk'+(p.sport?' #'+p.sport:'');
+    var sportTag=p.sport?' #'+p.sport:'';
+    var confStr=conf!==null?conf+'% confidence':'';
+    return _rcv('trends',[
+      function(){ return '\ud83d\udcc8 '+typeLabel+': '+player+(market?' ('+market+')':'')+(firstSent?'\n'+firstSent:'')+'\n'+(confStr||'\u2014% confidence')+(rec?' | Record: '+rec:'')+'\n\nData-driven picks, every day. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcc8 TREND: '+player+(market?' \u2014 '+market:'')+'\n\n'+(firstSent?firstSent+'.\n':'')+(confStr?confStr+'. ':'')+(rec?'Record: '+rec+'.':'')+'\n\nWe follow the data.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'What\'s trending in '+(p.sport||'props')+' right now?\n\n'+typeLabel+': '+player+(market?' ('+market+')':'')+(firstSent?'\n'+firstSent:'')+(confStr?'\n'+confStr+'.':'')+(rec?'\nRecord: '+rec+'.':'')+'\n\n\ud83d\udcc8 #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcc8 '+typeLabel.toUpperCase()+': '+player+(market?' \u2014 '+market:'')+'\n\n'+(firstSent?firstSent+'.\n':'')+(confStr?confStr+'.':'')+(rec?'\nRecord: '+rec+'.':'')+'\n\nNumbers-first. Always.\n\n#PropDesk'+sportTag; },
+      function(){ return 'TREND PLAY: '+player+' \u2014 '+(market||typeLabel)+'.\n\n'+(firstSent?firstSent+'.\n':'')+(confStr?confStr+'. ':'')+(rec?'Record: '+rec+'.':'')+'\n\nBacked by the numbers. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcc8 '+player+(market?' on '+market:'')+' is trending.\n\n'+(firstSent?firstSent+'.\n':'')+(confStr?confStr+'. ':'')+(rec?'Record: '+rec+'.':'')+'\n\nWe show our work.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return typeLabel+': '+player+(market?' ('+market+')':(firstSent?' \u2014 '+firstSent:''))+'.\n\n'+(confStr?confStr+'.':'')+(rec?'\nRecord: '+rec+'.':'')+'\n\nData is clear. We\'re in.\n\n\ud83d\udcc8 #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcc8 '+player+(market?' ('+market+')':'')+'\n\n'+(firstSent?firstSent+'.\n':'')+(confStr?confStr+'. ':'')+(rec?'Record: '+rec+'. ':'')+'\n\nPropDesk tracks the trends.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return '\ud83d\udcca TREND ALERT: '+player+' \u2014 '+(market||typeLabel)+(firstSent?'\n'+firstSent:'')+(confStr?'\n'+confStr+'.':'')+(rec?'\nRecord: '+rec+'.':'')+'\n\nNo gut. Data only.\n\n#PropDesk'+sportTag; },
+      function(){ return 'Following the trend on '+player+(market?' ('+market+')':'')+'.\n\n'+(firstSent?firstSent+'.\n':'')+(confStr?confStr+'.':'')+(rec?'\nRecord: '+rec+'.':'')+'\n\nThis is what the numbers say.\n\n\ud83d\udcc8 #PropDesk'+sportTag; },
+      function(){ return 'Spotted a trend worth betting: '+player+(market?' on '+market:'')+' \u2014 is this the one?\n\n'+(firstSent?firstSent+'.\n':'')+(confStr?confStr+'.':'')+(rec?'\nRecord: '+rec+'.':'')+'\n\n\ud83d\udcc8 #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcc8 TREND: '+player+(market?' \u2014 '+market:'')+'\n\n'+(rec?'Record: '+rec+'.\n':'')+(confStr?confStr+'.':'')+'\n\nData-driven. No guesses.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return player+' trending '+(market||'today')+'.\n\n'+(firstSent?firstSent+'.\n':'')+(confStr?confStr+'.\n':'')+(rec?'Record: '+rec+'.\n':'')+'\nWe show our work. \ud83d\udcca\n\n#PropDesk'+sportTag; }
+    ]);
   }
 });
 
@@ -780,10 +886,26 @@ registerTemplate({
   caption: function(picks){
     var p=picks[0]; if(!p) return '';
     var team=p.player||p.team||'';
-    return '\ud83d\udcb0 MONEYLINE: '+team+' '+(p.odds||'')+
-      (p.game?'\n'+p.game:'')+
-      '\n'+(p.confidence||'&mdash;')+'% confidence'+(p.tier?' | '+p.tier:'')+
-      '\n\n#PropDesk'+(p.sport?' #'+p.sport:'');
+    var game=p.game||'';
+    var conf=_resolveConf(p);
+    var odds=p.odds||'';
+    var tier=p.tier||'';
+    var sportTag=p.sport?' #'+p.sport:'';
+    var confStr=conf!==null?conf+'% confidence':'';
+    return _rcv('moneyline',[
+      function(){ return '\ud83d\udcb0 MONEYLINE: '+team+' '+(odds||'')+(game?'\n'+game:'')+'\n'+(confStr||'\u2014% confidence')+(tier?' | '+tier:'')+'\n\n#PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcb0 MONEYLINE: '+team+(game?' \u2014 '+game:'')+'.\n\n'+(confStr?confStr+'. ':'')+(odds?odds+'. ':'')+(tier?tier+'.':'')+'\n\nNumbers back it.\n\n#PropDesk'+sportTag; },
+      function(){ return 'Taking '+team+' on the moneyline'+(game?' in '+game:'')+'.\n\n'+(confStr?confStr+'. ':'')+(odds?odds+'.':'')+'\n\nWe show our work. \ud83d\udcca\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return '\ud83d\udcb0 ML PLAY: '+team+(game?' \u2014 '+game:'')+'.\n\n'+(confStr?confStr+'. ':'')+(odds?odds+'. ':'')+(tier?tier+'.':'')+'\n\nData-backed.\n\n#PropDesk'+sportTag; },
+      function(){ return team+' moneyline'+(odds?' at '+odds:'')+(game?' \u2014 '+game:'')+'.\n\n'+(confStr?confStr+'.':'')+'\n\nProps over gut, every time.\n\n\ud83d\udcb0 #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcb0 BACKING: '+team+(odds?' '+odds:'')+(game?'\n'+game:'')+'\n\n'+(confStr?confStr+'. ':'')+(tier?tier+'.':'')+'\n\nNumbers-first.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'Moneyline locked: '+team+(game?' | '+game:'')+'.\n\n'+(confStr?confStr+'. ':'')+(odds?odds+'.':'')+'\n\nBacked by the numbers. \ud83d\udcca\n\n#PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcb0 '+team.toUpperCase()+' ML'+(odds?' ('+odds+')':'')+(game?'\n'+game:'')+'\n\n'+(confStr?confStr+'.':'')+(tier?'\n'+tier+'.':'')+'\n\nData over gut.\n\n#PropDesk'+sportTag; },
+      function(){ return 'ML PLAY \u2014 '+team+(odds?' '+odds:'')+(game?'\n'+game:'')+'\n\n'+(confStr?confStr+'. ':'')+(tier?tier+'. ':'')+'We show our work.\n\n\ud83d\udcca #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcb0 MONEYLINE: '+team+(game?' in '+game:'')+'.\n\n'+(odds?odds+'. ':'')+(confStr?confStr+'.':'')+'\n\nNo guesses. Just the data.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return team+' ML'+(game?' \u2014 '+game:'')+'.\n\n'+(confStr?confStr+'. ':'')+(odds?odds+'. ':'')+(tier?tier+'. ':'')+'Backed by the numbers.\n\n\ud83d\udcca #PropDesk'+sportTag; },
+      function(){ return '\ud83d\udcb0 MONEYLINE PLAY\n\n'+team+(odds?' '+odds:'')+(game?'\n'+game:'')+'\n\n'+(confStr?confStr+'.':'')+'\n\n#PropDesk'+sportTag; }
+    ]);
   }
 });
 
@@ -879,12 +1001,31 @@ registerTemplate({
     if(!picks.length) return '';
     var p0=picks[0];
     var game=p0.game||'Matchup';
-    var lines=picks.slice(0,5).map(function(p){
+    var sport=p0.sport||'';
+    var sportTag=sport?' #'+sport:'';
+    var total=picks.length;
+    var linesFull=picks.slice(0,5).map(function(p){
       var conf=_resolveConf(p);
-      return (p.player||p.team||'')+' '+(p.line||'')+(conf?' ('+conf+'%)':'');
+      return (p.player||p.team||'')+' '+(p.line||'')+(conf!==null?' ('+conf+'%)':'');
     });
-    return '⚔️ GAME BOARD: '+game+'\n\n'+lines.join('\n')+(picks.length>5?'\n+more':'')+
-      '\n\nAll picks backed by data. 📊\n\n#PropDesk'+(p0.sport?' #'+p0.sport:'');
+    var linesShort=picks.slice(0,3).map(function(p){
+      var conf=_resolveConf(p);
+      return '• '+(p.player||p.team||'')+' '+(p.line||'')+(conf!==null?' — '+conf+'%':'');
+    });
+    return _rcv('game-board',[
+      function(){ return '⚔️ GAME BOARD: '+game+'\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nAll picks backed by data. 📊\n\n#PropDesk'+sportTag; },
+      function(){ return '⚔️ '+game+' — '+total+' props\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nWe show our work.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'GAME BOARD: '+game+'.\n\n'+linesShort.join('\n')+'\n\nConfidence on every play. Numbers-first.\n\n⚔️ #PropDesk'+sportTag; },
+      function(){ return '⚔️ '+game+'\n\n'+total+' props on this matchup:\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nAll data-backed.\n\n#PropDesk'+sportTag; },
+      function(){ return 'Locking in '+total+' plays on '+game+'.\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nBacked by the numbers. 📊\n\n#PropDesk'+sportTag; },
+      function(){ return '⚔️ MATCHUP CARD: '+game+'\n\n'+linesShort.join('\n')+'\n\nData over gut. We show our work.\n\n📊 #PropDesk'+sportTag; },
+      function(){ return game+' — full prop board:\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nConfidence shown on every pick.\n\n⚔️ #PropDesk #SportsProps'+sportTag; },
+      function(){ return '⚔️ GAME BOARD\n\n'+game+'\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nProps over gut picks, every time.\n\n#PropDesk'+sportTag; },
+      function(){ return total+' data-backed plays on '+game+'.\n\n'+linesShort.join('\n')+'\n\nWe show our work. 📊\n\n#PropDesk'+sportTag; },
+      function(){ return '⚔️ MATCHUP BOARD: '+game+'\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nNo guesses. Data only.\n\n#PropDesk #SportsProps'+sportTag; },
+      function(){ return 'Full card on '+game+':\n\n'+linesFull.join('\n')+(total>5?'\n+more':'')+'\n\nBacked by the numbers.\n\n⚔️ 📊 #PropDesk'+sportTag; },
+      function(){ return '⚔️ '+game+'\n\n'+linesShort.join('\n')+(total>3?'\n+more':'')+'\n\nData-driven plays. Every pick.\n\n#PropDesk'+sportTag; }
+    ]);
   }
 });
 
@@ -1027,7 +1168,8 @@ function setFormat(fmt, btn){
 
 function getSelectedPicks(){
   if(!selectedIds.size) return [];
-  return filteredPicks.filter(function(p){ return selectedIds.has(p._pid); });
+  return filteredPicks.filter(function(p){ return selectedIds.has(p._pid); })
+    .sort(function(a,b){ return (_resolveConf(b)||0)-(_resolveConf(a)||0); });
 }
 
 function gameFiltered(){

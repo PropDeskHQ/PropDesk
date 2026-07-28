@@ -6946,7 +6946,10 @@ async function renderPlayHistory(){
   var blk=$('phBulkBtn'); if(blk) blk.onclick=function(){
     var mlbPend=pastPending.filter(function(e){return e.sport==="MLB"&&!e.autoResolveLocked;});
     if(!mlbPend.length){ _phBulkResolve(pastPending); return; }
-    Promise.all(mlbPend.map(function(e){return resolvePlayAutomatically(e);})).then(function(){
+    var mlbTrends=mlbPend.filter(function(e){return e.source==='trend'&&e.trendIsOver!=null&&e.line;});
+    var mlbProps=mlbPend.filter(function(e){return e.source!=='trend';});
+    Promise.all(mlbTrends.map(function(e){return resolvePlayerStatTrend(e);}).concat(
+      mlbProps.map(function(e){return resolvePlayAutomatically(e);}))).then(function(){
       var h=loadPlayHist(), today=new Date().toISOString().slice(0,10);
       var still=h.filter(function(e){return e.result==="pending"&&e.date<today;});
       renderPlayHistory();
@@ -8117,6 +8120,8 @@ var _trendsSport="basketball_nba";
 var _trendsEvents=[];
 var _trendsEventId=null;
 var _trendChartMode="cumulative";
+var _trendsLoadedAt=0;
+var _TREND_LINE_MAX={batter_hits:1.5,batter_rbis:1.5,batter_home_runs:1.5,batter_runs_scored:1.5,batter_total_bases:3.5,batter_hits_runs_rbis:3.5};
 
 // Confidence score from hit-rate + sample quality
 function trendConf(hitRate, n){
@@ -8133,6 +8138,10 @@ function calcPlayerStreakTrends(){
     var line=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:null);
     if(line==null) return;
     var isOver=(p.pdSide||"Over")==="Over";
+    if(isThreshProp(p)){
+      if(!isOver) return;
+      if(_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
+    }
     function hr(n){
       var sl=vals.slice(0,Math.min(n,vals.length));
       if(sl.length<5) return null;
@@ -8212,6 +8221,10 @@ function calcPlayerHomeAwaySplitTrends(){
     var line=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:null);
     if(line==null) return;
     var isOver=(p.pdSide||"Over")==="Over";
+    if(isThreshProp(p)){
+      if(!isOver) return;
+      if(_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
+    }
     function hit(v){ return isOver?v>line:v<line; }
     var homeVals=[],awayVals=[];
     var n=Math.min(vals.length,isHomeArr.length,15);
@@ -8287,6 +8300,7 @@ function calcLineValueTrends(){
     if(!p.enriched||p.pdNoValue) return;
     var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
     if(line==null||line===0) return;
+    if(isThreshProp(p)&&_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
     // Skip low-usage players — their lines are low because of limited playing time,
     // not real value. 18 MPG is the cutoff; if no minutes data, use a book-line floor.
     if(p.avgMins!=null&&p.avgMins<18) return;
@@ -8319,8 +8333,8 @@ function calcLineValueTrends(){
         });
       }
     }
-    // Book Overvaluing: line is 15%+ above L5 average (Under value)
-    if(l5Avg&&l5Avg>0&&line>0){
+    // Book Overvaluing: line is 15%+ above L5 average (Under value) — suppressed for player prop markets
+    if(!isThreshProp(p)&&l5Avg&&l5Avg>0&&line>0){
       var gap2=line-l5Avg;
       var gapPct2=gap2/line*100;
       if(gapPct2>=15&&gap2>=0.5){
@@ -9569,7 +9583,7 @@ async function trendsFetchAndLoad(){
     }catch(ce){ calcErr=ce; }
     ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
     if(calcErr) throw calcErr;
-    _trendsData=trends;
+    _trendsData=trends; _trendsLoadedAt=Date.now();
     if(!_pdStatsCache){try{var _sr=await fetch("/propdesk-stats.json?_="+Math.floor(Date.now()/86400000),{signal:AbortSignal.timeout(5000)});if(_sr.ok)_pdStatsCache=await _sr.json();}catch(_se){}}
     renderTrends(trends);
     var ct=$("trendsCalcTime");
@@ -9581,9 +9595,13 @@ async function trendsFetchAndLoad(){
 
 function initTrends(){
   renderTrendsSportTabs();
-  if(_trendsData.length) renderTrends(_trendsData);
-  else if(_trendsEvents.length) trendsFetchAndLoad();
-  else trendsLoadSport();
+  if(_trendsData.length&&_trendsLoadedAt&&Date.now()-_trendsLoadedAt<2*3600*1000){
+    renderTrends(_trendsData);
+  } else {
+    _trendsData=[];
+    if(_trendsEvents.length) trendsFetchAndLoad();
+    else trendsLoadSport();
+  }
 }
 
 async function loadTrends(){
