@@ -77,6 +77,25 @@ input,textarea{cursor:text}
 /* Misc */
 .cs-empty{color:#333;font-size:12px;text-align:center;padding:32px 0}
 #act-status{font-size:11px;color:#00e87a;text-align:center;min-height:16px;margin-top:6px}
+
+/* ── Dashboard ──────────────────────────────────────────────────── */
+#dashboard{padding-bottom:8px}
+.dash-section{margin-bottom:32px}
+.dash-section-hd{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.dash-section-title{font-size:11px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.1em}
+.dash-section-meta{font-size:11px;color:#2a2a2a}
+.dash-empty{font-size:12px;color:#2a2a2a;padding:12px 0}
+.card-grid{display:flex;flex-wrap:wrap;gap:14px}
+.card-item{background:#141414;border:1px solid #1e1e1e;border-radius:12px;padding:14px;width:268px;flex-shrink:0}
+.card-mini-prev{width:240px;height:240px;overflow:hidden;border-radius:8px;background:#0a0a0a;margin-bottom:10px}
+.card-mini-inner{width:540px;height:540px;transform:scale(0.4444);transform-origin:top left;pointer-events:none}
+.card-cap{width:100%;background:#111;border:1px solid #252525;border-radius:8px;padding:8px 10px;color:#bbb;font-size:11px;line-height:1.55;resize:vertical;outline:none;min-height:60px;cursor:text;font-family:inherit}
+.card-cap:focus{border-color:#00e87a44}
+.card-actions{display:flex;gap:6px;margin-top:8px}
+.games-list{display:flex;flex-direction:column;gap:5px}
+.games-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#111;border:1px solid #1a1a1a;border-radius:8px}
+.games-name{font-size:13px;font-weight:600;color:#ccc}
+.games-picks{font-size:11px;color:#333}
 </style>
 </head>
 <body>
@@ -97,11 +116,24 @@ input,textarea{cursor:text}
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px">
     <div>
       <h1 style="font-size:20px;font-weight:800;color:#fff">PROP<span style="color:#00e87a">DESK</span> <span style="font-size:13px;font-weight:400;color:#444">Content Studio</span></h1>
-      <p style="font-size:12px;color:#333;margin-top:2px">Generate branded social graphics from your tracked picks</p>
+      <p style="font-size:12px;color:#333;margin-top:2px">Today's content, auto-generated and ready to post</p>
     </div>
-    <a href="index.html" style="font-size:12px;color:#444;padding:6px 12px;border:1px solid #252525;border-radius:6px">&#8592; Back to PropDesk</a>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span id="dash-refresh-ts" style="font-size:11px;color:#2a2a2a"></span>
+      <a href="index.html" style="font-size:12px;color:#444;padding:6px 12px;border:1px solid #252525;border-radius:6px">&#8592; Back to PropDesk</a>
+    </div>
   </div>
 
+  <!-- Dashboard auto-sections -->
+  <div id="dashboard"></div>
+
+  <!-- Advanced toggle -->
+  <div style="border-top:1px solid #1a1a1a;padding-top:16px;margin-top:4px;margin-bottom:20px">
+    <button class="btn" id="adv-toggle-btn" onclick="_toggleAdvanced()">&#9881; Advanced Controls</button>
+  </div>
+
+  <!-- Advanced panel: manual template / pick selection workflow -->
+  <div id="adv-panel" style="display:none">
   <div class="cs-layout">
 
     <!-- ─── LEFT ─────────────────────────────────────────────────── -->
@@ -182,6 +214,7 @@ input,textarea{cursor:text}
     </div>
 
   </div>
+  </div><!-- /adv-panel -->
 </div>
 
 <!-- Off-screen capture target for html2canvas -->
@@ -1189,6 +1222,191 @@ function showStatus(msg,withRetry){
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   DASHBOARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+var _dashCards=[];
+var _lastHash='';
+
+function _pickHash(picks){
+  return picks.length+':'+(picks[0]?picks[0].loggedAt:0);
+}
+
+function _getAutoTrends(){
+  var today=todayISO();
+  return allPicks.filter(function(p){ return p.source==='trend'&&p.date===today; })
+    .sort(function(a,b){ return (_resolveConf(b)||0)-(_resolveConf(a)||0); })
+    .slice(0,6);
+}
+
+function _getTodayPicks(){
+  var today=todayISO();
+  return allPicks.filter(function(p){ return p.source!=='trend'&&p.date===today; });
+}
+
+function _getTodayGames(picks){
+  var games={};
+  picks.forEach(function(p){ if(p.game){ games[p.game]=(games[p.game]||0)+1; } });
+  return games;
+}
+
+function _dashCardHtml(cardHtml,cap,idx){
+  return '<div class="card-item">'+
+    '<div class="card-mini-prev"><div class="card-mini-inner">'+cardHtml+'</div></div>'+
+    '<textarea class="card-cap" data-idx="'+idx+'">'+esc(cap)+'</textarea>'+
+    '<div class="card-actions">'+
+      '<button class="btn accent sm" style="flex:1" onclick="downloadCardPNG('+idx+')">&#8595; Download</button>'+
+      '<button class="btn sm" style="flex:1" onclick="copyCardCaption('+idx+')">&#10063; Caption</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderDashboard(){
+  _dashCards=[];
+  var today=todayISO();
+  var trends=_getAutoTrends();
+  var picks=_getTodayPicks();
+  var allToday=allPicks.filter(function(p){ return p.date===today; });
+  var games=_getTodayGames(allToday);
+  var gameKeys=Object.keys(games);
+  var out='';
+
+  // Games
+  if(gameKeys.length){
+    out+='<div class="dash-section">'+
+      '<div class="dash-section-hd"><span class="dash-section-title">Today\'s Games</span>'+
+      '<span class="dash-section-meta">'+gameKeys.length+' matchup'+(gameKeys.length!==1?'s':'')+'</span></div>'+
+      '<div class="games-list">';
+    gameKeys.forEach(function(g){
+      out+='<div class="games-item"><span class="games-name">'+esc(g)+'</span>'+
+        '<span class="games-picks">'+games[g]+' pick'+(games[g]!==1?'s':'')+'</span></div>';
+    });
+    out+='</div></div>';
+  }
+
+  // Trends
+  out+='<div class="dash-section">'+
+    '<div class="dash-section-hd"><span class="dash-section-title">Today\'s Trends</span>'+
+    '<span class="dash-section-meta">'+(trends.length?trends.length+' pick'+(trends.length!==1?'s':''):'none yet')+'</span></div>';
+  if(trends.length){
+    out+='<div class="card-grid">';
+    trends.forEach(function(p){
+      var tmpl=TEMPLATES['trends'];
+      var cHtml=tmpl?tmpl.render([p],'square'):_emptyCard('square');
+      var cap=tmpl?tmpl.caption([p]):'';
+      var idx=_dashCards.length;
+      _dashCards.push({html:cHtml,height:540,filename:'propdesk-trend-'+(p.player||p.team||'pick').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'')+'-'+today+'.png',caption:cap});
+      out+=_dashCardHtml(cHtml,cap,idx);
+    });
+    out+='</div>';
+  } else {
+    out+='<div class="dash-empty">No trends tracked today yet</div>';
+  }
+  out+='</div>';
+
+  // Picks
+  out+='<div class="dash-section">'+
+    '<div class="dash-section-hd"><span class="dash-section-title">Today\'s Picks</span>'+
+    '<span class="dash-section-meta">'+(picks.length?picks.length+' pick'+(picks.length!==1?'s':''):'none yet')+'</span></div>';
+  if(picks.length){
+    out+='<div class="card-grid">';
+    picks.forEach(function(p){
+      var tmpl=TEMPLATES['single-pick'];
+      var cHtml=tmpl?tmpl.render([p],'square'):_emptyCard('square');
+      var cap=tmpl?tmpl.caption([p]):'';
+      var idx=_dashCards.length;
+      _dashCards.push({html:cHtml,height:540,filename:'propdesk-'+(p.player||p.team||'pick').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'')+'-'+today+'.png',caption:cap});
+      out+=_dashCardHtml(cHtml,cap,idx);
+    });
+    out+='</div>';
+  } else {
+    out+='<div class="dash-empty">No picks tracked today yet</div>';
+  }
+  out+='</div>';
+
+  // Recap
+  out+='<div class="dash-section">'+
+    '<div class="dash-section-hd"><span class="dash-section-title">Today\'s Recap</span>'+
+    '<span class="dash-section-meta">'+(allToday.length?allToday.length+' total pick'+(allToday.length!==1?'s':''):'no picks yet')+'</span></div>';
+  if(allToday.length){
+    var rTmpl=TEMPLATES['recap'];
+    var rHtml=rTmpl?rTmpl.render(allToday,'square'):_emptyCard('square');
+    var rCap=rTmpl?rTmpl.caption(allToday):'';
+    var rIdx=_dashCards.length;
+    _dashCards.push({html:rHtml,height:540,filename:'propdesk-recap-'+today+'.png',caption:rCap});
+    out+='<div class="card-grid">'+_dashCardHtml(rHtml,rCap,rIdx)+'</div>';
+  } else {
+    out+='<div class="dash-empty">Track picks to see your daily recap</div>';
+  }
+  out+='</div>';
+
+  document.getElementById('dashboard').innerHTML=out;
+  var ts=document.getElementById('dash-refresh-ts');
+  if(ts){
+    var now=new Date();
+    ts.textContent='Updated '+now.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  }
+}
+
+function downloadCardPNG(idx){
+  var card=_dashCards[idx]; if(!card) return;
+  var render=document.getElementById('card-render');
+  render.style.height=card.height+'px';
+  render.innerHTML=card.html;
+  setTimeout(function(){
+    html2canvas(render.firstElementChild,{scale:2,useCORS:false,allowTaint:true,logging:false})
+    .then(function(canvas){
+      if(canvas.width<500||canvas.height<200) throw new Error('Render incomplete');
+      var link=document.createElement('a');
+      link.download=card.filename;
+      link.href=canvas.toDataURL('image/png');
+      link.click();
+    }).catch(function(e){ console.error('Download failed:',e); });
+  },160);
+}
+
+function copyCardCaption(idx){
+  var card=_dashCards[idx]; if(!card) return;
+  var tas=document.querySelectorAll('[data-idx]');
+  var txt=card.caption||'';
+  for(var i=0;i<tas.length;i++){
+    if(parseInt(tas[i].getAttribute('data-idx'))===idx){ txt=tas[i].value; break; }
+  }
+  if(!txt) return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).catch(function(){});
+  } else {
+    var el=document.createElement('textarea');
+    el.value=txt; el.style.cssText='position:fixed;opacity:0';
+    document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
+  }
+}
+
+function _refresh(){
+  var fresh=loadLocalPicks();
+  var hash=_pickHash(fresh);
+  if(hash===_lastHash) return;
+  _lastHash=hash;
+  allPicks=fresh;
+  allPicks.forEach(function(p,i){ p._pid=i; });
+  renderDashboard();
+  if(document.getElementById('adv-panel').style.display!=='none') applyDateFilter();
+}
+
+function _toggleAdvanced(){
+  var panel=document.getElementById('adv-panel');
+  var btn=document.getElementById('adv-toggle-btn');
+  var open=panel.style.display==='block';
+  panel.style.display=open?'none':'block';
+  btn.textContent=open?'⚙ Advanced Controls':'× Close Advanced';
+}
+
+function _showAdvanced(){
+  document.getElementById('adv-panel').style.display='block';
+  document.getElementById('adv-toggle-btn').textContent='× Close Advanced';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    INIT
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1238,6 +1456,13 @@ function init(){
   var cnt=document.getElementById('sync-count');
   if(cnt) cnt.textContent=allPicks.length+' picks';
 
+  // Render dashboard and set up auto-refresh
+  _lastHash=_pickHash(allPicks);
+  renderDashboard();
+  window.addEventListener('storage',function(e){ if(e.key===PLAY_HIST_KEY) _refresh(); });
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) _refresh(); });
+  setInterval(_refresh,60000);
+
   // Initial template hint
   document.getElementById('tmpl-hint').textContent='Select 1 pick from the list below.';
 
@@ -1249,11 +1474,12 @@ function init(){
   applyDateFilter();
   setTemplate(activeTmplId);
 
-  // Select the handed-off pick and render
+  // Select the handed-off pick and render; open advanced panel so it's visible
   if(_handoffPick&&_handoffTmpl){
     var _handoffLat=Number(_handoffPick);
     var _handoffFound=filteredPicks.find(function(p){ return p.loggedAt===_handoffLat; });
     if(_handoffFound){ selectedIds.add(_handoffFound._pid); updatePreview(); }
+    _showAdvanced();
   }
 }
 </script>
