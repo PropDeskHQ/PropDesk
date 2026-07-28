@@ -26,6 +26,10 @@ input,textarea{cursor:text}
   .panel{padding:12px}
   .picks-wrap{max-height:220px}
 }
+@media(pointer:coarse){
+  .btn,.pill,.fmt-btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;}
+  #gate button{min-height:44px;}
+}
 
 /* Panels */
 .panel{background:#141414;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:12px}
@@ -122,6 +126,13 @@ input,textarea{cursor:text}
       <span id="dash-refresh-ts" style="font-size:11px;color:#2a2a2a"></span>
       <a href="index.html" style="font-size:12px;color:#444;padding:6px 12px;border:1px solid #252525;border-radius:6px">&#8592; Back to PropDesk</a>
     </div>
+  </div>
+
+  <!-- Auto-sync banner (visible on new device / empty localStorage / sync error) -->
+  <div id="sync-banner" style="display:none;background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:12px 16px;margin-bottom:16px;align-items:center;gap:10px;flex-wrap:nowrap">
+    <span id="sync-banner-msg" style="font-size:12px;color:#888;flex:1;min-width:0;line-height:1.4"></span>
+    <button id="sync-banner-act" class="btn sm" style="flex-shrink:0;white-space:nowrap;display:none" onclick="syncSupabase()">Sync Now</button>
+    <button class="btn sm" style="flex-shrink:0;padding:4px 10px" onclick="document.getElementById('sync-banner').style.display='none'">&#215;</button>
   </div>
 
   <!-- Dashboard auto-sections -->
@@ -1039,33 +1050,66 @@ function loadLocalPicks(){
   catch(e){ return []; }
 }
 
-function syncSupabase(){
+function _setBanner(msg,showSyncBtn){
+  var b=document.getElementById('sync-banner');
+  var bm=document.getElementById('sync-banner-msg');
+  var ba=document.getElementById('sync-banner-act');
+  if(!b) return;
+  b.style.display='flex';
+  if(bm) bm.textContent=msg;
+  if(ba) ba.style.display=showSyncBtn?'':'none';
+}
+function _hideBanner(){
+  var b=document.getElementById('sync-banner');
+  if(b) b.style.display='none';
+}
+
+function syncSupabase(auto){
   var btn=document.getElementById('sync-btn');
   var stat=document.getElementById('sync-status');
   if(btn){btn.disabled=true;btn.textContent='Syncing\u2026';}
-  stat.textContent='Connecting\u2026';
+  if(stat) stat.textContent='Connecting\u2026';
+  if(auto) _setBanner('Syncing picks from Supabase\u2026',false);
 
   if(!_sb){
     try{ _sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY); }
-    catch(e){ stat.textContent='Supabase unavailable'; if(btn){btn.disabled=false;btn.textContent='Sync Supabase';} return; }
+    catch(e){
+      if(stat) stat.textContent='Supabase unavailable';
+      if(auto) _setBanner('Supabase unavailable \u2014 check your connection.',true);
+      if(btn){btn.disabled=false;btn.textContent='Sync Supabase';}
+      return;
+    }
   }
 
   _sb.auth.getSession().then(function(res){
     var session=res&&res.data&&res.data.session;
     if(!session){
-      stat.textContent='No active session \u2014 open PropDesk and sign in first.';
+      var noSessMsg='No Supabase session \u2014 open PropDesk on this device and sign in, then tap Sync.';
+      if(stat) stat.textContent=noSessMsg;
+      if(auto) _setBanner(noSessMsg,true);
       if(btn){btn.disabled=false;btn.textContent='Sync Supabase';}
       return;
     }
     var uid=session.user.id;
     _sb.from('plays').select('*').eq('user_id',uid).order('logged_at',{ascending:false}).then(function(res2){
-      if(res2.error){ stat.textContent='Sync failed: '+(res2.error.message||'unknown'); if(btn){btn.disabled=false;btn.textContent='Sync Supabase';} return; }
+      if(res2.error){
+        var errMsg='Sync failed: '+(res2.error.message||'unknown');
+        if(stat) stat.textContent=errMsg;
+        if(auto) _setBanner(errMsg,true);
+        if(btn){btn.disabled=false;btn.textContent='Sync Supabase';}
+        return;
+      }
       var rows=(res2.data||[]).map(_sbMap);
       localStorage.setItem(PLAY_HIST_KEY,JSON.stringify(rows));
       allPicks=rows;
-      document.getElementById('sync-count').textContent=rows.length+' picks';
-      stat.textContent='Synced from Supabase';
+      allPicks.forEach(function(p,i){ p._pid=i; });
+      _lastHash=_pickHash(allPicks);
+      var cnt=document.getElementById('sync-count');
+      if(cnt) cnt.textContent=rows.length+' picks';
+      if(stat) stat.textContent='Synced \u2014 '+rows.length+' picks';
+      if(auto) _hideBanner();
       applyDateFilter();
+      renderDashboard();
       if(btn){btn.disabled=false;btn.textContent='Sync Supabase';}
     });
   });
@@ -1305,6 +1349,27 @@ function updatePreview(){
    EXPORT
    ═══════════════════════════════════════════════════════════════════════════ */
 
+function _isIOS(){
+  return /iP(hone|ad|od)/.test(navigator.platform)||
+    (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+}
+
+function _downloadCanvas(canvas,filename,cb){
+  var ios=_isIOS();
+  canvas.toBlob(function(blob){
+    var url=URL.createObjectURL(blob);
+    if(ios){
+      window.open(url,'_blank');
+    } else {
+      var a=document.createElement('a');
+      a.download=filename; a.href=url;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); },60000);
+    }
+    if(cb) cb(ios);
+  },'image/png');
+}
+
 function downloadPNG(){
   var render=document.getElementById('card-render');
   if(!render.firstElementChild){ showStatus('Select a pick first'); return; }
@@ -1325,12 +1390,10 @@ function downloadPNG(){
       var picks=tmpl&&tmpl.autoLoad?allPicks:getSelectedPicks();
       var nameBase=(picks[0]&&(picks[0].player||picks[0].team)||'propdesk-card')
         .toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
-      var link=document.createElement('a');
-      link.download='propdesk-'+nameBase+'-'+todayISO()+'.png';
-      link.href=canvas.toDataURL('image/png');
-      link.click();
-      showStatus('Downloaded \u2713');
-      if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML='&darr; Download PNG';}
+      _downloadCanvas(canvas,'propdesk-'+nameBase+'-'+todayISO()+'.png',function(ios){
+        showStatus(ios?'Image opened \u2014 long-press to save \u2713':'Downloaded \u2713');
+        if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML='&darr; Download PNG';}
+      });
     }).catch(function(e){
       showStatus('Export failed: '+(e&&e.message||String(e)),true);
       if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML='&darr; Download PNG';}
@@ -1569,10 +1632,7 @@ function downloadCardPNG(idx){
     html2canvas(render.firstElementChild,{scale:2,useCORS:false,allowTaint:true,logging:false})
     .then(function(canvas){
       if(canvas.width<500||canvas.height<200) throw new Error('Render incomplete');
-      var link=document.createElement('a');
-      link.download=card.filename;
-      link.href=canvas.toDataURL('image/png');
-      link.click();
+      _downloadCanvas(canvas,card.filename);
     }).catch(function(e){ console.error('Download failed:',e); });
   },160);
 }
@@ -1663,7 +1723,7 @@ function init(){
     pillsEl.appendChild(btn);
   });
 
-  // Load picks
+  // Load picks — auto-sync from Supabase if localStorage is empty (new/different device)
   allPicks=loadLocalPicks();
   allPicks.forEach(function(p,i){ p._pid=i; });
   var cnt=document.getElementById('sync-count');
@@ -1672,6 +1732,7 @@ function init(){
   // Render dashboard and set up auto-refresh
   _lastHash=_pickHash(allPicks);
   renderDashboard();
+  if(!allPicks.length) syncSupabase(true);
   window.addEventListener('storage',function(e){ if(e.key===PLAY_HIST_KEY) _refresh(); });
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) _refresh(); });
   setInterval(_refresh,60000);
