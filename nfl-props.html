@@ -5740,7 +5740,7 @@ function _sbMapToLocal(r){
     trendSignal:r.trend_signal||null,trendRecord:r.trend_record||null,
     trendWinRate:r.trend_win_rate||null,trendSystem:r.trend_system||null,
     trendDescription:r.trend_description||null,trendSampleSize:r.trend_sample_size||null,
-    teamId:r.team_id||null,loggedAt:r.logged_at,autoResolved:r.auto_resolved||false};
+    teamId:r.team_id||null,loggedAt:r.logged_at!=null?Number(r.logged_at):null,autoResolved:r.auto_resolved||false};
 }
 function _sbToRow(play,uid){
   return {user_id:uid,date:play.date,player:play.player||null,market:play.market||null,
@@ -5778,6 +5778,7 @@ async function _sbMigrateIfNeeded(user){
       const sbLoggedAts=new Set(sbPlays.map(p=>p.loggedAt));
       const localPlays=loadPlayHist();
       const pendingLocal=localPlays.filter(p=>p.loggedAt&&!sbLoggedAts.has(p.loggedAt));
+      if(pendingLocal.length){ try{ await _supabase.from('plays').insert(pendingLocal.map(function(p){return _sbToRow(p,user.id);})); }catch(_){} }
       const merged=[...pendingLocal,...sbPlays];
       merged.sort((a,b)=>(b.loggedAt||0)-(a.loggedAt||0));
       savePlayHist(merged);
@@ -6479,6 +6480,7 @@ async function renderPlayHistory(){
         const sbLoggedAts=new Set(sbPlays.map(p=>p.loggedAt));
         const localPlays=loadPlayHist();
         const pendingLocal=localPlays.filter(p=>p.loggedAt&&!sbLoggedAts.has(p.loggedAt));
+        if(pendingLocal.length) _supabase.from('plays').insert(pendingLocal.map(function(p){return _sbToRow(p,_authUser.id);}));
         const merged=[...pendingLocal,...sbPlays];
         merged.sort((a,b)=>(b.loggedAt||0)-(a.loggedAt||0));
         savePlayHist(merged);

@@ -1355,18 +1355,30 @@ function _isIOS(){
 }
 
 function _downloadCanvas(canvas,filename,cb){
-  var ios=_isIOS();
   canvas.toBlob(function(blob){
+    var ios=_isIOS();
+    if(ios&&navigator.share){
+      var file=new File([blob],filename,{type:'image/png'});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){
+        navigator.share({files:[file],title:'PropDesk'})
+          .then(function(){ if(cb) cb('share'); })
+          .catch(function(){
+            var url=URL.createObjectURL(blob);
+            window.open(url,'_blank');
+            if(cb) cb('open');
+          });
+        return;
+      }
+    }
     var url=URL.createObjectURL(blob);
-    if(ios){
-      window.open(url,'_blank');
-    } else {
+    if(ios){ window.open(url,'_blank'); if(cb) cb('open'); }
+    else{
       var a=document.createElement('a');
       a.download=filename; a.href=url;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(function(){ URL.revokeObjectURL(url); },60000);
+      if(cb) cb(false);
     }
-    if(cb) cb(ios);
   },'image/png');
 }
 
@@ -1390,8 +1402,9 @@ function downloadPNG(){
       var picks=tmpl&&tmpl.autoLoad?allPicks:getSelectedPicks();
       var nameBase=(picks[0]&&(picks[0].player||picks[0].team)||'propdesk-card')
         .toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
-      _downloadCanvas(canvas,'propdesk-'+nameBase+'-'+todayISO()+'.png',function(ios){
-        showStatus(ios?'Image opened \u2014 long-press to save \u2713':'Downloaded \u2713');
+      _downloadCanvas(canvas,'propdesk-'+nameBase+'-'+todayISO()+'.png',function(result){
+        showStatus(result==='share'?'Tap \u201cSave Image\u201d in the share sheet \u2713':
+          result==='open'?'Image opened \u2014 long-press to save \u2713':'Downloaded \u2713');
         if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML='&darr; Download PNG';}
       });
     }).catch(function(e){
