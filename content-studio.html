@@ -1383,7 +1383,7 @@ function _getAutoTrends(){
 
 function _getTodayPicks(){
   var today=todayISO();
-  return allPicks.filter(function(p){ return p.source!=='trend'&&p.date===today; });
+  return allPicks.filter(function(p){ return p.date===today; });
 }
 
 function _getTodayGames(picks){
@@ -1541,6 +1541,7 @@ function _toggleAdvanced(){
   var open=panel.style.display==='block';
   panel.style.display=open?'none':'block';
   btn.textContent=open?'⚙ Advanced Controls':'× Close Advanced';
+  if(!open) applyDateFilter();
 }
 
 function _showAdvanced(){
