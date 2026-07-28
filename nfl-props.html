@@ -6957,7 +6957,7 @@ async function renderPlayHistory(){
     var mlbProps=mlbPend.filter(function(e){return e.source!=='trend';});
     Promise.all(mlbTrends.map(function(e){return resolvePlayerStatTrend(e);}).concat(
       mlbTotals.map(function(e){return resolveTotalsTrend(e);}).concat(
-      mlbProps.map(function(e){return resolvePlayAutomatically(e);}))).then(function(){
+      mlbProps.map(function(e){return resolvePlayAutomatically(e);})))).then(function(){
       var h=loadPlayHist(), today=new Date().toISOString().slice(0,10);
       var still=h.filter(function(e){return e.result==="pending"&&e.date<today;});
       renderPlayHistory();
