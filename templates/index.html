@@ -9341,33 +9341,34 @@ function _trendTypeBreakdownHtml(){
   var rows=ALL_TYPES.map(function(t){
     var tp=byType[t]; var n=tp.length;
     if(!n) return '';
-    if(n<MIN) return '<tr style="border-bottom:1px solid #0f0f0f">'
-      +'<td style="padding:7px 8px 7px 0;font-size:11px">'+t+'</td>'
-      +'<td colspan="4" style="text-align:center;color:#555;font-size:10px;font-style:italic;padding:7px 0">Not enough data ('+n+'/'+MIN+' min)</td></tr>';
+    var bd='border-bottom:1px solid #0f0f0f';
+    if(n<MIN) return '<tr>'
+      +'<td style="padding:7px 8px 7px 0;font-size:11px;'+bd+'">'+t+'</td>'
+      +'<td colspan="4" style="text-align:center;color:#555;font-size:10px;font-style:italic;padding:7px 0;'+bd+'">Not enough data ('+n+'/'+MIN+' min)</td></tr>';
     var hits=tp.filter(function(e){return e.result==='hit';}).length;
     var rate=Math.round(hits/n*100);
     var roi=calcROI(tp);
     var rCls=rate>=65?'ts-pos':rate<45?'ts-neg':'ts-neu';
     var oCls=roi.roi>0?'ts-pos':roi.roi<0?'ts-neg':'ts-neu';
     var uCls=roi.units>0?'ts-pos':roi.units<0?'ts-neg':'ts-neu';
-    return '<tr style="border-bottom:1px solid #0f0f0f">'
-      +'<td style="padding:7px 8px 7px 0;font-size:11px">'+t+'</td>'
-      +'<td class="'+rCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px">'+rate+'%</td>'
-      +'<td class="'+oCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px">'+(roi.roi>0?'+':'')+roi.roi+'%</td>'
-      +'<td class="'+uCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px">'+(roi.units>0?'+':'')+roi.units+'</td>'
-      +'<td style="text-align:right;padding:7px 0 7px 12px;color:var(--mut);font-size:11px">'+n+'</td></tr>';
+    return '<tr>'
+      +'<td style="padding:7px 8px 7px 0;font-size:11px;'+bd+'">'+t+'</td>'
+      +'<td class="'+rCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;'+bd+'">'+rate+'%</td>'
+      +'<td class="'+oCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;'+bd+'">'+(roi.roi>0?'+':'')+roi.roi+'%</td>'
+      +'<td class="'+uCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;'+bd+'">'+(roi.units>0?'+':'')+roi.units+'</td>'
+      +'<td style="text-align:right;padding:7px 0 7px 12px;color:var(--mut);font-size:11px;'+bd+'">'+n+'</td></tr>';
   }).join('');
   if(!rows) return '';
   return '<div class="ts-card" style="margin-bottom:14px">'
     +'<div class="ts-card-hdr"><span class="ts-card-title">By Trend Type</span>'
     +'<span style="font-size:10px;color:var(--mut2)">Tracked trends with resolved results</span></div>'
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
-    +'<thead><tr style="border-bottom:1px solid #222">'
-    +'<th style="text-align:left;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px">Type</th>'
-    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px">Hit Rate</th>'
-    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px">ROI%</th>'
-    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px">Units</th>'
-    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px">Plays</th>'
+    +'<thead><tr>'
+    +'<th style="text-align:left;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px;border-bottom:1px solid #222">Type</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">Hit Rate</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">ROI%</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">Units</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">Plays</th>'
     +'</tr></thead>'
     +'<tbody>'+rows+'</tbody></table></div></div>';
 }
