@@ -9348,6 +9348,10 @@ function _trendTypeBreakdownHtml(){
   ALL_TYPES.forEach(function(t){ byType[t]=[]; });
   plays.forEach(function(e){ if(byType[e.trendType]) byType[e.trendType].push(e); });
   if(!ALL_TYPES.some(function(t){ return byType[t].length>0; })) return '';
+  function _fmtD(d){ if(!d) return ''; var p=d.split('-'); var M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return M[+p[1]-1]+' '+parseInt(p[2],10); }
+  var dates=plays.map(function(p){return p.date||'';}).filter(Boolean).sort();
+  var dateLabel=dates.length>1?_fmtD(dates[0])+' – '+_fmtD(dates[dates.length-1]):dates.length===1?_fmtD(dates[0]):'';
+  var subtitle=plays.length+' resolved'+(dateLabel?' · '+dateLabel:'');
   var MIN=3;
   var rows=ALL_TYPES.map(function(t){
     var tp=byType[t]; var n=tp.length;
@@ -9355,28 +9359,52 @@ function _trendTypeBreakdownHtml(){
     var bd='border-bottom:1px solid #0f0f0f';
     if(n<MIN) return '<tr>'
       +'<td style="padding:7px 8px 7px 0;font-size:11px;'+bd+'">'+t+'</td>'
-      +'<td colspan="4" style="text-align:center;color:#555;font-size:10px;font-style:italic;padding:7px 0;'+bd+'">Not enough data ('+n+'/'+MIN+' min)</td></tr>';
+      +'<td colspan="5" style="text-align:center;color:#a07840;font-size:10px;font-style:italic;padding:7px 0;'+bd+'">Not enough data ('+n+'/'+MIN+' min)</td></tr>';
     var hits=tp.filter(function(e){return e.result==='hit';}).length;
     var rate=Math.round(hits/n*100);
+    var cVals=tp.map(function(p){ return p.confidence!=null?p.confidence:p.trendWinRate!=null?Math.round(p.trendWinRate*100):null; }).filter(function(v){return v!=null;});
+    var avgConf=cVals.length?Math.round(cVals.reduce(function(s,v){return s+v;},0)/cVals.length):null;
+    var cDiff=avgConf!=null?rate-avgConf:null;
+    var cCls=cDiff!=null?(cDiff>=5?'ts-pos':cDiff<=-5?'ts-neg':'ts-neu'):'ts-neu';
+    var confStr=avgConf!=null?(avgConf+'%'+(cDiff>=5?' ↑':cDiff<=-5?' ↓':'')):'—';
+    var confTitle=avgConf!=null?'Avg conf: '+avgConf+'%, actual: '+rate+'% ('+(cDiff>=0?'+':'')+cDiff+'pp)':'No confidence data';
+    var sorted=tp.slice().sort(function(a,b){return (b.loggedAt||0)-(a.loggedAt||0);});
+    var rc=sorted.slice(0,Math.min(20,n));
+    var rHits=rc.filter(function(e){return e.result==='hit';}).length;
+    var rRate=Math.round(rHits/rc.length*100);
+    var delta=rRate-rate;
+    var tArrow=n>=20?(delta>=5?'<span style="color:#00e87a;font-size:9px;vertical-align:middle;margin-left:3px">▲</span>':delta<=-5?'<span style="color:#ff4f4f;font-size:9px;vertical-align:middle;margin-left:3px">▼</span>':'<span style="color:#444;font-size:9px;vertical-align:middle;margin-left:3px">—</span>'):'';
+    var arrowTitle='Last '+rc.length+': '+rRate+'% vs all-time: '+rate+'%';
+    var pm={};
+    tp.forEach(function(p){ var k=p.player||''; if(!k) return; if(!pm[k]) pm[k]={hits:0,n:0}; pm[k].n++; if(p.result==='hit') pm[k].hits++; });
+    var qualified=Object.keys(pm).filter(function(k){return pm[k].n>=3;});
+    var best=null,bRate=-1,worst=null,wRate=2;
+    qualified.forEach(function(k){ var r=pm[k].hits/pm[k].n; if(r>bRate){bRate=r;best={name:k,hits:pm[k].hits,n:pm[k].n};} if(r<wRate){wRate=r;worst={name:k,hits:pm[k].hits,n:pm[k].n};} });
+    if(worst&&best&&worst.name===best.name) worst=null;
+    var subLines='';
+    if(best) subLines+='<div style="font-size:9px;color:#00e87a;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px">▲ '+esc(best.name)+' ('+best.hits+'/'+best.n+')</div>';
+    if(worst) subLines+='<div style="font-size:9px;color:#ff4f4f;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px">▼ '+esc(worst.name)+' ('+worst.hits+'/'+worst.n+')</div>';
     var roi=calcROI(tp);
     var rCls=rate>=65?'ts-pos':rate<45?'ts-neg':'ts-neu';
     var oCls=roi.roi>0?'ts-pos':roi.roi<0?'ts-neg':'ts-neu';
     var uCls=roi.units>0?'ts-pos':roi.units<0?'ts-neg':'ts-neu';
     return '<tr>'
-      +'<td style="padding:7px 8px 7px 0;font-size:11px;'+bd+'">'+t+'</td>'
-      +'<td class="'+rCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;'+bd+'">'+rate+'%</td>'
-      +'<td class="'+oCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;'+bd+'">'+(roi.roi>0?'+':'')+roi.roi+'%</td>'
-      +'<td class="'+uCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;'+bd+'">'+(roi.units>0?'+':'')+roi.units+'</td>'
-      +'<td style="text-align:right;padding:7px 0 7px 12px;color:var(--mut);font-size:11px;'+bd+'">'+n+'</td></tr>';
+      +'<td style="padding:7px 8px 7px 0;font-size:11px;'+bd+'"><div>'+t+'</div>'+subLines+'</td>'
+      +'<td class="'+rCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;vertical-align:top;'+bd+'" title="'+arrowTitle+'">'+rate+'%'+tArrow+'</td>'
+      +'<td class="'+cCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;vertical-align:top;'+bd+'" title="'+confTitle+'">'+confStr+'</td>'
+      +'<td class="'+oCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;vertical-align:top;'+bd+'">'+(roi.roi>0?'+':'')+roi.roi+'%</td>'
+      +'<td class="'+uCls+'" style="text-align:right;padding:7px 0 7px 12px;font-weight:700;font-size:13px;vertical-align:top;'+bd+'">'+(roi.units>0?'+':'')+roi.units+'</td>'
+      +'<td style="text-align:right;padding:7px 0 7px 12px;color:var(--mut);font-size:11px;vertical-align:top;'+bd+'">'+n+'</td></tr>';
   }).join('');
   if(!rows) return '';
   return '<div class="ts-card" style="margin-bottom:14px">'
     +'<div class="ts-card-hdr"><span class="ts-card-title">By Trend Type</span>'
-    +'<span style="font-size:10px;color:var(--mut2)">Tracked trends with resolved results</span></div>'
+    +'<span style="font-size:10px;color:var(--mut2)">'+subtitle+'</span></div>'
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">'
     +'<thead><tr>'
     +'<th style="text-align:left;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px;border-bottom:1px solid #222">Type</th>'
     +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">Hit Rate</th>'
+    +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">Avg Conf</th>'
     +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">ROI%</th>'
     +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">Units</th>'
     +'<th style="text-align:right;color:var(--mut2);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:0 0 8px 12px;border-bottom:1px solid #222">Plays</th>'
