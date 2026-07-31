@@ -1353,6 +1353,9 @@ function _isIOS(){
   return /iP(hone|ad|od)/.test(navigator.platform)||
     (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 }
+function _dlBtnLabel(){
+  return _isIOS()?'&#128247; Save to Photos':'&#8595; Download PNG';
+}
 
 function _downloadCanvas(canvas,filename,cb){
   canvas.toBlob(function(blob){
@@ -1362,7 +1365,8 @@ function _downloadCanvas(canvas,filename,cb){
       if(navigator.canShare&&navigator.canShare({files:[file]})){
         navigator.share({files:[file],title:'PropDesk'})
           .then(function(){ if(cb) cb('share'); })
-          .catch(function(){
+          .catch(function(err){
+            if(err&&err.name==='AbortError'){ if(cb) cb('cancel'); return; }
             var url=URL.createObjectURL(blob);
             window.open(url,'_blank');
             if(cb) cb('open');
@@ -1403,13 +1407,14 @@ function downloadPNG(){
       var nameBase=(picks[0]&&(picks[0].player||picks[0].team)||'propdesk-card')
         .toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
       _downloadCanvas(canvas,'propdesk-'+nameBase+'-'+todayISO()+'.png',function(result){
-        showStatus(result==='share'?'Tap \u201cSave Image\u201d in the share sheet \u2713':
+        showStatus(result==='share'?'Saved to Photos \u2713':
+          result==='cancel'?'':
           result==='open'?'Image opened \u2014 long-press to save \u2713':'Downloaded \u2713');
-        if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML='&darr; Download PNG';}
+        if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML=_dlBtnLabel();}
       });
     }).catch(function(e){
       showStatus('Export failed: '+(e&&e.message||String(e)),true);
-      if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML='&darr; Download PNG';}
+      if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML=_dlBtnLabel();}
     });
   },160);
 }
@@ -1475,7 +1480,7 @@ function _dashCardHtml(cardHtml,cap,idx){
     '<div class="card-mini-prev"><div class="card-mini-inner">'+cardHtml+'</div></div>'+
     '<textarea class="card-cap" data-idx="'+idx+'">'+esc(cap)+'</textarea>'+
     '<div class="card-actions">'+
-      '<button class="btn accent sm" style="flex:1" onclick="downloadCardPNG('+idx+')">&#8595; Download</button>'+
+      '<button class="btn accent sm" style="flex:1" onclick="downloadCardPNG('+idx+')">'+(_isIOS()?'&#128247; Save':'&#8595; Download')+'</button>'+
       '<button class="btn sm" style="flex:1" onclick="copyCardCaption('+idx+')">&#10063; Caption</button>'+
     '</div>'+
   '</div>';
@@ -1768,6 +1773,8 @@ function init(){
     if(_handoffFound){ selectedIds.add(_handoffFound._pid); updatePreview(); }
     _showAdvanced();
   }
+  var _dlb=document.getElementById('dl-btn');
+  if(_dlb) _dlb.innerHTML=_dlBtnLabel();
 }
 </script>
 </body>
