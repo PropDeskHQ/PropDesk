@@ -8637,6 +8637,7 @@ async function calcPlayerMatchupTrends(){
     combos.sort(function(a,b){ return b.rate-a.rate; });
     var best=combos[0];
     if(best.rate<0.70) continue; // require a real, meaningful lean — never surface a coin-flip as a "system"
+    var _matchType=best.label.indexOf("left-handed")>=0?"lefty_matchup":best.label.indexOf("right-handed")>=0?"righty_matchup":"matchup";
 
     var mktLbl=marketName(p._market);
     var isThresh=isThreshProp(p);
@@ -8647,7 +8648,7 @@ async function calcPlayerMatchupTrends(){
     var _tpM=best.vals.length<5?-0.07:(best.vals.length<10?-0.04:0);
     var conf=_rvM!=null?Math.round(Math.max(0.01,Math.min(0.95,_rvM+_tpM))*100):Math.round(Math.min(94,50+best.rate*40+Math.min(best.n,10)));
     trends.push({
-      type:"matchup",
+      type:_matchType,
       conf:conf,
       player:p.player,
       systemName:trendSystemName(p.player,best.label),
@@ -9059,6 +9060,196 @@ async function calcBullpenFatigueTrends(){
   return trends;
 }
 
+/* === Bullpen-Matchup Batter Edge (MLB only) ===
+   Combines fatigued opposing bullpen (>=9 relief IP / last 3 games) with a batter
+   batting cleanup or lower (slot 4-9). All underlying fetches are shared with
+   calcPlayerMatchupTrends and calcBullpenFatigueTrends (same cached endpoints). */
+async function calcBullpenMatchupTrends(){
+  var trends=[];
+  if(_trendsSport!=="baseball_mlb") return trends;
+
+  // Build opposing-team relief-IP map — all calls hit _boxCache/_teamGamesCache (warm after matchup trends)
+  var oppBullpenIP={};
+  for(var ei=0;ei<_trendsEvents.length;ei++){
+    var ev=_trendsEvents[ei];
+    var homeTeam=ev.home_team||"",awayTeam=ev.away_team||"";
+    var tIds=await Promise.all([mlbTeamId(homeTeam),mlbTeamId(awayTeam)]);
+    var hId=tIds[0],aId=tIds[1]; if(!hId||!aId) continue;
+    var allTms=[{id:hId,name:homeTeam},{id:aId,name:awayTeam}];
+    for(var ti2=0;ti2<allTms.length;ti2++){
+      var tm2=allTms[ti2];
+      if(oppBullpenIP[tm2.id]!==undefined) continue;
+      var rGames=await mlbTeamRecentGames(tm2.id);
+      var last3=rGames.filter(function(g){return g.gamePk!=null;}).slice(0,3);
+      if(last3.length<3){oppBullpenIP[tm2.id]=null;continue;}
+      var ips=await Promise.all(last3.map(async function(g2){
+        try{var bctx=await mlbBoxscoreContext(g2.gamePk);var side2=g2.isHome?"home":"away";
+          if(bctx&&bctx[side2])return bctx[side2].reliefIP||0;}catch(e2){}return null;
+      }));
+      var vld=ips.filter(function(v){return v!=null;});
+      oppBullpenIP[tm2.id]=vld.length>=2?ips.reduce(function(s,v){return s+(v||0);},0):null;
+    }
+  }
+
+  var candidates=(ST.props||[]).filter(function(p){
+    return p.enriched&&!p.pdNoValue&&p._market&&p._market.indexOf("batter_")===0&&
+      p._vals&&p._vals.length>=5&&p._gamePks&&
+      p._gamePks.filter(function(g){return g!=null;}).length>=5&&
+      p.pdConfidence!=null&&p.bestOdds!=null;
+  });
+  candidates.sort(function(a,b){return (b.pdConfidence||0)-(a.pdConfidence||0);});
+  candidates=candidates.slice(0,8);
+
+  var curEv=(_trendsEvents||[]).find(function(e){return e.id===ST.eventId;});
+  if(!curEv) return trends;
+  var _homeTeam=curEv.home_team||"",_awayTeam=curEv.away_team||"";
+  var _evIds=await Promise.all([mlbTeamId(_homeTeam),mlbTeamId(_awayTeam)]);
+  var _homeId=_evIds[0],_awayId=_evIds[1];
+
+  for(var ci=0;ci<candidates.length;ci++){
+    var p=candidates[ci];
+    var line=p.pdLine!=null?p.pdLine:p.bestLine;
+    if(line==null||p._playerId==null) continue;
+    var isOver=(p.pdSide||"Over")==="Over";
+    var vals=p._vals,gamePks=p._gamePks,isHomeArr=p._isHomeArr||[];
+    var n=Math.min(vals.length,gamePks.length,15);
+
+    // Determine which side of today's game the batter is on (cached after first call)
+    var playerTeamId=await mlbPlayerTeamId(p._playerId);
+    if(!playerTeamId) continue;
+    var playerIsHome=playerTeamId===_homeId;
+    var oppTeamId=playerIsHome?_awayId:_homeId;
+    var oppTeamName=playerIsHome?_awayTeam:_homeTeam;
+    if(!oppTeamId) continue;
+    var oppIP=oppBullpenIP[oppTeamId];
+    if(oppIP==null) continue;
+    var lean=oppIP>=12?"HEAVILY FATIGUED":oppIP>=9?"FATIGUED":null;
+    if(!lean) continue;
+
+    // Get the batter's typical lineup slot from recent boxscores
+    var ctxList=await Promise.all(gamePks.slice(0,n).map(function(gpk){
+      return gpk?mlbBoxscoreContext(gpk):Promise.resolve(null);
+    }));
+    var slots=[];
+    for(var gj=0;gj<n;gj++){
+      var box=ctxList[gj]; if(!box) continue;
+      var isHome=isHomeArr[gj]!==false;
+      var myBox=box[isHome?"home":"away"];
+      var slot=myBox?myBox.orderMap[p._playerId]:null;
+      if(slot!=null) slots.push(slot);
+    }
+    if(!slots.length) continue;
+    var avgSlot=slots.reduce(function(s,v){return s+v;},0)/slots.length;
+    if(avgSlot<3.5) continue; // top-3 batters face the starter more than relievers
+
+    var _rvB=compositeConf(vals,line,isOver,p.seasonBA||null);
+    if(_rvB===null) continue;
+    var _tpB=vals.length<5?-0.07:(vals.length<10?-0.04:0);
+    var fatigueBoost=lean==="HEAVILY FATIGUED"?0.06:0.04;
+    var conf=Math.round(Math.max(0.01,Math.min(0.93,_rvB+_tpB+fatigueBoost))*100);
+    if(conf<75) continue;
+
+    var isThresh=isThreshProp(p);
+    var lineLabel=isThresh?threshLabel(line,p._market):fmtLine(line,p.pdSide||"Over");
+    var ipStr=oppIP.toFixed(1);
+    var slotLabel=Math.round(avgSlot)===4?"cleanup":Math.round(avgSlot)+"th";
+    var hitCount=vals.filter(function(v){return isOver?v>line:v<line;}).length;
+
+    trends.push({
+      type:"bullpen_edge",conf:conf,player:p.player,systemName:lean,
+      headline:oppTeamName+" bullpen has thrown "+ipStr+" IP over the last 3 games ("+lean+"). "+p.player+" bats "+slotLabel+" in the order — well-positioned to face tired relief arms late.",
+      title:p.player+" "+lineLabel,
+      record:hitCount+"-"+(vals.length-hitCount)+" L"+vals.length,
+      hitRate:Math.round(hitCount/vals.length*100),
+      recordCls:(p.pdSide||"Over")==="Under"?"under":"",
+      detail:"Bullpen edge play — based on "+oppTeamName+"'s recent workload ("+ipStr+" relief innings over the last 3 games), not "+p.player+"'s personal record vs relievers. "+lean+" bullpens create structural late-game advantage for opposing hitters batting 4th–9th in the order.",
+      source:"MLB Stats API — Boxscore Workload",
+      shareText:"PropDesk Trend: "+p.player+" "+lineLabel+" — "+oppTeamName+" bullpen "+lean+" ("+ipStr+" IP/L3) | propdeskhq.netlify.app",
+      _game:p._game||"",_market:p._market||"",_rawLine:isThresh?threshLabel(line,p._market):line,
+      _rawIsOver:isOver,playerId:p._playerId||null,odds:p.bestOdds||null
+    });
+  }
+  return trends;
+}
+
+/* === Road Underdog Value (MLB only) ===
+   Surfaces teams with a strong road win record vs winning opponents when they are
+   today's road underdog in the +105 to +200 price band.
+   PROXY NOTE: "road vs .500+ opponent" stands in for historical underdog pricing —
+   actual per-game betting lines are not stored. This is written into the card detail copy. */
+var _h2hOddsCache={};
+async function calcRoadUnderdogTrends(){
+  var trends=[];
+  if(_trendsSport!=="baseball_mlb"||!getKey()) return trends;
+
+  for(var ei=0;ei<_trendsEvents.length;ei++){
+    var ev=_trendsEvents[ei];
+    var homeTeam=ev.home_team||"",awayTeam=ev.away_team||"";
+
+    // Fetch today's h2h odds — one Odds API call per event, cached
+    if(_h2hOddsCache[ev.id]===undefined){
+      _h2hOddsCache[ev.id]=null;
+      try{
+        var or=await fetch(apiUrl("/sports/"+_trendsSport+"/events/"+ev.id+"/odds",{
+          regions:"us",markets:"h2h",oddsFormat:"american"
+        }),{signal:AbortSignal.timeout(8000)});
+        if(or.ok){
+          var od=await or.json();
+          var bestAway=null,bestHome=null;
+          (od.bookmakers||[]).forEach(function(bm){
+            (bm.markets||[]).forEach(function(mkt){
+              if(mkt.key!=="h2h") return;
+              (mkt.outcomes||[]).forEach(function(oc){
+                if(oc.name===awayTeam&&(bestAway===null||oc.price>bestAway)) bestAway=oc.price;
+                if(oc.name===homeTeam&&(bestHome===null||oc.price>bestHome)) bestHome=oc.price;
+              });
+            });
+          });
+          if(bestAway!=null) _h2hOddsCache[ev.id]={awayOdds:bestAway,homeOdds:bestHome};
+        }
+      }catch(e){}
+    }
+    var h2h=_h2hOddsCache[ev.id];
+    if(!h2h||h2h.awayOdds==null) continue;
+
+    // Road team must be underdog in the +105 to +200 band — skip favorites and long shots
+    if(h2h.awayOdds<=100||h2h.awayOdds>200) continue;
+
+    var awayId=await mlbTeamId(awayTeam);
+    if(!awayId) continue;
+    var awayGames=await mlbTeamRecentGames(awayId);
+
+    // Proxy for "historical road underdog games": away games vs opponents with a winning record
+    var roadProxy=awayGames.filter(function(g){
+      return !g.isHome&&g.opponentRecord&&g.opponentRecord.wins>=g.opponentRecord.losses;
+    });
+    if(roadProxy.length<15) continue;
+    var wins=roadProxy.filter(function(g){return g.won;}).length;
+    var rate=wins/roadProxy.length;
+    if(rate<0.55) continue;
+
+    var n=roadProxy.length;
+    var conf=Math.round(Math.min(82,50+(rate-0.5)*200+Math.min(n-15,25)));
+    if(conf<75) continue;
+
+    var gameStr=awayTeam+" @ "+homeTeam;
+    var pct=Math.round(rate*100);
+    trends.push({
+      type:"road_underdog",conf:conf,player:awayTeam,team:awayTeam,
+      systemName:"ROAD UNDERDOG VALUE",
+      headline:awayTeam+" as road underdog ("+fmtOdds(h2h.awayOdds)+") — "+pct+"% road win rate vs .500+ opponents ("+wins+"-"+(n-wins)+") over "+n+" games, last 3 seasons",
+      title:awayTeam+" Moneyline",
+      record:wins+"-"+(n-wins)+" L"+n+" road vs .500+",
+      hitRate:pct,recordCls:rate<0.5?"under":"",
+      detail:"Road record vs opponents with a winning record: "+wins+"-"+(n-wins)+" ("+pct+"%) over "+n+" games, last 3 seasons. Proxy note: historical underdog betting lines are not stored — this uses road-vs-winning-opponent record as a structural equivalent. The public's tendency to overbet home favorites creates systematic value for road teams in the +105 to +200 range. Today's line: "+fmtOdds(h2h.awayOdds)+".",
+      source:"MLB Stats API — 3 Season Schedule + The Odds API",
+      shareText:"PropDesk Trend: "+awayTeam+" road underdog value — "+pct+"% vs .500+ opponents L3 seasons | propdeskhq.netlify.app",
+      _game:gameStr,_market:"h2h",_rawLine:null,_rawIsOver:null,teamId:awayId,odds:h2h.awayOdds
+    });
+  }
+  return trends;
+}
+
 /* === TYPE 7: Composite Trends (MLB batter multi-signal scoring) === */
 var MLB_PARK_FACTOR={
   "Colorado Rockies":1.14,"Cincinnati Reds":1.06,"Boston Red Sox":1.04,
@@ -9118,6 +9309,16 @@ function _trendCardTitle(t){
   }
   if(t.type==="homeway") return t.player+" — Home/away split";
   if(t.type==="matchup") return t.player+" — Situational matchup edge";
+  if(t.type==="lefty_matchup"||t.type==="righty_matchup"){
+    var mside=t.recordCls==="under"?"Under":"Over";
+    return "Favorable matchup for "+t.player+" — historical splits back the "+mside;
+  }
+  if(t.type==="bullpen_edge"){
+    return (t.recordCls==="under"?"Under":"Over")+" play — "+t.player+" vs a fatigued bullpen";
+  }
+  if(t.type==="road_underdog"){
+    return t.player+" has structural edge as today's road underdog";
+  }
   if(t.type==="nrfi") return t.title||t.player;
   if(t.type==="bullpen") return t.title||t.player;
   return t.title||t.player;
@@ -9165,7 +9366,9 @@ function renderTrendCard(t, sigCls, sigLabel, alreadyTracked){
   var sigCls=sigCls||"tc-weak";
   var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":
     t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
-    t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":
+    t.type==="matchup"?"MATCHUP SYSTEM":t.type==="lefty_matchup"?"LEFTY MATCHUP":t.type==="righty_matchup"?"RIGHTY MATCHUP":
+    t.type==="teamsit"?"TEAM SYSTEM":t.type==="bullpen_edge"?"BULLPEN EDGE":
+    t.type==="road_underdog"?"ROAD UNDERDOG":
     t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":"GAME TOTAL";
   var title=_trendCardTitle(t);
   var action=_trendActionLine(t);
@@ -9334,7 +9537,8 @@ function _trendsStatsSummaryHtml(data){
 
 function _trendTypeBreakdownHtml(){
   var ALL_TYPES=["PLAYER STREAK","HOME/AWAY SPLIT","LINE VALUE","SHARP MONEY",
-    "MATCHUP SYSTEM","TEAM SYSTEM","FIRST INNING","BULLPEN","GAME TOTAL"];
+    "MATCHUP SYSTEM","LEFTY MATCHUP","RIGHTY MATCHUP","TEAM SYSTEM","FIRST INNING",
+    "BULLPEN","BULLPEN EDGE","GAME TOTAL","ROAD UNDERDOG"];
   var plays=loadPlayHist().filter(function(e){
     return e.source==='trend'&&(e.result==='hit'||e.result==='miss');
   });
@@ -9412,11 +9616,14 @@ function renderTrends(trends){
   var breakdownHtml=_trendTypeBreakdownHtml();
   // Filter
   var visible=trends.filter(function(t){
-    return _trendsFilter==="all"||t.type===_trendsFilter;
+    return _trendsFilter==="all"||t.type===_trendsFilter||
+      (_trendsFilter==="matchup"&&(t.type==="lefty_matchup"||t.type==="righty_matchup"))||
+      (_trendsFilter==="bullpen"&&t.type==="bullpen_edge")||
+      (_trendsFilter==="teamsit"&&t.type==="road_underdog");
   });
   // Sort
-  var TYPE_RECENT={movement:0,totals:1,streak:2,homeway:3,linevalue:4,matchup:5,teamsit:6,nrfi:7,bullpen:8};
-  var TYPE_ALPHA={bullpen:0,homeway:1,linevalue:2,matchup:3,movement:4,nrfi:5,streak:6,teamsit:7,totals:8};
+  var TYPE_RECENT={movement:0,totals:1,streak:2,homeway:3,linevalue:4,matchup:5,lefty_matchup:5,righty_matchup:5,teamsit:6,road_underdog:6,nrfi:7,bullpen:8,bullpen_edge:8};
+  var TYPE_ALPHA={bullpen:0,bullpen_edge:0,homeway:1,linevalue:2,lefty_matchup:3,matchup:3,righty_matchup:3,movement:4,nrfi:5,streak:6,road_underdog:7,teamsit:7,totals:8};
   if(_trendsSort==="strength"){
     visible=visible.slice().sort(function(a,b){return b.conf-a.conf;});
   } else if(_trendsSort==="recent"){
@@ -9489,7 +9696,9 @@ function renderTrends(trends){
         if(!_trendQualifies(t)) return;
         var tl=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":
           t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
-          t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":
+          t.type==="matchup"?"MATCHUP SYSTEM":t.type==="lefty_matchup"?"LEFTY MATCHUP":
+          t.type==="righty_matchup"?"RIGHTY MATCHUP":t.type==="bullpen_edge"?"BULLPEN EDGE":
+          t.type==="road_underdog"?"ROAD UNDERDOG":t.type==="teamsit"?"TEAM SYSTEM":
           t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":"GAME TOTAL";
         var mkt=t._market||'';
         var tLine=t._rawLine!=null?String(t._rawLine):'';
@@ -9521,7 +9730,11 @@ function renderTrends(trends){
       var idx=parseInt(btn.getAttribute("data-tidx"),10);
       var t=_trendsData[idx]; if(!t) return;
       var today=new Date().toISOString().slice(0,10);
-      var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":t.type==="composite"?"COMPOSITE TREND":t.type==="ml"?"MONEYLINE TREND":t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":(t.type||"TREND").toUpperCase();
+      var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":
+        t.type==="composite"?"COMPOSITE TREND":t.type==="ml"?"MONEYLINE TREND":
+        t.type==="lefty_matchup"?"LEFTY MATCHUP":t.type==="righty_matchup"?"RIGHTY MATCHUP":
+        t.type==="bullpen_edge"?"BULLPEN EDGE":t.type==="road_underdog"?"ROAD UNDERDOG":
+        t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":(t.type||"TREND").toUpperCase();
       var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
       var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
       var _trSpMap={'americanfootball_nfl':'NFL','basketball_nba':'NBA','icehockey_nhl':'NHL','baseball_mlb':'MLB'};
@@ -9669,6 +9882,10 @@ async function trendsFetchAndLoad(){
       if(nrfiTrends.length) trends=trends.concat(nrfiTrends);
       var bullpenTrends=await calcBullpenFatigueTrends();
       if(bullpenTrends.length) trends=trends.concat(bullpenTrends);
+      var bullpenEdgeTrends=await calcBullpenMatchupTrends();
+      if(bullpenEdgeTrends.length) trends=trends.concat(bullpenEdgeTrends);
+      var roadUnderdogTrends=await calcRoadUnderdogTrends();
+      if(roadUnderdogTrends.length) trends=trends.concat(roadUnderdogTrends);
       trends.sort(function(a,b){ return b.conf-a.conf; });
     }catch(ce){ calcErr=ce; }
     ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
@@ -10106,7 +10323,9 @@ function openTrendDetail(t){
     '<div class="td-big-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
     '<div class="td-title">'+esc(t.player)+' &mdash; '+
       (t.type==="streak"?"Player Streak":t.type==="linevalue"?"Line Value":t.type==="movement"?"Sharp Money":
-       t.type==="matchup"?"Matchup System":t.type==="teamsit"?"Team System":"Game Total")+
+       t.type==="lefty_matchup"?"Lefty Matchup":t.type==="righty_matchup"?"Righty Matchup":
+       t.type==="matchup"?"Matchup System":t.type==="bullpen_edge"?"Bullpen Edge":
+       t.type==="road_underdog"?"Road Underdog":t.type==="teamsit"?"Team System":"Game Total")+
     '</div>';
   var shareBtn=$("tdShareBtn");
   if(shareBtn){ shareBtn.onclick=function(){ copyText(t.shareText); toast("Copied!"); }; }
@@ -10174,7 +10393,9 @@ function buildDetailContent(t){
     html+='<div class="td-section"><div class="td-sect-title">Similar Trends</div><div class="td-related">';
     similar.forEach(function(s,si){
       var typeLabel=s.type==="streak"?"Player Streak":s.type==="linevalue"?"Line Value":s.type==="movement"?"Sharp Money":
-        s.type==="matchup"?"Matchup System":s.type==="teamsit"?"Team System":"Game Total";
+        s.type==="lefty_matchup"?"Lefty Matchup":s.type==="righty_matchup"?"Righty Matchup":
+        s.type==="matchup"?"Matchup System":s.type==="bullpen_edge"?"Bullpen Edge":
+        s.type==="road_underdog"?"Road Underdog":s.type==="teamsit"?"Team System":"Game Total";
       html+='<div class="td-rel-item" data-relidx="'+_trendsData.indexOf(s)+'">'+
         '<div class="td-rel-record'+(s.recordCls?" "+s.recordCls:"")+'">'+esc(s.record)+'</div>'+
         '<div class="td-rel-info">'+
@@ -10234,6 +10455,15 @@ function buildInsight(t){
   }
   if(t.type==="matchup"){
     return "Built from real MLB boxscore data — opposing starter handedness and "+t.player+"'s actual batting-order slot in each game, not estimated. Sample size is shown as-is; small samples mean more variance.";
+  }
+  if(t.type==="lefty_matchup"||t.type==="righty_matchup"){
+    return "Built from real MLB boxscore data — "+t.player+"'s performance in this specific platoon situation is tracked game-by-game from boxscores. Sample size is shown as-is; small samples mean more variance.";
+  }
+  if(t.type==="bullpen_edge"){
+    return "Signal is based on the opposing bullpen's recent workload, not "+t.player+"'s personal career record vs relievers. A fatigued bullpen in the final innings creates structural value for batters hitting 4th–9th in the order, regardless of individual matchup history.";
+  }
+  if(t.type==="road_underdog"){
+    return "Based on "+t.player+"'s road record vs opponents with a winning record over 3 seasons — used as a structural proxy for road-underdog situations. Historical per-game betting lines are not stored, so the proxy substitutes road difficulty for price. The public's tendency to overbet home favorites drives systematic value in the +105 to +200 underdog band.";
   }
   if(t.type==="teamsit"){
     return "Built from the "+t.player+"'s real completed-game results this season, with today's posted total applied retroactively to those real final scores. No historical odds are assumed — only the total number and the actual outcomes are real.";
@@ -11179,7 +11409,9 @@ function _trackGameTrend(t,btn){
   var _spMap={americanfootball_nfl:'NFL',basketball_nba:'NBA',icehockey_nhl:'NHL',baseball_mlb:'MLB'};
   var typeLabel=t.type==="streak"?"PLAYER STREAK":t.type==="homeway"?"HOME/AWAY SPLIT":
     t.type==="linevalue"?"LINE VALUE":t.type==="movement"?"SHARP MONEY":
-    t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":
+    t.type==="matchup"?"MATCHUP SYSTEM":t.type==="lefty_matchup"?"LEFTY MATCHUP":
+    t.type==="righty_matchup"?"RIGHTY MATCHUP":t.type==="bullpen_edge"?"BULLPEN EDGE":
+    t.type==="road_underdog"?"ROAD UNDERDOG":t.type==="teamsit"?"TEAM SYSTEM":
     t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":"GAME TOTAL";
   var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
   var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
