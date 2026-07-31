@@ -294,11 +294,16 @@ function normalizeGame(g){
   return (a<b?a+' vs '+b:b+' vs '+a);
 }
 
-/* Resolved confidence: prop picks store p.confidence; trend picks store
-   confidence:null and use trendWinRate instead. */
+/* Resolved confidence: prop picks store p.confidence; trend picks may store
+   trendWinRate or a trendRecord "X-Y LN" from which a rate is derived. */
 function _resolveConf(p){
   if(p.confidence!=null) return p.confidence;
   if(p.trendWinRate!=null) return Math.round(p.trendWinRate*100);
+  // Fallback for old entries: derive from trendRecord "X-Y LN"
+  if(p.trendRecord){
+    var _m=p.trendRecord.match(/^(\d+)-(\d+)/);
+    if(_m){ var _tot=parseInt(_m[1])+parseInt(_m[2]); if(_tot>0) return Math.round(parseInt(_m[1])/_tot*100); }
+  }
   return null;
 }
 function _resolveTier(p){
@@ -411,6 +416,11 @@ registerTemplate({
     var tc=tierColors(_resolveTier(p));
     var nameSz=iw?28:42, lineSz=iw?20:30, barW=iw?380:476;
     var topPad=iw?19:31;
+    var _desc=p.trendDescription||p.trendSignal||'';
+    var _rec=p.trendRecord||'';
+    var _recDots='';
+    if(!iw&&_rec){var _rm=_rec.match(/^(\d+)-(\d+)/);if(_rm){var _dW=Math.min(parseInt(_rm[1]),10),_dL=Math.min(parseInt(_rm[2]),10-_dW),_di;_recDots='<div style="display:flex;gap:3px;margin-top:6px">';for(_di=0;_di<_dW;_di++)_recDots+='<div style="width:7px;height:7px;border-radius:50%;background:#00e87a"></div>';for(_di=0;_di<_dL;_di++)_recDots+='<div style="width:7px;height:7px;border-radius:50%;background:#2a2a2a"></div>';_recDots+='</div>';}}
+    var _whyHtml=(_desc||_rec)&&!iw?'<div style="padding:18px 32px 0"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="height:1px;background:#181818;flex:1"></div><span style="font-size:9px;font-weight:700;color:#282828;letter-spacing:.1em;text-transform:uppercase">The Signal</span><div style="height:1px;background:#181818;flex:1"></div></div>'+(_desc?'<div style="font-size:12px;color:#555;line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(_desc)+'</div>':'')+(_rec?'<div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span style="font-size:10px;font-weight:700;color:#2e2e2e">'+esc(_rec)+'</span>'+_recDots+'</div>':'')+'</div>':'';
 
     return '<div style="width:'+W+'px;height:'+H+'px;background:#0a0a0a;position:relative;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',sans-serif">'+
       '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:#00e87a"></div>'+
@@ -429,6 +439,7 @@ registerTemplate({
           _confBar(conf, barW)+
         '</div>'+
       '</div>'+
+      _whyHtml+
       '<div style="padding:'+(iw?8:14)+'px 32px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
         (p.game?'<span style="font-size:12px;color:#555">'+esc(p.game)+'</span><span style="color:#1e1e1e">&middot;</span>':'')+
         (p.odds?'<span style="font-size:13px;font-weight:700;color:#888">'+esc(p.odds)+'</span><span style="color:#1e1e1e">&middot;</span>':'')+
@@ -940,9 +951,6 @@ registerTemplate({
     var sport=p0.sport||'';
     var dt=p0.date||todayISO();
 
-    var confVals=picks.map(function(p){ return _resolveConf(p); }).filter(function(c){ return c!==null; });
-    var avgConf=confVals.length?Math.round(confVals.reduce(function(a,b){return a+b;},0)/confVals.length):null;
-
     var maxRows=7;
     var shown=picks.slice(0,maxRows);
     var extra=picks.length-shown.length;
@@ -991,16 +999,8 @@ registerTemplate({
         rows+
         (extra?'<div style="padding:4px 32px;font-size:10px;color:#333">+'+extra+' more</div>':'')+
       '</div>'+
-      '<div style="padding:10px 32px;border-top:1px solid #141414;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'+
+      '<div style="padding:10px 32px;border-top:1px solid #141414;display:flex;align-items:center;flex-shrink:0">'+
         '<span style="font-size:10px;font-weight:700;color:#3a3a3a;letter-spacing:.06em;text-transform:uppercase">'+picks.length+' PICK'+(picks.length!==1?'S':'')+'</span>'+
-        (avgConf!==null?
-          '<div style="display:flex;align-items:center;gap:8px">'+
-            '<div style="width:80px;height:3px;background:#111;border-radius:2px;overflow:hidden">'+
-              '<div style="height:100%;background:#00e87a;width:'+avgConf+'%"></div>'+
-            '</div>'+
-            '<span style="font-size:10px;color:#3a3a3a">'+avgConf+'% avg conf</span>'+
-          '</div>'
-        :'')+
       '</div>'+
       '<div style="padding:12px 32px 18px;border-top:1px solid #0f0f0f;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">'+
         '<span style="font-size:10px;color:#252525;letter-spacing:.06em;text-transform:uppercase">'+BRAND_URL+'</span>'+

@@ -8206,6 +8206,7 @@ function calcPlayerStreakTrends(){
       if(!isOver) return;
       if(_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
     }
+    if(p._market==='batter_total_bases'&&line<=1) return;
     function hr(n){
       var sl=vals.slice(0,Math.min(n,vals.length));
       if(sl.length<5) return null;
@@ -8289,6 +8290,7 @@ function calcPlayerHomeAwaySplitTrends(){
       if(!isOver) return;
       if(_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
     }
+    if(p._market==='batter_total_bases'&&line<=1) return;
     function hit(v){ return isOver?v>line:v<line; }
     var homeVals=[],awayVals=[];
     var n=Math.min(vals.length,isHomeArr.length,15);
@@ -8365,6 +8367,7 @@ function calcLineValueTrends(){
     var line=p.consensus!=null?p.consensus:(p.bestLine!=null?p.bestLine:null);
     if(line==null||line===0) return;
     if(isThreshProp(p)&&_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
+    if(p._market==='batter_total_bases'&&line<=1) return;
     // Skip low-usage players — their lines are low because of limited playing time,
     // not real value. 18 MPG is the cutoff; if no minutes data, use a book-line floor.
     if(p.avgMins!=null&&p.avgMins<18) return;
@@ -8434,6 +8437,7 @@ function calcOddsMovementTrends(){
   // Line movement across books (from snapshot)
   ST.props.forEach(function(p){
     if(!p.snapMove||seen[p.player]) return;
+    if(p._market==='batter_total_bases'&&p.bestLine!=null&&p.bestLine<=1) return;
     var upBooks=[], downBooks=[];
     Object.keys(p.snapMove).forEach(function(bk){
       var mv=p.snapMove[bk];
@@ -8480,6 +8484,7 @@ function calcOddsMovementTrends(){
   // Book spread signal (≥1.5 pts across ≥3 books = sharp vs square disagreement)
   ST.props.filter(function(p){ return (p.lineSpread||0)>=1.5&&p.bookCount>=3&&!seen[p.player]; })
     .forEach(function(p){
+      if(p._market==='batter_total_bases'&&p.bestLine!=null&&p.bestLine<=1) return;
       seen[p.player]=1;
       var sp=+(p.lineSpread||0).toFixed(1);
       var conf4=Math.round(Math.min(80,60+sp*5));
@@ -8598,6 +8603,7 @@ async function calcPlayerMatchupTrends(){
     var p=candidates[ci];
     var line=p.pdLine!=null?p.pdLine:p.bestLine;
     if(line==null||p._playerId==null) continue;
+    if(p._market==='batter_total_bases'&&line<=1) continue;
     var isOver=(p.pdSide||"Over")==="Over";
     var vals=p._vals, gamePks=p._gamePks, isHomeArr=p._isHomeArr||[];
     var n=Math.min(vals.length,gamePks.length,15);
@@ -9728,7 +9734,7 @@ function renderTrends(trends){
         var tLine=t._rawLine!=null?String(t._rawLine):'';
         if(_isBetDuplicate(t.player||t.team||'',mkt,tLine,today,h)) return;
         var _tp=(t.record||'').match(/^(\d+)-(\d+)/);
-        var entry={date:today,player:t.player||t.team||'',market:mkt,marketDisplay:t._rawMarket||(t._market?marketName(t._market):''),line:t._rawLine!=null?String(t._rawLine):'',confidence:null,result:'pending',source:'trend',type:'trend',sport:_trSpMap[_trendsSport]||'',game:t._game||t.game||'',trendType:tl,trendSignal:t.headline||'',trendRecord:t.record||'',trendWinRate:t.hitRate!=null?t.hitRate/100:null,trendSystem:tl,trendDescription:t.headline||'',trendSampleSize:_tp?(parseInt(_tp[1])+parseInt(_tp[2])):null,teamId:t.teamId||null,loggedAt:Date.now()+added,odds:t.odds||null,trendMarket:t._market||'',trendIsOver:t._rawIsOver!=null?!!t._rawIsOver:null,playerId:t.playerId||null};
+        var entry={date:today,player:t.player||t.team||'',market:mkt,marketDisplay:t._rawMarket||(t._market?marketName(t._market):''),line:t._rawLine!=null?String(t._rawLine):'',confidence:t.conf!=null?t.conf:null,result:'pending',source:'trend',type:'trend',sport:_trSpMap[_trendsSport]||'',game:t._game||t.game||'',trendType:tl,trendSignal:t.headline||'',trendRecord:t.record||'',trendWinRate:t.hitRate!=null?t.hitRate/100:null,trendSystem:tl,trendDescription:t.headline||'',trendSampleSize:_tp?(parseInt(_tp[1])+parseInt(_tp[2])):null,teamId:t.teamId||null,loggedAt:Date.now()+added,odds:t.odds||null,trendMarket:t._market||'',trendIsOver:t._rawIsOver!=null?!!t._rawIsOver:null,playerId:t.playerId||null};
         h.unshift(entry);
         _sbSavePlay(entry);
         added++;
@@ -9767,7 +9773,7 @@ function renderTrends(trends){
       var saved_loggedAt=_findTrackedLoggedAt(t.player||t.team||'',t._market||'',tLine,today,h);
       if(!saved_loggedAt){
         saved_loggedAt=Date.now();
-        var entry={date:today,player:t.player||t.team||'',market:t._market||'',marketDisplay:t._rawMarket||(t._market?marketName(t._market):''),line:tLine,confidence:null,result:'pending',source:'trend',type:'trend',sport:_trSpMap[_trendsSport]||'',game:t._game||t.game||'',trendType:typeLabel,trendSignal:t.headline||'',trendRecord:t.record||'',trendWinRate:t.hitRate!=null?t.hitRate/100:null,trendSystem:typeLabel,trendDescription:t.headline||'',trendSampleSize:_trSamp,teamId:t.teamId||null,loggedAt:saved_loggedAt,odds:t.odds||null,trendMarket:t._market||'',trendIsOver:t._rawIsOver!=null?!!t._rawIsOver:null,playerId:t.playerId||null};
+        var entry={date:today,player:t.player||t.team||'',market:t._market||'',marketDisplay:t._rawMarket||(t._market?marketName(t._market):''),line:tLine,confidence:t.conf!=null?t.conf:null,result:'pending',source:'trend',type:'trend',sport:_trSpMap[_trendsSport]||'',game:t._game||t.game||'',trendType:typeLabel,trendSignal:t.headline||'',trendRecord:t.record||'',trendWinRate:t.hitRate!=null?t.hitRate/100:null,trendSystem:typeLabel,trendDescription:t.headline||'',trendSampleSize:_trSamp,teamId:t.teamId||null,loggedAt:saved_loggedAt,odds:t.odds||null,trendMarket:t._market||'',trendIsOver:t._rawIsOver!=null?!!t._rawIsOver:null,playerId:t.playerId||null};
         h.unshift(entry);
         savePlayHist(h);
         _sbSavePlay(entry);
@@ -11486,7 +11492,7 @@ function _trackGameTrend(t,btn){
   if(!saved_loggedAt){
     saved_loggedAt=Date.now();
     var entry={date:today,player:t.player||t.team||'',market:t._market||'',marketDisplay:t._rawMarket||(t._market?marketName(t._market):''),
-      line:tLine,confidence:null,result:'pending',
+      line:tLine,confidence:t.conf!=null?t.conf:null,result:'pending',
       source:'trend',type:'trend',sport:_spMap[sport]||'',game:t._game||t.game||'',
       trendType:typeLabel,trendSignal:t.headline||'',trendRecord:t.record||'',
       trendWinRate:t.hitRate!=null?t.hitRate/100:null,trendSystem:typeLabel,
