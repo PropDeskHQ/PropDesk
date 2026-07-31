@@ -1357,32 +1357,31 @@ function _dlBtnLabel(){
   return _isIOS()?'&#128247; Save to Photos':'&#8595; Download PNG';
 }
 
+function _showSaveOverlay(dataUrl){
+  var m=document.getElementById('_cs_save_overlay');
+  if(!m){
+    m=document.createElement('div');
+    m.id='_cs_save_overlay';
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;box-sizing:border-box';
+    m.innerHTML='<button onclick="document.getElementById(\'_cs_save_overlay\').style.display=\'none\'" style="position:absolute;top:14px;right:18px;background:none;border:none;color:#555;font-size:30px;line-height:1;padding:4px 8px;cursor:pointer">&times;</button><img id="_cs_save_img" style="max-width:100%;max-height:62vh;border-radius:10px;display:block;box-shadow:0 0 0 1px #222"><p style="color:#666;font-size:13px;text-align:center;margin:0;line-height:1.6">Tap &amp; hold → <b style="color:#aaa">Save to Photos</b></p>';
+    document.body.appendChild(m);
+  }
+  m.style.display='flex';
+  document.getElementById('_cs_save_img').src=dataUrl;
+}
+
 function _downloadCanvas(canvas,filename,cb){
+  if(_isIOS()){
+    _showSaveOverlay(canvas.toDataURL('image/png'));
+    if(cb) cb('overlay');
+    return;
+  }
   canvas.toBlob(function(blob){
-    var ios=_isIOS();
-    if(ios&&navigator.share){
-      var file=new File([blob],filename,{type:'image/png'});
-      if(navigator.canShare&&navigator.canShare({files:[file]})){
-        navigator.share({files:[file],title:'PropDesk'})
-          .then(function(){ if(cb) cb('share'); })
-          .catch(function(err){
-            if(err&&err.name==='AbortError'){ if(cb) cb('cancel'); return; }
-            var url=URL.createObjectURL(blob);
-            window.open(url,'_blank');
-            if(cb) cb('open');
-          });
-        return;
-      }
-    }
-    var url=URL.createObjectURL(blob);
-    if(ios){ window.open(url,'_blank'); if(cb) cb('open'); }
-    else{
-      var a=document.createElement('a');
-      a.download=filename; a.href=url;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(function(){ URL.revokeObjectURL(url); },60000);
-      if(cb) cb(false);
-    }
+    var a=document.createElement('a');
+    a.download=filename; a.href=URL.createObjectURL(blob);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); },60000);
+    if(cb) cb('downloaded');
   },'image/png');
 }
 
@@ -1407,9 +1406,7 @@ function downloadPNG(){
       var nameBase=(picks[0]&&(picks[0].player||picks[0].team)||'propdesk-card')
         .toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,'');
       _downloadCanvas(canvas,'propdesk-'+nameBase+'-'+todayISO()+'.png',function(result){
-        showStatus(result==='share'?'Saved to Photos \u2713':
-          result==='cancel'?'':
-          result==='open'?'Image opened \u2014 long-press to save \u2713':'Downloaded \u2713');
+        showStatus(result==='downloaded'?'Downloaded \u2713':'');
         if(dlBtn){dlBtn.disabled=false;dlBtn.innerHTML=_dlBtnLabel();}
       });
     }).catch(function(e){
