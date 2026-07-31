@@ -568,6 +568,8 @@ table th:nth-child(4),table td:nth-child(4){min-width:110px;padding-left:14px}
 .trends-sort-row,.trends-filter-row{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
 .trends-ctl-lbl{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--mut2);white-space:nowrap;padding-right:4px}
 .trends-sort-row .pill,.trends-filter-row .pill{font-size:11px;padding:5px 11px;min-width:0}
+.trends-team-sel{font-size:11px;padding:4px 8px;background:var(--surf2,#161616);color:var(--text);border:1px solid #2a2a2a;border-radius:6px;cursor:pointer;outline:none;max-width:200px}
+.trends-team-sel:focus{border-color:#444}
 /* TREND DETAIL PANEL */
 .td-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:150;display:none;justify-content:flex-end}
 .td-overlay.open{display:flex}
@@ -8176,6 +8178,7 @@ function saveManualParlay(){
 var _trendsTime=null;
 var _trendsFilter="all";
 var _trendsSort="strength";
+var _trendsTeamFilter="";
 var _trendsData=[];
 var _trendsSport="basketball_nba";
 var _trendsEvents=[];
@@ -8499,11 +8502,12 @@ function calcOddsMovementTrends(){
 }
 
 /* --- TYPE 4: Game Totals (async) ---------------------------------- */
-async function calcTotalsTrends(){
-  if(!ST.eventId||!getKey()) return [];
+async function calcTotalsTrends(eid){
+  var _eid=eid!=null?eid:ST.eventId;
+  if(!_eid||!getKey()) return [];
   var trends=[];
   try{
-    var r=await fetch(apiUrl("/sports/"+ST.sport+"/events/"+ST.eventId+"/odds",{
+    var r=await fetch(apiUrl("/sports/"+ST.sport+"/events/"+_eid+"/odds",{
       regions:"us,us2", markets:"totals", oddsFormat:"american"
     }),{signal:AbortSignal.timeout(8000)});
     if(!r.ok) return [];
@@ -8538,7 +8542,7 @@ async function calcTotalsTrends(){
     var betterOdds=betterSide==="Over"?medOver:medUnder;
     if(Math.abs(betterEV)<1.5&&vigAmt>5) return [];
     var ev=d; // reuse var name for event
-    var evData=(ST.events||[]).filter(function(e){return e.id===ST.eventId;})[0];
+    var evData=(ST.events||[]).filter(function(e){return e.id===_eid;})[0];
     var teams=evData?(evData.away_team+" @ "+evData.home_team):"Today's Game";
     var gameKey=evData?(evData.away_team+" vs "+evData.home_team):"";
     var conf=Math.round(Math.min(80,55+Math.abs(betterEV)*5+(5.5-Math.min(5.5,vigAmt))*2));
@@ -9619,13 +9623,27 @@ function _trendTypeBreakdownHtml(){
 function renderTrends(trends){
   var mount=$("trendsMount"); if(!mount) return;
   var breakdownHtml=_trendTypeBreakdownHtml();
-  // Filter
+  // Build unique team list from all loaded trends (before any filter)
+  var _tTeams=[];
+  trends.forEach(function(t){
+    var g=(t._game||"").replace(" vs "," @ ");
+    g.split(" @ ").forEach(function(nm){ nm=(nm||"").trim(); if(nm&&_tTeams.indexOf(nm)<0) _tTeams.push(nm); });
+  });
+  _tTeams.sort();
+  // Filter by type
   var visible=trends.filter(function(t){
     return _trendsFilter==="all"||t.type===_trendsFilter||
       (_trendsFilter==="matchup"&&(t.type==="lefty_matchup"||t.type==="righty_matchup"))||
       (_trendsFilter==="bullpen"&&t.type==="bullpen_edge")||
       (_trendsFilter==="teamsit"&&t.type==="road_underdog");
   });
+  // Filter by team
+  if(_trendsTeamFilter){
+    visible=visible.filter(function(t){
+      var g=t._game||"",pl=t.player||"",tm=t.team||"";
+      return g.indexOf(_trendsTeamFilter)>=0||pl===_trendsTeamFilter||tm===_trendsTeamFilter;
+    });
+  }
   // Sort
   var TYPE_RECENT={movement:0,totals:1,streak:2,homeway:3,linevalue:4,matchup:5,lefty_matchup:5,righty_matchup:5,teamsit:6,road_underdog:6,nrfi:7,bullpen:8,bullpen_edge:8};
   var TYPE_ALPHA={bullpen:0,bullpen_edge:0,homeway:1,linevalue:2,lefty_matchup:3,matchup:3,righty_matchup:3,movement:4,nrfi:5,streak:6,road_underdog:7,teamsit:7,totals:8};
@@ -9670,6 +9688,10 @@ function renderTrends(trends){
     FILTER_OPTS.map(function(o){return '<button class="pill'+(o.k===_trendsFilter?" active":"")
       +'" data-ttype="'+o.k+'">'+o.lbl+'</button>';}).join("")+
     '</div>'+
+    (_tTeams.length>1?'<div class="trends-sort-row"><span class="trends-ctl-lbl">Team</span>'+
+      '<select class="trends-team-sel" id="trendsTeamSel"><option value="">All teams</option>'+
+      _tTeams.map(function(nm){return '<option value="'+nm+'"'+(_trendsTeamFilter===nm?' selected':'')+'>'+nm+'</option>';}).join("")+
+      '</select></div>':'')+
     (qualCount>0?'<div style="display:flex;justify-content:flex-end;margin-top:4px"><button class="pill tq-btn" style="color:#00e87a;border-color:rgba(0,232,122,.35);background:rgba(0,232,122,.06)">⚡ Track All Qualifying ('+qualCount+')</button></div>':'')+
     '</div>';
   // Empty state for filtered view
@@ -9692,6 +9714,8 @@ function renderTrends(trends){
   mount.querySelectorAll("[data-ttype]").forEach(function(btn){
     btn.onclick=function(){ _trendsFilter=btn.getAttribute("data-ttype"); renderTrends(_trendsData); };
   });
+  var _teamSelEl=$("trendsTeamSel");
+  if(_teamSelEl) _teamSelEl.onchange=function(){ _trendsTeamFilter=this.value; renderTrends(_trendsData); };
   mount.querySelectorAll(".tq-btn").forEach(function(btn){
     btn.onclick=function(){
       var today=new Date().toISOString().slice(0,10);
@@ -9788,7 +9812,7 @@ function renderTrendsSportTabs(){
     b.textContent=sp.label;
     b.onclick=function(){
       if(_trendsSport===sp.key) return;
-      _trendsSport=sp.key; _trendsEventId=null; _trendsEvents=[]; _trendsData=[];
+      _trendsSport=sp.key; _trendsEventId=null; _trendsEvents=[]; _trendsData=[]; _trendsTeamFilter="";
       renderTrendsSportTabs();
       trendsLoadSport();
     };
@@ -9816,6 +9840,22 @@ async function trendsLoadSport(){
   }catch(e){ mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>Error loading games. Try again.</p></div>'; }
 }
 
+// Run up to `limit` promise-factories concurrently. JS is single-threaded so shared
+// arrays like allCandidates/seen are safe to write from multiple in-flight callbacks.
+async function _runConcurrent(taskFns, limit){
+  var i=0, results=[];
+  async function _worker(){
+    while(i<taskFns.length){
+      var idx=i++;
+      try{ results[idx]=await taskFns[idx](); }catch(e){ results[idx]=null; }
+    }
+  }
+  var workers=[];
+  for(var _w=0;_w<Math.min(limit,taskFns.length);_w++) workers.push(_worker());
+  await Promise.all(workers);
+  return results;
+}
+
 async function trendsFetchAndLoad(){
   var mount=$("trendsMount"); if(!mount) return;
   if(!_trendsEvents.length){
@@ -9825,33 +9865,37 @@ async function trendsFetchAndLoad(){
   if(!mks.length) mks=["player_points","player_assists","player_rebounds"];
   mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Loading '+_trendsEvents.length+' game'+(_trendsEvents.length!==1?"s":"")+'…</p></div>';
   try{
-    // Fetch one market at a time per event — same pattern as Props tab loadBoard → fetchOdds(eventId, market)
+    // === PHASE 1: Fetch all event×market combinations in parallel (cap 15 concurrent) ===
     var allCandidates=[],seen={};
-    for(var ei=0;ei<_trendsEvents.length;ei++){
-      var ev=_trendsEvents[ei];
+    var _mktTasks=[];
+    _trendsEvents.forEach(function(ev){
       var gameLabel=(ev.away_team||"")+" vs "+(ev.home_team||"");
-      for(var mi=0;mi<mks.length;mi++){
-        var mk=mks[mi];
-        try{
-          var _trMkUrl=apiUrl("/sports/"+_trendsSport+"/events/"+ev.id+"/odds",{
+      mks.forEach(function(mk){
+        _mktTasks.push(function(){
+          return fetch(apiUrl("/sports/"+_trendsSport+"/events/"+ev.id+"/odds",{
             regions:"us,us2",markets:mk,oddsFormat:"american",dateFormat:"iso"
-          });
-          var r=await fetch(_trMkUrl,{signal:AbortSignal.timeout(8000)});
-          if(!r.ok){ console.warn("[PropDesk] trendsFetch SKIP "+mk,r.status); continue; }
-          var oddsData=await r.json();
-          var mkProps=parseProps(oddsData,mk);
-          mkProps.forEach(function(p){
-            if(p.bestOdds==null||p.yesNo||p.bestLine==null) return;
-            p._market=mk; p._sport=_trendsSport; p._game=gameLabel;
-            var k=p.player.toLowerCase()+"|"+mk;
-            if(!seen[k]){ seen[k]=1; allCandidates.push(p); }
-          });
-        }catch(e){ console.warn("[PropDesk] trendsFetch error",mk,e); }
-      }
-    }
+          }),{signal:AbortSignal.timeout(8000)})
+            .then(function(r){ return r.ok?r.json():null; })
+            .then(function(d){
+              if(!d) return;
+              parseProps(d,mk).forEach(function(p){
+                if(p.bestOdds==null||p.yesNo||p.bestLine==null) return;
+                p._market=mk; p._sport=_trendsSport; p._game=gameLabel;
+                var k=p.player.toLowerCase()+"|"+mk;
+                if(!seen[k]){ seen[k]=1; allCandidates.push(p); }
+              });
+            })
+            .catch(function(e){ console.warn("[PropDesk] trendsFetch error",mk,e); });
+        });
+      });
+    });
+    await _runConcurrent(_mktTasks, 15);
+
     if(!allCandidates.length){
       mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">📋</div><p>No lines available yet for today\'s games.</p></div>'; return;
     }
+
+    // === PHASE 2: Enrich candidates in parallel batches (50ms soft guard between batches) ===
     mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Enriching '+allCandidates.length+' players…</p></div>';
     var savedSport=ST.sport,savedMkt=ST.market,savedProps=ST.props,savedEid=ST.eventId;
     var _trendsEnrichFails=0,_trendsEnrichOk=0,_EB=8;
@@ -9862,43 +9906,64 @@ async function trendsFetchAndLoad(){
         try{ await enrichWithConfidence(p); if(p._vals) _trendsEnrichOk++; }
         catch(e){ _trendsEnrichFails=(_trendsEnrichFails||0)+1; }
       }));
-      if(bi+_EB<allCandidates.length) await new Promise(function(r){setTimeout(r,300);});
+      if(bi+_EB<allCandidates.length) await new Promise(function(r){setTimeout(r,50);});
     }
     console.log("[PropDesk] Enriched "+_trendsEnrichOk+"/"+allCandidates.length+" props successfully");
     if(_trendsEnrichFails>0) console.warn("[PropDesk] Trend enrichment: "+_trendsEnrichFails+" props failed silently");
+
     ST.sport=_trendsSport; ST.market=mks[0]||""; ST.props=allCandidates;
-    var trends=[],calcErr=null;
+    ST.eventId=_trendsEvents[0]?_trendsEvents[0].id:null;
+    var trends=[];
     try{
-      ST.eventId=_trendsEvents[0]?_trendsEvents[0].id:null;
+      // === PHASE 3: Sync trends — render immediately so user sees cards right away ===
       trends=trends.concat(calcPlayerStreakTrends());
       trends=trends.concat(calcPlayerHomeAwaySplitTrends());
       trends=trends.concat(calcLineValueTrends());
       trends=trends.concat(calcOddsMovementTrends());
-      trends.sort(function(a,b){ return b.conf-a.conf; });
-      for(var ti=0;ti<_trendsEvents.length;ti++){
-        ST.eventId=_trendsEvents[ti].id;
-        var totTrends=await calcTotalsTrends();
-        if(totTrends.length) trends=trends.concat(totTrends);
+      _trendsData=trends.slice();
+      renderTrends(_trendsData);
+
+      // === PHASE 4: Game totals — all events in parallel (no shared-state race: eid passed explicitly) ===
+      var _totArr=await Promise.all(_trendsEvents.map(function(ev){ return calcTotalsTrends(ev.id); }));
+      _totArr.forEach(function(tr){ if(tr&&tr.length) trends=trends.concat(tr); });
+      _trendsData=trends.slice();
+      renderTrends(_trendsData);
+
+      // === PHASE 5: MLB systems — pre-warm cache then render each system as it completes ===
+      if(_trendsSport==="baseball_mlb"){
+        // Pre-warm _teamGamesCache for all today's teams in parallel before any calc function runs
+        var _wNames=[];
+        _trendsEvents.forEach(function(ev){
+          if(ev.home_team&&_wNames.indexOf(ev.home_team)<0) _wNames.push(ev.home_team);
+          if(ev.away_team&&_wNames.indexOf(ev.away_team)<0) _wNames.push(ev.away_team);
+        });
+        var _wIds=await Promise.all(_wNames.map(mlbTeamId));
+        await Promise.all(_wIds.filter(Boolean).map(mlbTeamRecentGames));
+
+        var _mlbSystems=[
+          {fn:calcPlayerMatchupTrends,   label:"matchup"},
+          {fn:calcTeamSituationalTrends, label:"teamSit"},
+          {fn:calcNRFITrends,            label:"nrfi"},
+          {fn:calcBullpenFatigueTrends,  label:"bullpen"},
+          {fn:calcBullpenMatchupTrends,  label:"bullpenEdge"},
+          {fn:calcRoadUnderdogTrends,    label:"roadUnderdog"}
+        ];
+        for(var _si=0;_si<_mlbSystems.length;_si++){
+          var _sys=_mlbSystems[_si];
+          try{
+            var _sysTrends=await _sys.fn();
+            if(_sysTrends.length){
+              trends=trends.concat(_sysTrends);
+              _trendsData=trends.slice();
+              renderTrends(_trendsData);
+            }
+          }catch(e){ console.warn("[PropDesk]",_sys.label,"trends error:",e); }
+        }
       }
-      // Multi-condition systems — MLB only, real boxscore/standings/final-score data, no fabricated odds.
-      // First load per session is slower (boxscore/schedule fetches); cached aggressively after that.
-      if(_trendsSport==="baseball_mlb") mount.innerHTML='<div class="tc-no-data"><div class="nd-icon">⚡</div><p>Building matchup &amp; team systems from real game data&hellip;</p></div>';
-      var matchupTrends=await calcPlayerMatchupTrends();
-      if(matchupTrends.length) trends=trends.concat(matchupTrends);
-      var teamSitTrends=await calcTeamSituationalTrends();
-      if(teamSitTrends.length) trends=trends.concat(teamSitTrends);
-      var nrfiTrends=await calcNRFITrends();
-      if(nrfiTrends.length) trends=trends.concat(nrfiTrends);
-      var bullpenTrends=await calcBullpenFatigueTrends();
-      if(bullpenTrends.length) trends=trends.concat(bullpenTrends);
-      var bullpenEdgeTrends=await calcBullpenMatchupTrends();
-      if(bullpenEdgeTrends.length) trends=trends.concat(bullpenEdgeTrends);
-      var roadUnderdogTrends=await calcRoadUnderdogTrends();
-      if(roadUnderdogTrends.length) trends=trends.concat(roadUnderdogTrends);
       trends.sort(function(a,b){ return b.conf-a.conf; });
-    }catch(ce){ calcErr=ce; }
+    }catch(ce){ console.warn("[PropDesk] trends calc error:",ce); }
+
     ST.sport=savedSport; ST.market=savedMkt; ST.props=savedProps; ST.eventId=savedEid;
-    if(calcErr) throw calcErr;
     _trendsData=trends; _trendsLoadedAt=Date.now();
     if(!_pdStatsCache){try{var _sr=await fetch("/propdesk-stats.json?_="+Math.floor(Date.now()/86400000),{signal:AbortSignal.timeout(5000)});if(_sr.ok)_pdStatsCache=await _sr.json();}catch(_se){}}
     renderTrends(trends);
