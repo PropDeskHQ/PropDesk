@@ -1398,7 +1398,7 @@ var LOTD_MARKETS = {
   americanfootball_nfl:["player_pass_yds","player_rush_yds","player_reception_yds","player_pass_tds","player_receptions"],
   basketball_nba:["player_points","player_rebounds","player_assists","player_threes","player_steals","player_blocks","player_points_rebounds_assists"],
   icehockey_nhl:["player_goals","player_shots_on_goal","player_assists","player_points","player_saves"],
-  baseball_mlb:["batter_hits","batter_total_bases","batter_rbis","batter_home_runs","batter_runs_scored","pitcher_strikeouts"]
+  baseball_mlb:["batter_hits","batter_total_bases","batter_home_runs","batter_runs_scored","batter_hits_runs_rbis","pitcher_strikeouts"]
 };
 // Default implied line for synthetic roster entries that have no posted book line.
 // Threshold markets: lowest natural line (1+ hit, 2+ TB, etc.). Null = use season avg.
@@ -3262,7 +3262,7 @@ var LOTD_MARKETS = {
   americanfootball_nfl: ["player_pass_yds","player_rush_yds","player_reception_yds","player_pass_tds","player_receptions"],
   basketball_nba:       ["player_points","player_rebounds","player_assists","player_threes","player_steals","player_blocks","player_points_rebounds_assists"],
   icehockey_nhl:        ["player_goals","player_shots_on_goal","player_assists","player_points","player_saves"],
-  baseball_mlb:         ["batter_hits","batter_total_bases","batter_rbis","batter_home_runs","batter_runs_scored","pitcher_strikeouts"]
+  baseball_mlb:         ["batter_hits","batter_total_bases","batter_home_runs","batter_runs_scored","batter_hits_runs_rbis","pitcher_strikeouts"]
 };
 
 async function loadLOTD(){
@@ -8207,6 +8207,8 @@ function calcPlayerStreakTrends(){
       if(_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
     }
     if(p._market==='batter_total_bases'&&line<=1) return;
+    if(p._market==='batter_rbis') return;
+    if(p._market==='batter_hits'&&p.bestOdds!=null&&p.bestOdds<-180) return;
     function hr(n){
       var sl=vals.slice(0,Math.min(n,vals.length));
       if(sl.length<5) return null;
@@ -8291,6 +8293,8 @@ function calcPlayerHomeAwaySplitTrends(){
       if(_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
     }
     if(p._market==='batter_total_bases'&&line<=1) return;
+    if(p._market==='batter_rbis') return;
+    if(p._market==='batter_hits'&&p.bestOdds!=null&&p.bestOdds<-180) return;
     function hit(v){ return isOver?v>line:v<line; }
     var homeVals=[],awayVals=[];
     var n=Math.min(vals.length,isHomeArr.length,15);
@@ -8368,6 +8372,8 @@ function calcLineValueTrends(){
     if(line==null||line===0) return;
     if(isThreshProp(p)&&_TREND_LINE_MAX[p._market]!=null&&line>_TREND_LINE_MAX[p._market]) return;
     if(p._market==='batter_total_bases'&&line<=1) return;
+    if(p._market==='batter_rbis') return;
+    if(p._market==='batter_hits'&&p.bestOdds!=null&&p.bestOdds<-180) return;
     // Skip low-usage players — their lines are low because of limited playing time,
     // not real value. 18 MPG is the cutoff; if no minutes data, use a book-line floor.
     if(p.avgMins!=null&&p.avgMins<18) return;
@@ -8438,6 +8444,8 @@ function calcOddsMovementTrends(){
   ST.props.forEach(function(p){
     if(!p.snapMove||seen[p.player]) return;
     if(p._market==='batter_total_bases'&&p.bestLine!=null&&p.bestLine<=1) return;
+    if(p._market==='batter_rbis') return;
+    if(p._market==='batter_hits'&&p.bestOdds!=null&&p.bestOdds<-180) return;
     var upBooks=[], downBooks=[];
     Object.keys(p.snapMove).forEach(function(bk){
       var mv=p.snapMove[bk];
@@ -8485,6 +8493,8 @@ function calcOddsMovementTrends(){
   ST.props.filter(function(p){ return (p.lineSpread||0)>=1.5&&p.bookCount>=3&&!seen[p.player]; })
     .forEach(function(p){
       if(p._market==='batter_total_bases'&&p.bestLine!=null&&p.bestLine<=1) return;
+      if(p._market==='batter_rbis') return;
+      if(p._market==='batter_hits'&&p.bestOdds!=null&&p.bestOdds<-180) return;
       seen[p.player]=1;
       var sp=+(p.lineSpread||0).toFixed(1);
       var conf4=Math.round(Math.min(80,60+sp*5));
@@ -8604,6 +8614,8 @@ async function calcPlayerMatchupTrends(){
     var line=p.pdLine!=null?p.pdLine:p.bestLine;
     if(line==null||p._playerId==null) continue;
     if(p._market==='batter_total_bases'&&line<=1) continue;
+    if(p._market==='batter_rbis') continue;
+    if(p._market==='batter_hits'&&p.bestOdds!=null&&p.bestOdds<-180) continue;
     var isOver=(p.pdSide||"Over")==="Over";
     var vals=p._vals, gamePks=p._gamePks, isHomeArr=p._isHomeArr||[];
     var n=Math.min(vals.length,gamePks.length,15);
