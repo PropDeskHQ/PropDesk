@@ -1390,12 +1390,15 @@ var MARKETS = {
   ]
 };
 
-// MLB markets hidden from the pill nav and excluded from Best Plays scanning.
+// Markets hidden from the pill nav and excluded from Best Plays scanning.
 // Underlying data/confidence logic is intact — remove a key here to re-enable.
 var MLB_HIDDEN_MARKETS={batter_strikeouts:1,pitcher_hits_allowed:1,pitcher_earned_runs:1,pitcher_outs:1};
+// NFL: player_reception_yds has the highest hold and worst injury-news volatility; deprioritized.
+var NFL_HIDDEN_MARKETS={player_reception_yds:1};
+function isHiddenMarket(k){ return !!(MLB_HIDDEN_MARKETS[k]||NFL_HIDDEN_MARKETS[k]); }
 
 var LOTD_MARKETS = {
-  americanfootball_nfl:["player_pass_yds","player_rush_yds","player_reception_yds","player_pass_tds","player_receptions"],
+  americanfootball_nfl:["player_pass_yds","player_rush_yds","player_pass_tds","player_receptions"],
   basketball_nba:["player_points","player_rebounds","player_assists","player_threes","player_steals","player_blocks","player_points_rebounds_assists"],
   icehockey_nhl:["player_goals","player_shots_on_goal","player_assists","player_points","player_saves"],
   baseball_mlb:["batter_hits","batter_total_bases","batter_home_runs","batter_hits_runs_rbis","pitcher_strikeouts"]
@@ -2380,9 +2383,23 @@ function computeValue(p){
 }
 
 // Phase 2: full confidence analysis using real game log
+function nflCurrentSeasonStart(){
+  // NFL regular season runs Sep–Feb; month<7 (Jan–Jul) means we're still in the previous season year
+  var now=new Date(), yr=now.getFullYear();
+  if(now.getMonth()<7) yr-=1;
+  return yr+"-09-01"; // Sep 1 predates any opener and postdates all preseason games
+}
 async function enrichWithConfidence(p){
   try{
     var gl=await getGameLog(p.player,p._market);
+    // NFL: drop cross-season game log entries before running any trend or confidence calc.
+    // espnGameLog returns up to 15 trailing games regardless of season; without this filter
+    // a player's 2024 role and line environment contaminates 2025 confidence numbers.
+    if(gl&&gl.values&&ST.sport==="americanfootball_nfl"){
+      var _nflStart=nflCurrentSeasonStart(),_fv=[],_fd=[];
+      (gl.dates||[]).forEach(function(d,i){ if(d>=_nflStart){_fv.push(gl.values[i]);_fd.push(d);} });
+      gl={values:_fv,dates:_fd,seasonAvg:gl.seasonAvg,seasonBA:gl.seasonBA,avgMins:gl.avgMins};
+    }
     if(!gl||!gl.values||gl.values.length<3){
       p.enriched=true; p.thinData=true;
       if(p.guardrailFlags.indexOf("THIN_DATA")<0) p.guardrailFlags.push("THIN_DATA");
@@ -2840,7 +2857,7 @@ function renderPropTabs(){
   var gi=el("button","pill"+(ST.market==="__gameinfo__"?" active":""),"Game Information");
   gi.onclick=function(){ ST.market="__gameinfo__"; renderPropTabs(); showGameInfoSection(); updateBotnavActive("games"); };
   c.appendChild(gi);
-  (MARKETS[ST.sport]||[]).filter(function(m){return m.k!=="_h2h"&&!MLB_HIDDEN_MARKETS[m.k];}).forEach(function(m){
+  (MARKETS[ST.sport]||[]).filter(function(m){return m.k!=="_h2h"&&!isHiddenMarket(m.k);}).forEach(function(m){
     var b=el("button","pill"+(m.k===ST.market?" active":""),m.n);
     b.onclick=function(){ ST_tierFilter="all"; ST.market=m.k; localStorage.setItem("pe_market",m.k); renderPropTabs(); showGameContent(); if(ST.eventId) loadBoard(); updateBotnavActive("games"); };
     c.appendChild(b);
@@ -3254,7 +3271,7 @@ function renderPropOfDay(p, mkt){
 
 /* ============ LAY OF THE DAY ============ */
 var LOTD_MARKETS = {
-  americanfootball_nfl: ["player_pass_yds","player_rush_yds","player_reception_yds","player_pass_tds","player_receptions"],
+  americanfootball_nfl: ["player_pass_yds","player_rush_yds","player_pass_tds","player_receptions"],
   basketball_nba:       ["player_points","player_rebounds","player_assists","player_threes","player_steals","player_blocks","player_points_rebounds_assists"],
   icehockey_nhl:        ["player_goals","player_shots_on_goal","player_assists","player_points","player_saves"],
   baseball_mlb:         ["batter_hits","batter_total_bases","batter_home_runs","batter_hits_runs_rbis","pitcher_strikeouts"]
@@ -5794,7 +5811,7 @@ async function _sbMigrateIfNeeded(user){
 function _buildHistEntry(p){
   if(!p||!p._market||!p.player||!p.enriched||p.thinData||p.pdNoValue||p.pdConfidence==null) return null;
   if(Math.round((p.pdConfidence||0)*100)<75) return null;
-  if(MLB_HIDDEN_MARKETS[p._market]) return null;
+  if(isHiddenMarket(p._market)) return null;
   var conf=Math.round((p.pdConfidence||0)*100);
   var sp=p._sport||ST.sport;
   var spLabel={baseball_mlb:"MLB",americanfootball_nfl:"NFL",basketball_nba:"NBA",icehockey_nhl:"NHL"}[sp]||sp;
@@ -11343,7 +11360,7 @@ function updateBestPlaysDisplay(eventId,remaining){
   var _potd=_potgCache[eventId];
   Object.keys(cached).forEach(function(mk){
     if(UNDERPERFORMING_MARKETS[mk]) return;
-    var _mkHidden=!!MLB_HIDDEN_MARKETS[mk];
+    var _mkHidden=isHiddenMarket(mk);
     (cached[mk]||[]).forEach(function(p){
       if(_mkHidden&&!(_potd&&p.player===_potd.prop.player&&mk===_potd.mkt)) return;
       if(!p._market) p._market=mk;
@@ -11388,7 +11405,7 @@ async function startGameEnrichment(eventId){
   var sport=ST.sport;
   if(!ev||!getKey()) return;
   var allMkts=(MARKETS[sport]||[]).map(function(m){return m.k;})
-    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]&&!MLB_HIDDEN_MARKETS[k]; });
+    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]&&!isHiddenMarket(k); });
   var gameLabel=(ev.home_team||"")+" vs "+(ev.away_team||"");
   try{
     for(var mi=0;mi<allMkts.length;mi++){
@@ -11450,7 +11467,7 @@ async function loadGameTop5(){
   var ev=(ST.events||[]).filter(function(e){return e.id===eventId;})[0];
   if(!ev||!getKey()) return;
   var allMkts=(MARKETS[ST.sport]||[]).map(function(m){return m.k;})
-    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]&&!MLB_HIDDEN_MARKETS[k]; });
+    .filter(function(k){ return k!=="_h2h"&&!YESNO_MARKETS[k]&&!isHiddenMarket(k); });
   if(!_gameEnrichTaskId[eventId]) startGameEnrichment(eventId);
   var cachedMkts=Object.keys((_gamePropsCache[eventId]||{}));
   updateBestPlaysDisplay(eventId,Math.max(0,allMkts.length-cachedMkts.length));
