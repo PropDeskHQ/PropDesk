@@ -8234,7 +8234,7 @@ function calcPlayerStreakTrends(){
       if(i===0){streak=h2?1:-1;continue;}
       if(h2&&streak>0)streak++; else if(!h2&&streak<0)streak--; else break;
     }
-    var _raw=compositeConf(vals,line,isOver,p.seasonBA||null);
+    var _raw=compositeConf(vals,line,isOver,p.seasonBA||null,p._market);
     var _sa=streak>=4?0.04:streak>=3?0.025:streak>=2?0.01:streak<=-4?-0.04:streak<=-3?-0.025:streak<=-2?-0.01:0;
     var _tp=vals.length<10?-0.04:0;
     var conf=_raw!=null?Math.round(Math.max(0.01,Math.min(0.95,_raw+_sa+_tp))*100):trendConf(best,bestN);
