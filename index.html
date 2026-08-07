@@ -2438,6 +2438,7 @@ async function enrichWithConfidence(p){
     p._isHomeArr=gl.isHomeArr||[];
     p._opponents=gl.opponents||[];
     p._playerId=gl.playerId||null;
+    p._espnTeam=gl.espnTeam||null;
 
     if(vals.length<10&&p.guardrailFlags.indexOf("THIN_DATA")<0)
       p.guardrailFlags.push("THIN_DATA");
@@ -4567,6 +4568,7 @@ async function getGameLog(name,market){
     var meta=await getMeta(name);
     if(!meta||!meta.id){ _cacheSet(_glCache,ckey,null); return null; }
     try{ result=await espnGameLog(meta.id,mkt); }catch(e){}
+    if(result&&meta.team) result.espnTeam=meta.team;
   }
   _cacheSet(_glCache,ckey,result);
   return result;
@@ -8219,6 +8221,9 @@ function calcPlayerStreakTrends(){
   ST.props.forEach(function(p){
     var vals=p._vals;
     if(!vals||vals.length<5) return;
+    // NFL: explicit Week 4+ gate — 3+ current-season games required. The 5-game minimum
+    // above is the binding constraint in practice, but this documents the policy.
+    if(ST.sport==="americanfootball_nfl"&&vals.length<3) return;
     var line=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:null);
     if(line==null) return;
     var isOver=(p.pdSide||"Over")==="Over";
@@ -9370,6 +9375,7 @@ function _trendCardTitle(t){
   }
   if(t.type==="nrfi") return t.title||t.player;
   if(t.type==="bullpen") return t.title||t.player;
+  if(t.type==="nfl_opp_rank") return t.player+" — "+(t._rawMarket||marketName(t._market||""))+" vs opponent defensive weakness";
   return t.title||t.player;
 }
 function _trendActionLine(t){
@@ -9401,6 +9407,7 @@ function _trendActionLine(t){
   if(t.type==="teamsit") return "";
   if(t.type==="nrfi") return "Model Only — no book line";
   if(t.type==="bullpen") return "Model Only — no book line";
+  if(t.type==="nfl_opp_rank") return "Opponent defense is in the bottom tier — consider the Over on "+t.player;
   return "";
 }
 function _trendQualifies(t){
@@ -9418,7 +9425,8 @@ function renderTrendCard(t, sigCls, sigLabel, alreadyTracked){
     t.type==="matchup"?"MATCHUP SYSTEM":t.type==="lefty_matchup"?"LEFTY MATCHUP":t.type==="righty_matchup"?"RIGHTY MATCHUP":
     t.type==="teamsit"?"TEAM SYSTEM":t.type==="bullpen_edge"?"BULLPEN EDGE":
     t.type==="road_underdog"?"ROAD UNDERDOG":
-    t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":"GAME TOTAL";
+    t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":
+    t.type==="nfl_opp_rank"?"OPP WEAKNESS":"GAME TOTAL";
   var title=_trendCardTitle(t);
   var action=_trendActionLine(t);
   var systemName=t.systemName?'<div class="tc-system-name">'+esc(t.systemName)+'</div>':'';
@@ -9768,7 +9776,8 @@ function renderTrends(trends){
           t.type==="matchup"?"MATCHUP SYSTEM":t.type==="lefty_matchup"?"LEFTY MATCHUP":
           t.type==="righty_matchup"?"RIGHTY MATCHUP":t.type==="bullpen_edge"?"BULLPEN EDGE":
           t.type==="road_underdog"?"ROAD UNDERDOG":t.type==="teamsit"?"TEAM SYSTEM":
-          t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":"GAME TOTAL";
+          t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":
+          t.type==="nfl_opp_rank"?"OPP WEAKNESS":"GAME TOTAL";
         var mkt=t._market||'';
         var tLine=t._rawLine!=null?String(t._rawLine):'';
         if(_isBetDuplicate(t.player||t.team||'',mkt,tLine,today,h)) return;
@@ -9803,7 +9812,8 @@ function renderTrends(trends){
         t.type==="composite"?"COMPOSITE TREND":t.type==="ml"?"MONEYLINE TREND":
         t.type==="lefty_matchup"?"LEFTY MATCHUP":t.type==="righty_matchup"?"RIGHTY MATCHUP":
         t.type==="bullpen_edge"?"BULLPEN EDGE":t.type==="road_underdog"?"ROAD UNDERDOG":
-        t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":(t.type||"TREND").toUpperCase();
+        t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":
+        t.type==="nfl_opp_rank"?"OPP WEAKNESS":(t.type||"TREND").toUpperCase();
       var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
       var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
       var _trSpMap={'americanfootball_nfl':'NFL','basketball_nba':'NBA','icehockey_nhl':'NHL','baseball_mlb':'MLB'};
@@ -9892,6 +9902,119 @@ async function _runConcurrent(taskFns, limit){
   return results;
 }
 
+// ── NFL Opponent Defensive Rank trend helpers ─────────────────────────────────
+
+function nflMatchTeam(espnTeam,oddsTeam){
+  if(!espnTeam||!oddsTeam) return false;
+  var a=espnTeam.toLowerCase().trim(), b=oddsTeam.toLowerCase().trim();
+  if(a===b) return true;
+  var aLast=a.split(' ').filter(Boolean).pop()||"";
+  var bLast=b.split(' ').filter(Boolean).pop()||"";
+  return aLast.length>3&&aLast===bLast;
+}
+
+var _nflTeamIdCache=null;
+async function nflGetTeamId(teamName){
+  if(!_nflTeamIdCache){
+    _nflTeamIdCache={};
+    try{
+      var r=await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams?limit=32");
+      var d=await r.json();
+      var leagues=((d.sports||[])[0]||{}).leagues||[];
+      (leagues[0]||{}).teams&&(leagues[0].teams||[]).forEach(function(t){
+        var tm=t.team||t;
+        if(!tm||!tm.id) return;
+        [tm.displayName,tm.name,tm.abbreviation,tm.nickname,tm.shortDisplayName].forEach(function(n){
+          if(n) _nflTeamIdCache[n.toLowerCase()]=tm.id;
+        });
+      });
+    }catch(e){}
+  }
+  if(!teamName) return null;
+  var k=teamName.toLowerCase().trim();
+  if(_nflTeamIdCache[k]) return _nflTeamIdCache[k];
+  var lastWord=k.split(' ').filter(Boolean).pop()||"";
+  return (lastWord.length>3&&_nflTeamIdCache[lastWord])||null;
+}
+
+var _nflDefStatsCache={};
+async function nflTeamDefStats(teamId){
+  if(_nflDefStatsCache[teamId]) return _nflDefStatsCache[teamId];
+  var now=new Date(), yr=now.getFullYear();
+  if(now.getMonth()<7) yr--;
+  try{
+    var r=await fetch("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/"+yr+"/types/2/teams/"+teamId+"/statistics");
+    var d=await r.json();
+    var passYpg=null, rushYpg=null;
+    ((d.splits&&d.splits.categories)||[]).forEach(function(cat){
+      (cat.stats||[]).forEach(function(s){
+        if(s.name==="passingYardsAllowed") passYpg=s.value;
+        if(s.name==="rushingYardsAllowed") rushYpg=s.value;
+      });
+    });
+    var result={passYpg:passYpg,rushYpg:rushYpg};
+    _nflDefStatsCache[teamId]=result;
+    return result;
+  }catch(e){ return null; }
+}
+
+async function calcNFLOpponentRankTrends(){
+  // Selection: opponent allows ≥248 pass ypg or ≥127 rush ypg (~10% above NFL average)
+  // Confidence: trendConf on player's current-season hit rate at book line (independent signal)
+  var PASS_YPG=248, RUSH_YPG=127;
+  var PASS_MARKETS={player_pass_yds:1,player_receptions:1};
+  var RUSH_MARKETS={player_rush_yds:1};
+  var results=[];
+  var candidates=ST.props.filter(function(p){
+    return p._espnTeam&&p._homeTeam&&(PASS_MARKETS[p._market]||RUSH_MARKETS[p._market]);
+  });
+  for(var i=0;i<candidates.length;i++){
+    var p=candidates[i];
+    var isPass=!!PASS_MARKETS[p._market];
+    var oppTeam=null;
+    if(nflMatchTeam(p._espnTeam,p._homeTeam)) oppTeam=p._awayTeam;
+    else if(nflMatchTeam(p._espnTeam,p._awayTeam)) oppTeam=p._homeTeam;
+    if(!oppTeam) continue;
+    var oppId=await nflGetTeamId(oppTeam);
+    if(!oppId) continue;
+    var def=await nflTeamDefStats(oppId);
+    if(!def) continue;
+    var allowed=isPass?def.passYpg:def.rushYpg;
+    var threshold=isPass?PASS_YPG:RUSH_YPG;
+    if(allowed==null||allowed<threshold) continue;
+    var vals=p._vals||[], line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) continue;
+    var hits=vals.filter(function(v){ return v>line; }).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.50) continue;
+    var conf=trendConf(hitRate,vals.length);
+    var defSide=isPass?"passing defense":"run defense";
+    results.push({
+      type:"nfl_opp_rank",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:true,
+      _rawVals:vals,
+      recordCls:"over",
+      headline:oppTeam+" allows "+Math.round(allowed)+" "+(isPass?"pass":"rush")+" ypg",
+      systemName:"OPPONENT WEAKNESS",
+      _oppTeam:oppTeam,
+      _oppAllowed:Math.round(allowed),
+      _defSide:defSide
+    });
+  }
+  return results;
+}
+
 async function trendsFetchAndLoad(){
   var mount=$("trendsMount"); if(!mount) return;
   if(!_trendsEvents.length){
@@ -9917,6 +10040,7 @@ async function trendsFetchAndLoad(){
               parseProps(d,mk).forEach(function(p){
                 if(p.bestOdds==null||p.yesNo||p.bestLine==null) return;
                 p._market=mk; p._sport=_trendsSport; p._game=gameLabel;
+                p._homeTeam=ev.home_team||""; p._awayTeam=ev.away_team||"";
                 var k=p.player.toLowerCase()+"|"+mk;
                 if(!seen[k]){ seen[k]=1; allCandidates.push(p); }
               });
@@ -9995,6 +10119,18 @@ async function trendsFetchAndLoad(){
             }
           }catch(e){ console.warn("[PropDesk]",_sys.label,"trends error:",e); }
         }
+      }
+
+      // === PHASE 5b: NFL systems ===
+      if(_trendsSport==="americanfootball_nfl"){
+        try{
+          var _nflOppTrends=await calcNFLOpponentRankTrends();
+          if(_nflOppTrends.length){
+            trends=trends.concat(_nflOppTrends);
+            _trendsData=trends.slice();
+            renderTrends(_trendsData);
+          }
+        }catch(e){ console.warn("[PropDesk] nfl_opp_rank error:",e); }
       }
       trends.sort(function(a,b){ return b.conf-a.conf; });
     }catch(ce){ console.warn("[PropDesk] trends calc error:",ce); }
@@ -10435,7 +10571,8 @@ function openTrendDetail(t){
       (t.type==="streak"?"Player Streak":t.type==="linevalue"?"Line Value":t.type==="movement"?"Sharp Money":
        t.type==="lefty_matchup"?"Lefty Matchup":t.type==="righty_matchup"?"Righty Matchup":
        t.type==="matchup"?"Matchup System":t.type==="bullpen_edge"?"Bullpen Edge":
-       t.type==="road_underdog"?"Road Underdog":t.type==="teamsit"?"Team System":"Game Total")+
+       t.type==="road_underdog"?"Road Underdog":t.type==="teamsit"?"Team System":
+       t.type==="nfl_opp_rank"?"Opp Weakness":"Game Total")+
     '</div>';
   var shareBtn=$("tdShareBtn");
   if(shareBtn){ shareBtn.onclick=function(){ copyText(t.shareText); toast("Copied!"); }; }
@@ -10505,7 +10642,8 @@ function buildDetailContent(t){
       var typeLabel=s.type==="streak"?"Player Streak":s.type==="linevalue"?"Line Value":s.type==="movement"?"Sharp Money":
         s.type==="lefty_matchup"?"Lefty Matchup":s.type==="righty_matchup"?"Righty Matchup":
         s.type==="matchup"?"Matchup System":s.type==="bullpen_edge"?"Bullpen Edge":
-        s.type==="road_underdog"?"Road Underdog":s.type==="teamsit"?"Team System":"Game Total";
+        s.type==="road_underdog"?"Road Underdog":s.type==="teamsit"?"Team System":
+        s.type==="nfl_opp_rank"?"Opp Weakness":"Game Total";
       html+='<div class="td-rel-item" data-relidx="'+_trendsData.indexOf(s)+'">'+
         '<div class="td-rel-record'+(s.recordCls?" "+s.recordCls:"")+'">'+esc(s.record)+'</div>'+
         '<div class="td-rel-info">'+
@@ -10577,6 +10715,9 @@ function buildInsight(t){
   }
   if(t.type==="teamsit"){
     return "Built from the "+t.player+"'s real completed-game results this season, with today's posted total applied retroactively to those real final scores. No historical odds are assumed — only the total number and the actual outcomes are real.";
+  }
+  if(t.type==="nfl_opp_rank"){
+    return t.player+"'s opponent is allowing above-average "+(t._defSide||"yards")+" this season. The trend fires when the defense ranks in the bottom tier league-wide — an independent signal from the player's own production record. Confidence reflects "+t.player+"'s current-season hit rate at their book line.";
   }
   return "";
 }
@@ -11522,7 +11663,8 @@ function _trackGameTrend(t,btn){
     t.type==="matchup"?"MATCHUP SYSTEM":t.type==="lefty_matchup"?"LEFTY MATCHUP":
     t.type==="righty_matchup"?"RIGHTY MATCHUP":t.type==="bullpen_edge"?"BULLPEN EDGE":
     t.type==="road_underdog"?"ROAD UNDERDOG":t.type==="teamsit"?"TEAM SYSTEM":
-    t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":"GAME TOTAL";
+    t.type==="nrfi"?"FIRST INNING":t.type==="bullpen"?"BULLPEN":
+    t.type==="nfl_opp_rank"?"OPP WEAKNESS":"GAME TOTAL";
   var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
   var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
   var tLine=t._rawLine!=null?String(t._rawLine):'';
@@ -11561,7 +11703,8 @@ function renderGameTrends(trends){
   var _gtH=loadPlayHist(); var _gtToday=new Date().toISOString().slice(0,10);
   var typeLabel=function(type){
     return type==="streak"?"PLAYER STREAK":type==="homeway"?"HOME/AWAY SPLIT":
-      type==="linevalue"?"LINE VALUE":type==="movement"?"SHARP MONEY":"TREND";
+      type==="linevalue"?"LINE VALUE":type==="movement"?"SHARP MONEY":
+      type==="nfl_opp_rank"?"OPP WEAKNESS":"TREND";
   };
   var hdr=document.createElement("div");
   hdr.className="g5-hdr";
