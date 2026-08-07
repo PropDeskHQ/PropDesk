@@ -2273,7 +2273,7 @@ function computeBestBet(p,marketKey){
 // isOver=true → "hit" means val > line; isOver=false → val < line
 // seasonBA: optional full-season batting average — used as the season weight when provided,
 //           replacing the noisy 15-game hit-rate proxy (rAll)
-function compositeConf(vals, line, isOver, seasonBA){
+function compositeConf(vals, line, isOver, seasonBA, market){
   if(!vals||vals.length<3) return null;
   function sliceHR(n){
     var sl=vals.slice(0,Math.min(n,vals.length));
@@ -2290,6 +2290,7 @@ function compositeConf(vals, line, isOver, seasonBA){
   var composite=((r5||0)*w5+(r10||0)*w10+(rSzn||0)*wA)/tot;
   // High-variance penalty: recent form diverging >20% from season signal
   if(r5!=null&&rSzn!=null&&Math.abs(r5-rSzn)>0.20) composite=composite*0.93;
+  if(market&&market.indexOf('pitcher_')===0) composite=Math.min(composite,0.80);
   return composite;
 }
 
@@ -2478,7 +2479,7 @@ async function enrichWithConfidence(p){
       var composite=(wOpp*0.33)+(wL5*0.28)+(wSzn*0.22)+(wRest*0.17);
       p.value=Math.round(Math.min(95,composite));
       // Confidence = historical hit rate at book line
-      var kConfRaw=compositeConf(vals,bookLine,true);
+      var kConfRaw=compositeConf(vals,bookLine,true,null,p._market);
       p.pdSide="Over";
       p.pdLine=bookLine;
       p.pdGap=0;
@@ -3677,7 +3678,7 @@ function generateWhyExplanation(p){
 
 function rowHtml(p,cols,idx,silent,_extraCount){
   if(p._id==null) p._id=Math.random().toString(36).slice(2,9);
-  var tier=tierOf(p.value);
+  var tier=confTierOf(p.pdConfidence!=null?Math.round(p.pdConfidence*100):(p.value||0));
   var isThresh=isThreshProp(p);
   // Book line display — threshold markets show "1+ Goals" instead of "Over 0.5"
   var bookLine=p.bestLine!=null?p.bestLine:"";
@@ -4158,7 +4159,7 @@ function analyzeVerdict(p,line,seasonAvg,l5avg,overRate){
   var pdLine=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:line);
   var confPct=p.pdConfidence!=null?Math.round(p.pdConfidence*100):null;
   var bet=pdSide+(pdLine!=null?" "+pdLine:"")+(p.bestOdds!=null?" at "+fmtOdds(p.bestOdds):"");
-  var tier=tierOf(p.value).t;
+  var tier=confTierOf(confPct!=null?confPct:(p.value||0)).t;
   var sentences=[];
 
   // S1: PropDesk Line recommendation + confidence
