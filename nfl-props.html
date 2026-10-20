@@ -11025,6 +11025,116 @@ function calcNFLFadeTrends(){
   return results;
 }
 
+function calcNFLPlayerSituationalTrends(){
+  var results=[];
+  if(_trendsSport!=="americanfootball_nfl") return results;
+  var candidates=ST.props.filter(function(p){
+    return p._vals&&p._vals.length>=3&&p._isHomeArr&&p._isHomeArr.length&&p._dates&&p._dates.length;
+  });
+  candidates.forEach(function(p){
+    var vals=p._vals||[];
+    var dates=p._dates||[];
+    var homeArr=p._isHomeArr||[];
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) return;
+    // PRIMETIME EDGE: Thu (dow=4) or Mon (dow=1) vs Sunday (dow=0)
+    if(dates.length>=4){
+      var ptHits=0,ptCnt=0,sunHits=0,sunCnt=0;
+      for(var i=0;i<vals.length&&i<dates.length;i++){
+        var dow=new Date(dates[i]).getDay();
+        var hit=vals[i]>line?1:0;
+        if(dow===4||dow===1){ptHits+=hit;ptCnt++;}
+        else if(dow===0){sunHits+=hit;sunCnt++;}
+      }
+      if(ptCnt>=2&&sunCnt>=2){
+        var ptRate=ptHits/ptCnt;
+        var sunRate=sunHits/sunCnt;
+        if(Math.abs(ptRate-sunRate)>=0.40&&(ptRate>=0.75||sunRate>=0.75)){
+          var isPT=ptRate>sunRate;
+          var siRate=isPT?ptRate:sunRate;
+          var siN=isPT?ptCnt:sunCnt;
+          var siHits=isPT?ptHits:sunHits;
+          var siConf=trendConf(siRate,vals.length);
+          if(siConf>=60){
+            results.push({
+              type:"teamsit",player:p.player,_market:p._market,_rawMarket:marketName(p._market||""),
+              _game:p._game,_sport:"americanfootball_nfl",
+              record:siHits+"-"+(siN-siHits)+" in "+(isPT?"primetime":"Sunday")+" games",
+              hitRate:Math.round(siRate*100),conf:siConf,odds:p.bestOdds,
+              _rawLine:line,_rawLineNum:line,_rawIsOver:true,_rawVals:vals,recordCls:"over",
+              headline:(isPT?"PRIMETIME":"SUNDAY")+" EDGE: "+Math.round(siRate*100)+"% ("+siHits+"/"+siN+")",
+              systemName:"PRIMETIME EDGE",playerId:p.playerId||null
+            });
+          }
+        }
+      }
+    }
+    // HOME FIELD SPLIT: home vs away using p._isHomeArr
+    if(homeArr.length>=3){
+      var hHits=0,hCnt=0,aHits=0,aCnt=0;
+      for(var j=0;j<vals.length&&j<homeArr.length;j++){
+        if(homeArr[j]){hHits+=(vals[j]>line?1:0);hCnt++;}
+        else{aHits+=(vals[j]>line?1:0);aCnt++;}
+      }
+      if(hCnt>=2&&aCnt>=2){
+        var hRate=hHits/hCnt;
+        var aRate=aHits/aCnt;
+        if(Math.abs(hRate-aRate)>=0.35&&(hRate>=0.75||aRate>=0.75)){
+          var isHome=hRate>aRate;
+          var haRate=isHome?hRate:aRate;
+          var haN=isHome?hCnt:aCnt;
+          var haHits2=isHome?hHits:aHits;
+          var haConf=trendConf(haRate,vals.length);
+          if(haConf>=60){
+            results.push({
+              type:"teamsit",player:p.player,_market:p._market,_rawMarket:marketName(p._market||""),
+              _game:p._game,_sport:"americanfootball_nfl",
+              record:haHits2+"-"+(haN-haHits2)+" "+(isHome?"at home":"on road"),
+              hitRate:Math.round(haRate*100),conf:haConf,odds:p.bestOdds,
+              _rawLine:line,_rawLineNum:line,_rawIsOver:true,_rawVals:vals,recordCls:"over",
+              headline:(isHome?"HOME FIELD":"ROAD WARRIOR")+": "+Math.round(haRate*100)+"% ("+haHits2+"/"+haN+")",
+              systemName:"HOME FIELD SPLIT",playerId:p.playerId||null
+            });
+          }
+        }
+      }
+    }
+    // SEASON SPLIT: September (month<=8) vs October+ (month>=9)
+    if(dates.length>=4){
+      var eHits=0,eCnt=0,lHits=0,lCnt=0;
+      for(var k=0;k<vals.length&&k<dates.length;k++){
+        var mo=new Date(dates[k]).getMonth();
+        var h2=vals[k]>line?1:0;
+        if(mo<=8){eHits+=h2;eCnt++;}
+        else{lHits+=h2;lCnt++;}
+      }
+      if(eCnt>=2&&lCnt>=2){
+        var eRate=eHits/eCnt;
+        var lRate=lHits/lCnt;
+        if(Math.abs(eRate-lRate)>=0.40&&(eRate>=0.75||lRate>=0.75)){
+          var isLate=lRate>eRate;
+          var seRate=isLate?lRate:eRate;
+          var seN=isLate?lCnt:eCnt;
+          var seHits2=isLate?lHits:eHits;
+          var seConf=trendConf(seRate,vals.length);
+          if(seConf>=60){
+            results.push({
+              type:"teamsit",player:p.player,_market:p._market,_rawMarket:marketName(p._market||""),
+              _game:p._game,_sport:"americanfootball_nfl",
+              record:seHits2+"-"+(seN-seHits2)+" in "+(isLate?"Oct+":"Sep")+" games",
+              hitRate:Math.round(seRate*100),conf:seConf,odds:p.bestOdds,
+              _rawLine:line,_rawLineNum:line,_rawIsOver:true,_rawVals:vals,recordCls:"over",
+              headline:(isLate?"OCTOBER SURGE":"SEPTEMBER EDGE")+": "+Math.round(seRate*100)+"% ("+seHits2+"/"+seN+")",
+              systemName:"SEASON SPLIT",playerId:p.playerId||null
+            });
+          }
+        }
+      }
+    }
+  });
+  return results;
+}
+
 async function trendsFetchAndLoad(){
   var mount=$("trendsMount"); if(!mount) return;
   if(!_trendsEvents.length){
@@ -11144,7 +11254,8 @@ async function trendsFetchAndLoad(){
         try{
           var _nflSync=[].concat(calcNFLBounceBackTrends(),calcNFLShortWeekTrends(),
             calcNFLVenueSplitTrends(),calcNFLPostByeTrends(),calcNFLAscendingTrends(),
-            calcNFLHotHandTrends(),calcNFLValueLineTrends(),calcNFLTDStreakTrends(),calcNFLFadeTrends());
+            calcNFLHotHandTrends(),calcNFLValueLineTrends(),calcNFLTDStreakTrends(),calcNFLFadeTrends(),
+            calcNFLPlayerSituationalTrends());
           if(_nflSync.length){ trends=trends.concat(_nflSync); _trendsData=trends.slice(); renderTrends(_trendsData); }
         }catch(e){ console.warn("[PropDesk] nfl_sync trends error:",e); }
         // Async trends (require API calls)
