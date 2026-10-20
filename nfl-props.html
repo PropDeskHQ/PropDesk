@@ -1395,7 +1395,9 @@ var MARKETS = {
 var MLB_HIDDEN_MARKETS={batter_strikeouts:1,pitcher_hits_allowed:1,pitcher_earned_runs:1,pitcher_outs:1};
 // NFL: player_reception_yds has the highest hold and worst injury-news volatility; deprioritized.
 var NFL_HIDDEN_MARKETS={player_reception_yds:1};
-function isHiddenMarket(k){ return !!(MLB_HIDDEN_MARKETS[k]||NFL_HIDDEN_MARKETS[k]); }
+// Tracked and auto-resolved in My History but hidden from pill nav, LOTD, Trends, and Best Plays.
+var NFL_SHADOW_MARKETS={player_pass_attempts:1,player_pass_completions:1,player_rush_attempts:1};
+function isHiddenMarket(k){ return !!(MLB_HIDDEN_MARKETS[k]||NFL_HIDDEN_MARKETS[k]||NFL_SHADOW_MARKETS[k]); }
 
 var LOTD_MARKETS = {
   americanfootball_nfl:["player_pass_yds","player_rush_yds","player_pass_tds","player_receptions"],
@@ -6983,13 +6985,15 @@ async function renderPlayHistory(){
   };
   var blk=$('phBulkBtn'); if(blk) blk.onclick=function(){
     var mlbPend=pastPending.filter(function(e){return e.sport==="MLB"&&!e.autoResolveLocked;});
-    if(!mlbPend.length){ _phBulkResolve(pastPending); return; }
+    var nflTrendPend=pastPending.filter(function(e){return e.sport==="NFL"&&!e.autoResolveLocked&&e.source==='trend'&&e.trendIsOver!=null&&e.line;});
+    if(!mlbPend.length&&!nflTrendPend.length){ _phBulkResolve(pastPending); return; }
     var mlbTrends=mlbPend.filter(function(e){return e.source==='trend'&&e.trendIsOver!=null&&e.line&&e.trendMarket!=='totals';});
     var mlbTotals=mlbPend.filter(function(e){return e.source==='trend'&&e.trendMarket==='totals'&&e.trendIsOver!=null&&e.line;});
     var mlbProps=mlbPend.filter(function(e){return e.source!=='trend';});
     Promise.all(mlbTrends.map(function(e){return resolvePlayerStatTrend(e);}).concat(
       mlbTotals.map(function(e){return resolveTotalsTrend(e);}).concat(
-      mlbProps.map(function(e){return resolvePlayAutomatically(e);})))).then(function(){
+      mlbProps.map(function(e){return resolvePlayAutomatically(e);}).concat(
+      nflTrendPend.map(function(e){return resolveNFLPlayerStatTrend(e);})))).then(function(){
       var h=loadPlayHist(), today=new Date().toISOString().slice(0,10);
       var still=h.filter(function(e){return e.result==="pending"&&e.date<today;});
       renderPlayHistory();
@@ -7341,6 +7345,11 @@ async function _phAutoResolveAll(){
       var resolved=await resolveTotalsTrend(totalsTrendPend[i]);
       if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
     }
+    var nflStatTrendPend=h.filter(function(e){ return e.result==='pending'&&e.source==='trend'&&e.trendIsOver!=null&&e.line&&e.sport==='NFL'&&_arPastGate(e.date)&&!e.autoResolveLocked; });
+    for(var i=0;i<nflStatTrendPend.length;i++){
+      var resolved=await resolveNFLPlayerStatTrend(nflStatTrendPend[i]);
+      if(resolved&&$("page-history")&&$("page-history").classList.contains("active")) renderPlayHistory();
+    }
   }catch(e){}
   _arRunning=false;
 }
@@ -7538,6 +7547,58 @@ async function resolvePlayerStatTrend(play){
     var threshold=isOver?Math.ceil(lineVal):Math.floor(lineVal);
     var result=isOver?(actual>=threshold?'hit':'miss'):(actual<=threshold?'hit':'miss');
     h.forEach(function(e){ if(e.loggedAt===play.loggedAt&&e.player===play.player){ e.result=result;e.autoResolved=true;updated=true; } });
+    if(!updated) return false;
+    savePlayHist(h); _sbUpdatePlay(play.loggedAt,{result:result,auto_resolved:true});
+    return result;
+  }catch(e){ return false; }
+}
+
+async function resolveNFLPlayerStatTrend(play){
+  try{
+    if(!play||play.source!=='trend'||play.result!=='pending'||play.autoResolveLocked) return false;
+    if(!_arPastGate(play.date)) return false;
+    if(play.sport!=='NFL') return false;
+    if(play.trendIsOver===null||play.trendIsOver===undefined) return false;
+    var lineVal=parseFloat(play.line||'');
+    if(isNaN(lineVal)) return false;
+    var market=play.trendMarket||play.market;
+    if(!(STAT_KEYS[market]||[]).length) return false;
+    var playerId=play.playerId||null;
+    if(!playerId){
+      var savedSport=ST.sport; ST.sport="americanfootball_nfl";
+      var meta=await getMeta(play.player);
+      ST.sport=savedSport;
+      playerId=meta&&meta.id?meta.id:null;
+    }
+    if(!playerId) return false;
+    var savedSport2=ST.sport; ST.sport="americanfootball_nfl";
+    var gl=await espnGameLog(playerId,market);
+    ST.sport=savedSport2;
+    if(!gl||!gl.values||!gl.dates) return false;
+    var matchIdx=-1;
+    for(var i=0;i<gl.dates.length;i++){
+      if(gl.dates[i]===play.date){matchIdx=i;break;}
+    }
+    if(matchIdx<0){
+      for(var j=0;j<gl.dates.length;j++){
+        if(Math.abs(new Date(gl.dates[j])-new Date(play.date))<=86400000){matchIdx=j;break;}
+      }
+    }
+    var h=loadPlayHist(),updated=false;
+    if(matchIdx<0){
+      if(Date.now()-new Date(play.date).getTime()>3*86400000){
+        h.forEach(function(e){if(e.loggedAt===play.loggedAt&&e.player===play.player){e.result='void';e.autoResolved=true;updated=true;}});
+        if(!updated) return false;
+        savePlayHist(h); _sbUpdatePlay(play.loggedAt,{result:'void',auto_resolved:true});
+        return 'void';
+      }
+      return false;
+    }
+    var actual=gl.values[matchIdx];
+    if(actual==null) return false;
+    var isOver=!!play.trendIsOver;
+    var result=isOver?(actual>=Math.ceil(lineVal)?'hit':'miss'):(actual<=Math.floor(lineVal)?'hit':'miss');
+    h.forEach(function(e){if(e.loggedAt===play.loggedAt&&e.player===play.player){e.result=result;e.autoResolved=true;updated=true;}});
     if(!updated) return false;
     savePlayHist(h); _sbUpdatePlay(play.loggedAt,{result:result,auto_resolved:true});
     return result;
@@ -9366,6 +9427,16 @@ function _trendCardTitle(t){
   if(t.type==="nrfi") return t.title||t.player;
   if(t.type==="bullpen") return t.title||t.player;
   if(t.type==="nfl_opp_rank") return t.player+" — "+(t._rawMarket||marketName(t._market||""))+" vs opponent defensive weakness";
+  if(t.type==="nfl_sack_rate") return t.player+" — "+marketName(t._market||"")+" vs elite pass rush";
+  if(t.type==="nfl_implied_total") return t.player+" — "+marketName(t._market||"")+" in favorable game script";
+  if(t.type==="nfl_wind") return t.player+" — wind suppression alert";
+  if(t.type==="nfl_bounce_back") return t.player+" — bounce-back spot after big miss";
+  if(t.type==="nfl_target_vacuum") return t.player+" — target redistribution opportunity";
+  if(t.type==="nfl_short_week") return t.player+" — short-week under signal";
+  if(t.type==="nfl_dome_split") return t.player+" — venue context edge";
+  if(t.type==="nfl_underdog_volume") return t.player+" — underdog passing volume";
+  if(t.type==="nfl_post_bye") return t.player+" — post-bye production boost";
+  if(t.type==="nfl_ascending") return t.player+" — ascending production trend";
   return t.title||t.player;
 }
 function _trendActionLine(t){
@@ -9408,9 +9479,20 @@ function _trendActionLine(t){
   if(t.type==="nrfi") return "Model Only — no book line";
   if(t.type==="bullpen") return "Model Only — no book line";
   if(t.type==="nfl_opp_rank") return "Opponent defense is in the bottom tier — consider the Over on "+t.player;
+  if(t.type==="nfl_sack_rate") return "Elite pass rush in this matchup — consider the Under on "+t.player;
+  if(t.type==="nfl_implied_total") return "Favorable game script for "+t.player+" — consider the Over";
+  if(t.type==="nfl_wind") return "Wind may suppress passing — consider the Under on "+t.player;
+  if(t.type==="nfl_bounce_back") return t.player+" is due for a bounce-back — consider the Over";
+  if(t.type==="nfl_target_vacuum") return "Target vacuum emerging for "+t.player+" — consider the Over";
+  if(t.type==="nfl_short_week") return "Short week reduces output — consider the Under on "+t.player;
+  if(t.type==="nfl_dome_split") return "Venue sets up well for "+t.player+" — consider the Over";
+  if(t.type==="nfl_underdog_volume") return "Underdog game script = more pass volume for "+t.player;
+  if(t.type==="nfl_post_bye") return t.player+" coming off bye — consider the Over";
+  if(t.type==="nfl_ascending") return t.player+" is on a rising trend — back the Over momentum";
   return "";
 }
 function _trendQualifies(t){
+  if(t._qbChanged) return false; // QB change detected — suppress from Best Plays/LOTD
   if((t.conf||0)<75) return false;
   if(t.odds==null) return false;
   if(t.type==='streak') return t.streak>=3;
@@ -9426,12 +9508,18 @@ function renderTrendCard(t, sigCls, sigLabel, alreadyTracked){
     t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":
     t.type==="nrfi"?"FIRST INNING":t.type==="bullpen_edge"?"BULLPEN EDGE":
     t.type==="road_underdog"?"ROAD UNDERDOG":t.type==="bullpen"?"BULLPEN":
-    t.type==="nfl_opp_rank"?"OPP WEAKNESS":"GAME TOTAL";
+    t.type==="nfl_opp_rank"?"OPP WEAKNESS":t.type==="nfl_sack_rate"?"PASS RUSH THREAT":
+    t.type==="nfl_implied_total"?"GAME SCRIPT":t.type==="nfl_wind"?"WIND GAME":
+    t.type==="nfl_bounce_back"?"BOUNCE-BACK":t.type==="nfl_target_vacuum"?"TARGET VACUUM":
+    t.type==="nfl_short_week"?"SHORT WEEK":t.type==="nfl_dome_split"?"VENUE SPLIT":
+    t.type==="nfl_underdog_volume"?"UNDERDOG VOLUME":t.type==="nfl_post_bye"?"POST-BYE BOOST":
+    t.type==="nfl_ascending"?"RISING TREND":"GAME TOTAL";
   var title=_trendCardTitle(t);
   var action=_trendActionLine(t);
   var systemName=t.systemName?'<div class="tc-system-name">'+esc(t.systemName)+'</div>':'';
   var streakBadge=(t.streak>=3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge">🔥 STREAK '+t.streak+'</span></div>':
     (t.streak<=-3)?'<div style="margin-bottom:6px"><span class="tc-streak-badge" style="background:rgba(255,80,80,.1);color:#ff5050;border-color:rgba(255,80,80,.2)">❄ COLD '+Math.abs(t.streak)+'</span></div>':'';
+  var qbChangeBadge=t._qbChanged?'<div style="margin-bottom:6px"><span class="tc-streak-badge" style="background:rgba(255,165,0,.12);color:#e09000;border-color:rgba(255,165,0,.25)">⚠ QB CHANGE — now: '+esc(t._qbChangedTo||'backup')+'</span></div>':'';
   var spark=(t._rawVals&&t._rawVals.length>=3&&(t._rawLineNum!=null||t._rawLine!=null))?renderSparkline(t._rawVals,t._rawLineNum!=null?t._rawLineNum:t._rawLine,t._rawIsOver!==false):'';
   var _hitBarColor=(t.type==="nrfi"&&t.recordCls==="under")?"#f5a623":
     (t.type==="bullpen"&&t.lean==="HEAVILY FATIGUED")?"#e84040":
@@ -9455,7 +9543,7 @@ function renderTrendCard(t, sigCls, sigLabel, alreadyTracked){
     '<div class="tc-title-main">'+esc(title)+'</div>'+
     '<div class="tc-sub-hl">'+esc(t.headline||"")+'</div>'+
     propBet+
-    streakBadge+
+    streakBadge+qbChangeBadge+
     (spark?'<div>'+spark+'</div>':'')+
     '<div class="tc-record'+(t.recordCls?" "+t.recordCls:"")+'">'+esc(t.record)+'</div>'+
     hitBar+
@@ -9783,7 +9871,12 @@ function renderTrends(trends){
           t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":
           t.type==="nrfi"?"FIRST INNING":t.type==="bullpen_edge"?"BULLPEN EDGE":
           t.type==="road_underdog"?"ROAD UNDERDOG":t.type==="bullpen"?"BULLPEN":
-          t.type==="nfl_opp_rank"?"OPP WEAKNESS":"GAME TOTAL";
+          t.type==="nfl_opp_rank"?"OPP WEAKNESS":t.type==="nfl_sack_rate"?"PASS RUSH THREAT":
+          t.type==="nfl_implied_total"?"GAME SCRIPT":t.type==="nfl_wind"?"WIND GAME":
+          t.type==="nfl_bounce_back"?"BOUNCE-BACK":t.type==="nfl_target_vacuum"?"TARGET VACUUM":
+          t.type==="nfl_short_week"?"SHORT WEEK":t.type==="nfl_dome_split"?"VENUE SPLIT":
+          t.type==="nfl_underdog_volume"?"UNDERDOG VOLUME":t.type==="nfl_post_bye"?"POST-BYE BOOST":
+          t.type==="nfl_ascending"?"RISING TREND":"GAME TOTAL";
         var mkt=t._market||'';
         var tLine=t._rawLine!=null?String(t._rawLine):'';
         if(_isBetDuplicate(t.player||t.team||'',mkt,tLine,today,h)) return;
@@ -9820,7 +9913,12 @@ function renderTrends(trends){
         t.type==="matchup"?"MATCHUP SYSTEM":t.type==="teamsit"?"TEAM SYSTEM":
         t.type==="nrfi"?"FIRST INNING":t.type==="bullpen_edge"?"BULLPEN EDGE":
         t.type==="road_underdog"?"ROAD UNDERDOG":t.type==="bullpen"?"BULLPEN":
-        t.type==="nfl_opp_rank"?"OPP WEAKNESS":"GAME TOTAL";
+        t.type==="nfl_opp_rank"?"OPP WEAKNESS":t.type==="nfl_sack_rate"?"PASS RUSH THREAT":
+        t.type==="nfl_implied_total"?"GAME SCRIPT":t.type==="nfl_wind"?"WIND GAME":
+        t.type==="nfl_bounce_back"?"BOUNCE-BACK":t.type==="nfl_target_vacuum"?"TARGET VACUUM":
+        t.type==="nfl_short_week"?"SHORT WEEK":t.type==="nfl_dome_split"?"VENUE SPLIT":
+        t.type==="nfl_underdog_volume"?"UNDERDOG VOLUME":t.type==="nfl_post_bye"?"POST-BYE BOOST":
+        t.type==="nfl_ascending"?"RISING TREND":"GAME TOTAL";
       var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
       var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
       var _trSpMap={'americanfootball_nfl':'NFL','basketball_nba':'NBA','icehockey_nhl':'NHL','baseball_mlb':'MLB'};
@@ -9946,34 +10044,191 @@ async function nflGetTeamId(teamName){
   return (lastWord.length>3&&_nflTeamIdCache[lastWord])||null;
 }
 
+// Fixed: returns sack data from ESPN /statistics (confirmed working)
 var _nflDefStatsCache={};
 async function nflTeamDefStats(teamId){
   if(_nflDefStatsCache[teamId]) return _nflDefStatsCache[teamId];
   var now=new Date(), yr=now.getFullYear();
   if(now.getMonth()<7) yr--;
   try{
-    var r=await fetch("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/"+yr+"/types/2/teams/"+teamId+"/statistics");
+    var r=await fetch("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/"+yr+"/types/2/teams/"+teamId+"/statistics",{signal:AbortSignal.timeout(8000)});
     var d=await r.json();
-    var passYpg=null, rushYpg=null;
+    var sacks=null, gamesPlayed=null;
     ((d.splits&&d.splits.categories)||[]).forEach(function(cat){
       (cat.stats||[]).forEach(function(s){
-        if(s.name==="passingYardsAllowed") passYpg=s.value;
-        if(s.name==="rushingYardsAllowed") rushYpg=s.value;
+        if(s.name==="sacks") sacks=s.value;
+        if(s.name==="gamesPlayed"||s.name==="teamGamesPlayed") gamesPlayed=s.value;
       });
     });
-    var result={passYpg:passYpg,rushYpg:rushYpg};
+    var sacksPg=(sacks!=null&&gamesPlayed)?sacks/gamesPlayed:null;
+    var result={sacks:sacks,gamesPlayed:gamesPlayed,sacksPg:sacksPg};
     _nflDefStatsCache[teamId]=result;
     return result;
   }catch(e){ return null; }
 }
 
+// avgPointsAgainst ranking: fetches record endpoint for each team in today's games
+var _nflDefRankCache=null;
+async function nflGetDefRanks(){
+  if(_nflDefRankCache) return _nflDefRankCache;
+  var now=new Date(), yr=now.getFullYear();
+  if(now.getMonth()<7) yr--;
+  var oppTeams={};
+  (ST.props||[]).forEach(function(p){
+    if(p._homeTeam) oppTeams[p._homeTeam]=1;
+    if(p._awayTeam) oppTeams[p._awayTeam]=1;
+  });
+  var teamNames=Object.keys(oppTeams);
+  if(!teamNames.length) return {};
+  var ids=await Promise.all(teamNames.map(nflGetTeamId));
+  var validPairs=teamNames.map(function(n,i){return{name:n,id:ids[i]};}).filter(function(x){return x.id;});
+  var records=await Promise.all(validPairs.map(async function(pair){
+    try{
+      var r=await fetch("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/"+yr+"/types/2/teams/"+pair.id+"/record",{signal:AbortSignal.timeout(8000)});
+      var d=await r.json();
+      var avgPts=null;
+      // Try total/overall item first
+      ((d.items)||[]).forEach(function(item){
+        if(!avgPts&&(item.type==="total"||(item.name&&item.name.toLowerCase().includes("total")))){
+          (item.stats||[]).forEach(function(s){if(s.name==="avgPointsAgainst") avgPts=s.value;});
+        }
+      });
+      // Fallback: any item
+      if(avgPts==null){
+        ((d.items)||[]).forEach(function(item){
+          (item.stats||[]).forEach(function(s){if(s.name==="avgPointsAgainst"&&avgPts==null) avgPts=s.value;});
+        });
+      }
+      return{id:pair.id,name:pair.name,ptsAllowed:avgPts};
+    }catch(e){return{id:pair.id,name:pair.name,ptsAllowed:null};}
+  }));
+  var valid=records.filter(function(r){return r.ptsAllowed!=null;});
+  valid.sort(function(a,b){return b.ptsAllowed-a.ptsAllowed;}); // worst defense = rank 1
+  var result={};
+  valid.forEach(function(r,i){result[r.id]={rank:i+1,total:valid.length,ptsAllowed:r.ptsAllowed};});
+  _nflDefRankCache=result;
+  return result;
+}
+
+// Stadium lookup: lat/lon for NWS weather API, dome flag, surface type
+var NFL_STADIUM_DATA={
+  "Arizona Cardinals":{lat:33.5277,lon:-112.2626,dome:true,turf:"artificial"},
+  "Atlanta Falcons":{lat:33.7553,lon:-84.4006,dome:true,turf:"artificial"},
+  "Baltimore Ravens":{lat:39.2780,lon:-76.6227,dome:false,turf:"grass"},
+  "Buffalo Bills":{lat:42.7738,lon:-78.7870,dome:false,turf:"artificial"},
+  "Carolina Panthers":{lat:35.2258,lon:-80.8528,dome:false,turf:"grass"},
+  "Chicago Bears":{lat:41.8623,lon:-87.6167,dome:false,turf:"grass"},
+  "Cincinnati Bengals":{lat:39.0954,lon:-84.5160,dome:false,turf:"artificial"},
+  "Cleveland Browns":{lat:41.5061,lon:-81.6995,dome:false,turf:"grass"},
+  "Dallas Cowboys":{lat:32.7473,lon:-97.0945,dome:true,turf:"artificial"},
+  "Denver Broncos":{lat:39.7439,lon:-105.0201,dome:false,turf:"grass"},
+  "Detroit Lions":{lat:42.3400,lon:-83.0456,dome:true,turf:"artificial"},
+  "Green Bay Packers":{lat:44.5013,lon:-88.0622,dome:false,turf:"grass"},
+  "Houston Texans":{lat:29.6847,lon:-95.4107,dome:true,turf:"artificial"},
+  "Indianapolis Colts":{lat:39.7601,lon:-86.1639,dome:true,turf:"artificial"},
+  "Jacksonville Jaguars":{lat:30.3240,lon:-81.6373,dome:false,turf:"artificial"},
+  "Kansas City Chiefs":{lat:39.0489,lon:-94.4839,dome:false,turf:"grass"},
+  "Las Vegas Raiders":{lat:36.0909,lon:-115.1836,dome:true,turf:"artificial"},
+  "Los Angeles Chargers":{lat:33.9535,lon:-118.3392,dome:true,turf:"artificial"},
+  "Los Angeles Rams":{lat:33.9535,lon:-118.3392,dome:true,turf:"artificial"},
+  "Miami Dolphins":{lat:25.9580,lon:-80.2389,dome:false,turf:"grass"},
+  "Minnesota Vikings":{lat:44.9738,lon:-93.2575,dome:true,turf:"artificial"},
+  "New England Patriots":{lat:42.0909,lon:-71.2643,dome:false,turf:"artificial"},
+  "New Orleans Saints":{lat:29.9511,lon:-90.0812,dome:true,turf:"artificial"},
+  "New York Giants":{lat:40.8128,lon:-74.0741,dome:false,turf:"artificial"},
+  "New York Jets":{lat:40.8128,lon:-74.0741,dome:false,turf:"artificial"},
+  "Philadelphia Eagles":{lat:39.9008,lon:-75.1675,dome:false,turf:"grass"},
+  "Pittsburgh Steelers":{lat:40.4468,lon:-80.0158,dome:false,turf:"grass"},
+  "San Francisco 49ers":{lat:37.4033,lon:-121.9698,dome:false,turf:"grass"},
+  "Seattle Seahawks":{lat:47.5952,lon:-122.3316,dome:false,turf:"artificial"},
+  "Tampa Bay Buccaneers":{lat:27.9759,lon:-82.5033,dome:false,turf:"grass"},
+  "Tennessee Titans":{lat:36.1665,lon:-86.7713,dome:false,turf:"artificial"},
+  "Washington Commanders":{lat:38.9078,lon:-76.8645,dome:false,turf:"grass"}
+};
+
+// Wind data via NWS free API (US-only, no key required)
+var _nflWeatherCache={};
+async function nflGetWeather(homeTeam){
+  if(_nflWeatherCache[homeTeam]!=null) return _nflWeatherCache[homeTeam];
+  var st=NFL_STADIUM_DATA[homeTeam];
+  if(!st||st.dome){_nflWeatherCache[homeTeam]={wind:0,dome:!!(st&&st.dome)};return _nflWeatherCache[homeTeam];}
+  try{
+    var lat=st.lat.toFixed(4), lon=st.lon.toFixed(4);
+    var pr=await fetch("https://api.weather.gov/points/"+lat+","+lon,{signal:AbortSignal.timeout(7000)});
+    var pd=await pr.json();
+    var fUrl=pd&&pd.properties&&pd.properties.forecastHourly;
+    if(!fUrl) throw new Error("no forecast url");
+    var fr=await fetch(fUrl,{signal:AbortSignal.timeout(7000)});
+    var fd=await fr.json();
+    var periods=(fd&&fd.properties&&fd.properties.periods)||[];
+    var maxWind=0;
+    periods.slice(0,24).forEach(function(per){
+      var h=new Date(per.startTime).getHours();
+      if(h>=12&&h<=21){
+        var ws=parseInt((per.windSpeed||"0 mph").replace(/[^0-9]/g,""))||0;
+        if(ws>maxWind) maxWind=ws;
+      }
+    });
+    _nflWeatherCache[homeTeam]={wind:maxWind,dome:false};
+    return _nflWeatherCache[homeTeam];
+  }catch(e){_nflWeatherCache[homeTeam]={wind:0,dome:false};return _nflWeatherCache[homeTeam];}
+}
+
+// QB depth chart: rank-1 QB per team (for QB change badge on pass-market trends)
+var _nflQBCache={};
+async function nflGetRank1QB(teamId){
+  if(_nflQBCache[teamId]!==undefined) return _nflQBCache[teamId];
+  var now=new Date(), yr=now.getFullYear();
+  if(now.getMonth()<7) yr--;
+  try{
+    var r=await fetch("https://sports.core.api.espn.com/v2/sports/football/leagues/nfl/seasons/"+yr+"/teams/"+teamId+"/depthcharts",{signal:AbortSignal.timeout(8000)});
+    var d=await r.json();
+    var rank1={id:null,name:null};
+    ((d.items)||[]).forEach(function(chart){
+      if(rank1.id) return;
+      if((chart.name||'').toLowerCase().includes('offense')||(chart.type||'').toLowerCase().includes('offense')){
+        var qbPos=(chart.positions||[]).find(function(pos){return (pos.abbreviation||pos.name||'').toLowerCase()==='qb';});
+        if(qbPos){
+          var r1=(qbPos.athletes||[]).find(function(a){return a.rank===1;});
+          if(r1&&r1.athlete&&r1.athlete.$ref){
+            var m=r1.athlete.$ref.match(/athletes\/(\d+)/);
+            if(m) rank1.id=m[1];
+            rank1.name=r1.athlete.displayName||null;
+          }
+        }
+      }
+    });
+    _nflQBCache[teamId]=rank1;
+    return rank1;
+  }catch(e){_nflQBCache[teamId]={id:null,name:null};return _nflQBCache[teamId];}
+}
+
+// Game spread cache: fetched lazily per event
+var _nflSpreadCache={};
+async function nflGetEventSpread(evId){
+  if(_nflSpreadCache[evId]!=null) return _nflSpreadCache[evId];
+  try{
+    var r=await fetch(apiUrl("/sports/americanfootball_nfl/events/"+evId+"/odds",{regions:"us",markets:"spreads",oddsFormat:"american",dateFormat:"iso"}),{signal:AbortSignal.timeout(6000)});
+    var d=await r.json();
+    var spreads={};
+    ((d)||[]).forEach(function(bk){
+      (bk.markets||[]).forEach(function(m){
+        if(m.key!=="spreads") return;
+        (m.outcomes||[]).forEach(function(o){if(o.name&&o.point!=null) spreads[o.name]=o.point;});
+      });
+    });
+    _nflSpreadCache[evId]=spreads;
+    return spreads;
+  }catch(e){_nflSpreadCache[evId]={};return {};}
+}
+
+// === NFL TREND FUNCTIONS ===
+
 async function calcNFLOpponentRankTrends(){
-  // Selection: opponent allows ≥248 pass ypg or ≥127 rush ypg (~10% above NFL average)
-  // Confidence: trendConf on player's current-season hit rate at book line (independent signal)
-  var PASS_YPG=248, RUSH_YPG=127;
   var PASS_MARKETS={player_pass_yds:1,player_receptions:1};
   var RUSH_MARKETS={player_rush_yds:1};
   var results=[];
+  var defRanks=await nflGetDefRanks();
   var candidates=ST.props.filter(function(p){
     return p._espnTeam&&p._homeTeam&&(PASS_MARKETS[p._market]||RUSH_MARKETS[p._market]);
   });
@@ -9986,17 +10241,17 @@ async function calcNFLOpponentRankTrends(){
     if(!oppTeam) continue;
     var oppId=await nflGetTeamId(oppTeam);
     if(!oppId) continue;
-    var def=await nflTeamDefStats(oppId);
-    if(!def) continue;
-    var allowed=isPass?def.passYpg:def.rushYpg;
-    var threshold=isPass?PASS_YPG:RUSH_YPG;
-    if(allowed==null||allowed<threshold) continue;
+    var def=defRanks[oppId];
+    if(!def||def.ptsAllowed==null) continue;
+    var isWeak=(def.total>=4&&def.rank<=Math.ceil(def.total*0.4))||def.ptsAllowed>=27;
+    if(!isWeak) continue;
     var vals=p._vals||[], line=p.consensus!=null?p.consensus:p.bestLine;
     if(!line||vals.length<3) continue;
-    var hits=vals.filter(function(v){ return v>line; }).length;
+    var hits=vals.filter(function(v){return v>line;}).length;
     var hitRate=hits/vals.length;
     if(hitRate<0.50) continue;
     var conf=trendConf(hitRate,vals.length);
+    if(conf<60) continue;
     var defSide=isPass?"passing defense":"run defense";
     results.push({
       type:"nfl_opp_rank",
@@ -10014,13 +10269,484 @@ async function calcNFLOpponentRankTrends(){
       _rawIsOver:true,
       _rawVals:vals,
       recordCls:"over",
-      headline:oppTeam+" allows "+Math.round(allowed)+" "+(isPass?"pass":"rush")+" ypg",
+      headline:oppTeam+" allowing "+def.ptsAllowed.toFixed(1)+" pts/game (bottom-tier defense)",
       systemName:"OPPONENT WEAKNESS",
       _oppTeam:oppTeam,
-      _oppAllowed:Math.round(allowed),
-      _defSide:defSide
+      _defSide:defSide,
+      playerId:p.playerId||null
     });
   }
+  return results;
+}
+
+async function calcNFLSackRateTrends(){
+  var PASS_MARKETS={player_pass_yds:1,player_pass_completions:1};
+  var results=[];
+  var candidates=ST.props.filter(function(p){
+    return p._espnTeam&&p._homeTeam&&PASS_MARKETS[p._market];
+  });
+  for(var i=0;i<candidates.length;i++){
+    var p=candidates[i];
+    var oppTeam=null;
+    if(nflMatchTeam(p._espnTeam,p._homeTeam)) oppTeam=p._awayTeam;
+    else if(nflMatchTeam(p._espnTeam,p._awayTeam)) oppTeam=p._homeTeam;
+    if(!oppTeam) continue;
+    var oppId=await nflGetTeamId(oppTeam);
+    if(!oppId) continue;
+    var def=await nflTeamDefStats(oppId);
+    if(!def||def.sacksPg==null||def.sacksPg<3.5) continue;
+    var vals=p._vals||[], line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) continue;
+    var underHits=vals.filter(function(v){return v<line;}).length;
+    var hitRate=underHits/vals.length;
+    if(hitRate<0.50) continue;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) continue;
+    results.push({
+      type:"nfl_sack_rate",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:underHits+"-"+(vals.length-underHits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:false,
+      _rawVals:vals,
+      recordCls:"under",
+      headline:oppTeam+" generates "+def.sacksPg.toFixed(1)+" sacks/game — elite pass rush",
+      systemName:"SACK RATE",
+      _oppTeam:oppTeam,
+      playerId:p.playerId||null
+    });
+  }
+  return results;
+}
+
+async function calcNFLImpliedTotalTrends(){
+  var PASS_MARKETS={player_pass_yds:1,player_receptions:1,player_reception_yds:1};
+  var results=[];
+  var spreadData={};
+  await Promise.all(_trendsEvents.map(async function(ev){
+    var sp=await nflGetEventSpread(ev.id);
+    spreadData[ev.id]={home:ev.home_team,away:ev.away_team,spreads:sp};
+  }));
+  var candidates=ST.props.filter(function(p){
+    return p._espnTeam&&p._homeTeam&&PASS_MARKETS[p._market];
+  });
+  for(var i=0;i<candidates.length;i++){
+    var p=candidates[i];
+    var playerTeam=null;
+    if(nflMatchTeam(p._espnTeam,p._homeTeam)) playerTeam=p._homeTeam;
+    else if(nflMatchTeam(p._espnTeam,p._awayTeam)) playerTeam=p._awayTeam;
+    if(!playerTeam) continue;
+    var evId=null;
+    _trendsEvents.forEach(function(ev){
+      if(!evId&&(ev.home_team===p._homeTeam||ev.away_team===p._homeTeam)) evId=ev.id;
+    });
+    if(!evId) continue;
+    var spData=(spreadData[evId]&&spreadData[evId].spreads)||{};
+    var teamSpread=null, lastWord=playerTeam.split(' ').pop().toLowerCase();
+    Object.keys(spData).forEach(function(tName){
+      if(teamSpread==null&&tName.toLowerCase().includes(lastWord)) teamSpread=spData[tName];
+    });
+    if(teamSpread==null||teamSpread>-7) continue; // Must be 7+ point favorite
+    var vals=p._vals||[], line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) continue;
+    var hits=vals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.50) continue;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) continue;
+    results.push({
+      type:"nfl_implied_total",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:true,
+      _rawVals:vals,
+      recordCls:"over",
+      headline:playerTeam+" favored by "+Math.abs(teamSpread)+" — pass-heavy game script expected",
+      systemName:"GAME SCRIPT",
+      playerId:p.playerId||null
+    });
+  }
+  return results;
+}
+
+async function calcNFLWindTrends(){
+  var PASS_MARKETS={player_pass_yds:1,player_pass_completions:1,player_receptions:1};
+  var WIND_THRESHOLD=15;
+  var results=[];
+  var candidates=ST.props.filter(function(p){return p._homeTeam&&PASS_MARKETS[p._market];});
+  var homeTeams=[]; candidates.forEach(function(p){if(homeTeams.indexOf(p._homeTeam)<0) homeTeams.push(p._homeTeam);});
+  var weatherMap={};
+  await Promise.all(homeTeams.map(async function(ht){weatherMap[ht]=await nflGetWeather(ht);}));
+  for(var i=0;i<candidates.length;i++){
+    var p=candidates[i];
+    var wx=weatherMap[p._homeTeam];
+    if(!wx||wx.dome||wx.wind<WIND_THRESHOLD) continue;
+    var vals=p._vals||[], line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) continue;
+    var underHits=vals.filter(function(v){return v<line;}).length;
+    var hitRate=underHits/vals.length;
+    if(hitRate<0.50) continue;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) continue;
+    results.push({
+      type:"nfl_wind",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:underHits+"-"+(vals.length-underHits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:false,
+      _rawVals:vals,
+      recordCls:"under",
+      headline:wx.wind+"mph winds forecast at "+p._homeTeam.split(' ').pop()+" stadium today",
+      systemName:"WIND GAME",
+      playerId:p.playerId||null
+    });
+  }
+  return results;
+}
+
+function calcNFLBounceBackTrends(){
+  var results=[];
+  var candidates=ST.props.filter(function(p){
+    return p._vals&&p._vals.length>=5&&(p._market==="player_pass_yds"||
+      p._market==="player_rush_yds"||p._market==="player_receptions"||
+      p._market==="player_reception_yds"||p._market==="player_rush_attempts");
+  });
+  candidates.forEach(function(p){
+    var vals=p._vals.slice(0,5);
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line) return;
+    var mean=vals.reduce(function(a,b){return a+b;},0)/vals.length;
+    var variance=vals.reduce(function(a,v){return a+Math.pow(v-mean,2);},0)/vals.length;
+    var sd=Math.sqrt(variance);
+    if(vals[0]>=(mean-1.5*sd)) return; // Last game was NOT a big miss
+    var allVals=p._vals||[];
+    var hits=allVals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/allVals.length;
+    if(hitRate<0.50||allVals.length<4) return;
+    var conf=trendConf(hitRate,allVals.length);
+    if(conf<60) return;
+    results.push({
+      type:"nfl_bounce_back",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:hits+"-"+(allVals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:true,
+      _rawVals:allVals,
+      recordCls:"over",
+      headline:"Last game: "+Math.round(vals[0])+" "+marketName(p._market)+"; season avg: "+Math.round(mean),
+      systemName:"BOUNCE-BACK",
+      playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
+async function calcNFLWR1AbsenceTrends(){
+  var REC_MARKETS={player_receptions:1,player_reception_yds:1};
+  var results=[];
+  var injuryMap={};
+  try{
+    var ir=await fetch("https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries?limit=200",{signal:AbortSignal.timeout(8000)});
+    var id=await ir.json();
+    ((id.injuries)||(id.items)||[]).forEach(function(ti){
+      var tName=(ti.team&&(ti.team.displayName||ti.team.abbreviation))||'';
+      (ti.injuries||[]).forEach(function(inj){
+        var pos=(inj.athlete&&inj.athlete.position&&inj.athlete.position.abbreviation)||'';
+        var status=inj.status||(inj.type&&inj.type.description)||'';
+        if((pos==='WR'||pos==='TE')&&/out|doubtful/i.test(status)){
+          if(!injuryMap[tName]) injuryMap[tName]=[];
+          injuryMap[tName].push({pos:pos,name:(inj.athlete&&inj.athlete.displayName)||''});
+        }
+      });
+    });
+  }catch(e){}
+  if(!Object.keys(injuryMap).length) return results;
+  var candidates=ST.props.filter(function(p){return p._espnTeam&&p._homeTeam&&REC_MARKETS[p._market];});
+  candidates.forEach(function(p){
+    var playerTeam=null;
+    if(nflMatchTeam(p._espnTeam,p._homeTeam)) playerTeam=p._homeTeam;
+    else if(nflMatchTeam(p._espnTeam,p._awayTeam)) playerTeam=p._awayTeam;
+    if(!playerTeam) return;
+    var teamInjuries=null;
+    Object.keys(injuryMap).forEach(function(tn){
+      if(!teamInjuries&&playerTeam.toLowerCase().includes(tn.toLowerCase())) teamInjuries=injuryMap[tn];
+    });
+    if(!teamInjuries||!teamInjuries.length) return;
+    var vals=p._vals||[], line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) return;
+    var hits=vals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.50) return;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) return;
+    var injNames=teamInjuries.map(function(i){return i.name;}).slice(0,2).join(', ');
+    results.push({
+      type:"nfl_target_vacuum",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:true,
+      _rawVals:vals,
+      recordCls:"over",
+      headline:injNames+" ("+playerTeam.split(' ').pop()+") listed Out — target redistribution",
+      systemName:"TARGET VACUUM",
+      playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
+function calcNFLShortWeekTrends(){
+  var MARKETS={player_pass_yds:1,player_rush_yds:1,player_receptions:1};
+  var results=[];
+  var candidates=ST.props.filter(function(p){return p._commenceTime&&MARKETS[p._market];});
+  candidates.forEach(function(p){
+    var d=new Date(p._commenceTime), utcDay=d.getUTCDay();
+    // TNF: Thursday 8:20pm ET ≈ 00:20 UTC Friday (utcDay=5), or 4 for early Thursday slots
+    if(utcDay!==4&&utcDay!==5) return;
+    var vals=p._vals||[], line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) return;
+    var underHits=vals.filter(function(v){return v<line;}).length;
+    var hitRate=underHits/vals.length;
+    if(hitRate<0.50) return;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) return;
+    results.push({
+      type:"nfl_short_week",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:underHits+"-"+(vals.length-underHits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:false,
+      _rawVals:vals,
+      recordCls:"under",
+      headline:"Thursday Night Football — 4-day turnaround for both teams",
+      systemName:"SHORT WEEK",
+      playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
+function calcNFLVenueSplitTrends(){
+  var MARKETS={player_pass_yds:1,player_rush_yds:1,player_reception_yds:1};
+  var results=[];
+  var candidates=ST.props.filter(function(p){return p._homeTeam&&p._vals&&p._vals.length>=4&&MARKETS[p._market];});
+  candidates.forEach(function(p){
+    var homeStadium=NFL_STADIUM_DATA[p._homeTeam];
+    if(!homeStadium) return;
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line) return;
+    var vals=p._vals||[];
+    var hits=vals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.55) return;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<62) return;
+    var isDome=homeStadium.dome, isArtificial=homeStadium.turf==="artificial";
+    var venueDesc=(isDome?"enclosed dome":"outdoor stadium")+(isArtificial?" (turf)":"");
+    results.push({
+      type:"nfl_dome_split",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:true,
+      _rawVals:vals,
+      recordCls:"over",
+      headline:"Playing at "+p._homeTeam.split(' ').pop()+" — "+venueDesc,
+      systemName:"VENUE SPLIT",
+      playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
+async function calcNFLUnderdogVolumeTrends(){
+  var PASS_MARKETS={player_pass_yds:1,player_receptions:1,player_reception_yds:1};
+  var results=[];
+  var spreadData={};
+  await Promise.all(_trendsEvents.map(async function(ev){
+    var sp=await nflGetEventSpread(ev.id);
+    spreadData[ev.id]={spreads:sp};
+  }));
+  var candidates=ST.props.filter(function(p){return p._espnTeam&&p._homeTeam&&PASS_MARKETS[p._market];});
+  for(var i=0;i<candidates.length;i++){
+    var p=candidates[i];
+    var playerTeam=null;
+    if(nflMatchTeam(p._espnTeam,p._homeTeam)) playerTeam=p._homeTeam;
+    else if(nflMatchTeam(p._espnTeam,p._awayTeam)) playerTeam=p._awayTeam;
+    if(!playerTeam) continue;
+    var evId=null;
+    _trendsEvents.forEach(function(ev){if(!evId&&(ev.home_team===p._homeTeam||ev.away_team===p._homeTeam)) evId=ev.id;});
+    if(!evId) continue;
+    var spData=(spreadData[evId]&&spreadData[evId].spreads)||{};
+    var teamSpread=null, lastWord=playerTeam.split(' ').pop().toLowerCase();
+    Object.keys(spData).forEach(function(tName){if(teamSpread==null&&tName.toLowerCase().includes(lastWord)) teamSpread=spData[tName];});
+    if(teamSpread==null||teamSpread<=7) continue; // Must be 7+ underdog
+    var vals=p._vals||[], line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) continue;
+    var hits=vals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.50) continue;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) continue;
+    results.push({
+      type:"nfl_underdog_volume",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:true,
+      _rawVals:vals,
+      recordCls:"over",
+      headline:playerTeam+" is +"+teamSpread+" underdog — volume passing expected",
+      systemName:"UNDERDOG VOLUME",
+      playerId:p.playerId||null
+    });
+  }
+  return results;
+}
+
+function calcNFLPostByeTrends(){
+  var BYE_MIN=12, BYE_MAX=18;
+  var results=[];
+  var today=new Date();
+  var candidates=ST.props.filter(function(p){return p._vals&&p._vals.length>=3&&p._dates&&p._dates.length;});
+  candidates.forEach(function(p){
+    var lastGame=new Date(p._dates[0]);
+    var daysSince=(today-lastGame)/86400000;
+    if(daysSince<BYE_MIN||daysSince>BYE_MAX) return;
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line) return;
+    var vals=p._vals||[];
+    var hits=vals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.50||vals.length<3) return;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) return;
+    results.push({
+      type:"nfl_post_bye",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:true,
+      _rawVals:vals,
+      recordCls:"over",
+      headline:Math.round(daysSince)+" days since last game — coming off bye week",
+      systemName:"POST-BYE BOOST",
+      playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
+function calcNFLAscendingTrends(){
+  var results=[];
+  var candidates=ST.props.filter(function(p){return p._vals&&p._vals.length>=4;});
+  candidates.forEach(function(p){
+    var vals=p._vals||[];
+    // vals[0] = most recent. Ascending means vals[0]>vals[1]>vals[2]
+    if(!(vals[0]>vals[1]&&vals[1]>vals[2])) return;
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line) return;
+    var hits=vals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.50) return;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) return;
+    var last3=[vals[2],vals[1],vals[0]].map(Math.round).join(" → ");
+    results.push({
+      type:"nfl_ascending",
+      player:p.player,
+      _market:p._market,
+      _rawMarket:marketName(p._market||""),
+      _game:p._game,
+      _sport:"americanfootball_nfl",
+      record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),
+      conf:conf,
+      odds:p.bestOdds,
+      _rawLine:line,
+      _rawLineNum:line,
+      _rawIsOver:true,
+      _rawVals:vals,
+      recordCls:"over",
+      headline:"3-game ascending trend: "+last3,
+      systemName:"RISING TREND",
+      playerId:p.playerId||null
+    });
+  });
   return results;
 }
 
@@ -10050,6 +10776,7 @@ async function trendsFetchAndLoad(){
                 if(p.bestOdds==null||p.yesNo||p.bestLine==null) return;
                 p._market=mk; p._sport=_trendsSport; p._game=gameLabel;
                 p._homeTeam=ev.home_team||""; p._awayTeam=ev.away_team||"";
+                p._commenceTime=ev.commence_time||"";
                 var k=p.player.toLowerCase()+"|"+mk;
                 if(!seen[k]){ seen[k]=1; allCandidates.push(p); }
               });
@@ -10132,14 +10859,45 @@ async function trendsFetchAndLoad(){
 
       // === PHASE 5b: NFL systems ===
       if(_trendsSport==="americanfootball_nfl"){
+        // Sync trends (pure math, no API calls)
         try{
-          var _nflOppTrends=await calcNFLOpponentRankTrends();
-          if(_nflOppTrends.length){
-            trends=trends.concat(_nflOppTrends);
-            _trendsData=trends.slice();
-            renderTrends(_trendsData);
-          }
-        }catch(e){ console.warn("[PropDesk] nfl_opp_rank error:",e); }
+          var _nflSync=[].concat(calcNFLBounceBackTrends(),calcNFLShortWeekTrends(),
+            calcNFLVenueSplitTrends(),calcNFLPostByeTrends(),calcNFLAscendingTrends());
+          if(_nflSync.length){ trends=trends.concat(_nflSync); _trendsData=trends.slice(); renderTrends(_trendsData); }
+        }catch(e){ console.warn("[PropDesk] nfl_sync trends error:",e); }
+        // Async trends (require API calls)
+        var _nflAsyncSystems=[
+          {fn:calcNFLOpponentRankTrends,   label:"nfl_opp_rank"},
+          {fn:calcNFLSackRateTrends,        label:"nfl_sack_rate"},
+          {fn:calcNFLImpliedTotalTrends,    label:"nfl_implied_total"},
+          {fn:calcNFLWindTrends,            label:"nfl_wind"},
+          {fn:calcNFLWR1AbsenceTrends,      label:"nfl_wr1_absence"},
+          {fn:calcNFLUnderdogVolumeTrends,  label:"nfl_underdog_volume"}
+        ];
+        for(var _nsi=0;_nsi<_nflAsyncSystems.length;_nsi++){
+          var _nsys=_nflAsyncSystems[_nsi];
+          try{
+            var _nsTrends=await _nsys.fn();
+            if(_nsTrends.length){ trends=trends.concat(_nsTrends); _trendsData=trends.slice(); renderTrends(_trendsData); }
+          }catch(e){ console.warn("[PropDesk]",_nsys.label,"error:",e); }
+        }
+        // QB change badge: for pass-market trends, check if the player is still rank-1 QB
+        var _QB_PASS={player_pass_yds:1,player_pass_tds:1,player_pass_completions:1,player_pass_attempts:1};
+        var _nflPassTrends=trends.filter(function(t){return t._sport==="americanfootball_nfl"&&_QB_PASS[t._market]&&t.playerId;});
+        if(_nflPassTrends.length){
+          var _qbTeamIds={};
+          await Promise.all(_nflPassTrends.map(async function(t){
+            if(!t._espnTeam) return;
+            var tid=await nflGetTeamId(t._espnTeam||t._game);
+            if(!tid) return;
+            var qb=await nflGetRank1QB(tid);
+            if(qb&&qb.id&&String(qb.id)!==String(t.playerId)){
+              t._qbChanged=true; t._qbChangedTo=qb.name||"backup";
+            }
+          }));
+          var _hadChange=_nflPassTrends.some(function(t){return t._qbChanged;});
+          if(_hadChange){ _trendsData=trends.slice(); renderTrends(_trendsData); }
+        }
       }
       trends.sort(function(a,b){ return b.conf-a.conf; });
     }catch(ce){ console.warn("[PropDesk] trends calc error:",ce); }
@@ -10726,7 +11484,37 @@ function buildInsight(t){
     return "Built from the "+t.player+"'s real completed-game results this season, with today's posted total applied retroactively to those real final scores. No historical odds are assumed — only the total number and the actual outcomes are real.";
   }
   if(t.type==="nfl_opp_rank"){
-    return t.player+"'s opponent is allowing above-average "+(t._defSide||"yards")+" this season. The trend fires when the defense ranks in the bottom tier league-wide — an independent signal from the player's own production record. Confidence reflects "+t.player+"'s current-season hit rate at their book line.";
+    return t.player+"'s opponent is allowing above-average points this season (bottom-tier defense). The trend fires when the defense ranks in the bottom tier by points allowed — an independent signal from the player's own production record. Confidence reflects "+t.player+"'s current-season hit rate at their book line.";
+  }
+  if(t.type==="nfl_sack_rate"){
+    return (t._oppTeam||"The opponent")+" generates elite pass pressure. High sack-rate defenses consistently force incompletions, scrambles, and throw-aways — depressing pass yards and completions below the book line. This is an independent structural signal from the player's own record.";
+  }
+  if(t.type==="nfl_implied_total"){
+    return "When "+t.player+"'s team enters as a heavy favorite, they control the game script — building early leads through the air and protecting them late. This creates elevated pass volume and reception opportunities relative to neutral game situations.";
+  }
+  if(t.type==="nfl_wind"){
+    return "High winds (15+ mph) consistently reduce completion percentages, pass attempts, and yardage totals for all QBs and pass-catchers. Both the weather forecast and the player's historical miss rate at this line align to create a structural edge on the Under.";
+  }
+  if(t.type==="nfl_bounce_back"){
+    return t.player+" posted a significant underperformance last game relative to their season average. Players consistently revert toward their baseline after outlier-low outputs — the bounce-back pattern is one of the most repeatable in prop betting across all sports.";
+  }
+  if(t.type==="nfl_target_vacuum"){
+    return "A key pass-catcher on "+t.player+"'s team is listed Out. In the NFL, target shares redistribute quickly when WRs or TEs miss games — secondary receivers absorb the majority of the vacated volume within the same game week.";
+  }
+  if(t.type==="nfl_short_week"){
+    return "Thursday Night Football means only four days of recovery and preparation. Short weeks consistently produce below-average offensive output, particularly for skill positions that rely on timing routes, conditioning, and pad-level execution after Sunday physical wear.";
+  }
+  if(t.type==="nfl_dome_split"){
+    return t.player+"'s team hosts this game in a controlled venue. Dome and covered stadium games remove weather variance entirely, and artificial turf consistently produces higher yardage totals per play versus natural grass, benefiting skill players across all markets.";
+  }
+  if(t.type==="nfl_underdog_volume"){
+    return "As a significant underdog, "+t.player+"'s team is likely to fall behind and enter pass-heavy game scripts. Trailing teams average 8-12 more pass attempts per game versus teams in neutral or winning states, directly boosting per-player volume statistics.";
+  }
+  if(t.type==="nfl_post_bye"){
+    return t.player+" had a full extra week of rest, film study, and physical recovery. Bye weeks consistently produce above-average performances in the first 1-2 games back, especially for skill players managing minor nagging injuries or expanded roles mid-season.";
+  }
+  if(t.type==="nfl_ascending"){
+    return t.player+"'s production has increased in each of the last three tracked games. Rising trends typically reflect role expansion, scheme adjustments, or recovery from injury — and tend to persist for at least one more game before normalizing to the season baseline.";
   }
   return "";
 }
@@ -12135,15 +12923,14 @@ async function fetchWeather(homeTeam,sport){
 
 /* ============ AUTH ============ */
 function _initAuth(){
-  _supabase=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-  _supabase.auth.getSession().then(function(res){
-    var session=res.data&&res.data.session;
-    if(!session){ _showAuthModal(); }
-    else{ _checkTrialAndLaunch(session.user); }
-  });
-  _supabase.auth.onAuthStateChange(function(event,session){
-    if(event==='SIGNED_OUT'){ _showAuthModal(); }
-  });
+  try{ _supabase=supabase.createClient(SUPABASE_URL,SUPABASE_KEY); }catch(e){}
+  if(_supabase){
+    _supabase.auth.getSession().then(function(res){
+      var session=res.data&&res.data.session;
+      if(session){ _checkTrialAndLaunch(session.user); }
+      else{ init(); }
+    }).catch(function(){ init(); });
+  } else { init(); }
 }
 var _disclaimerAckCb=null;
 function _showDisclaimerModal(callback){
