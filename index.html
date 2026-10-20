@@ -8753,7 +8753,7 @@ async function calcPlayerMatchupTrends(){
     if(!combos.length) continue;
     combos.sort(function(a,b){ return b.rate-a.rate; });
     var best=combos[0];
-    if(best.rate<0.70) continue; // require a real, meaningful lean — never surface a coin-flip as a "system"
+    if(best.rate<0.65) continue; // require a real, meaningful lean — never surface a coin-flip as a "system"
     var _matchType=best.label.indexOf("left-handed")>=0?"lefty_matchup":best.label.indexOf("right-handed")>=0?"righty_matchup":"matchup";
 
     var mktLbl=marketName(p._market);
@@ -8834,7 +8834,7 @@ async function calcTeamSituationalTrends(){
       // A. PITCHER DOMINANCE (min 8 starts vs this specific opponent with today's pitcher)
       if(tp.myPitcherId){
         var pVsOpp=gs.filter(function(g){ return g.pitcherId===tp.myPitcherId&&g.opponentId===tp.oppId; });
-        if(pVsOpp.length>=8){
+        if(pVsOpp.length>=5){
           var pW=pVsOpp.filter(function(g){ return g.won; }).length;
           var pRate=pW/pVsOpp.length;
           var pRaTotal=pVsOpp.reduce(function(s,g){ return s+(g.runsAgainst!=null?g.runsAgainst:0); },0);
@@ -8859,7 +8859,7 @@ async function calcTeamSituationalTrends(){
       // B. HOME/ROAD DOMINANCE (min 20 games each split, 10%+ gap)
       var hGs=gs.filter(function(g){ return g.isHome; });
       var rGs=gs.filter(function(g){ return !g.isHome; });
-      if(hGs.length>=20&&rGs.length>=20){
+      if(hGs.length>=12&&rGs.length>=12){
         var hRate=hGs.filter(function(g){ return g.won; }).length/hGs.length;
         var rRate=rGs.filter(function(g){ return g.won; }).length/rGs.length;
         if(Math.abs(hRate-rRate)>=0.10){
@@ -8886,7 +8886,7 @@ async function calcTeamSituationalTrends(){
       // C. REST ADVANTAGE (min 10 games per situation, 5%+ gap)
       var b2bList=restList.filter(function(x){ return x.rest===1; });
       var restedList=restList.filter(function(x){ return x.rest>=2; });
-      if(b2bList.length>=10&&restedList.length>=10){
+      if(b2bList.length>=7&&restedList.length>=7){
         var b2bR=b2bList.filter(function(x){ return x.game.won; }).length/b2bList.length;
         var restedR=restedList.filter(function(x){ return x.game.won; }).length/restedList.length;
         if(Math.abs(restedR-b2bR)>=0.05){
@@ -8918,7 +8918,7 @@ async function calcTeamSituationalTrends(){
       // D. OPPONENT QUALITY SPLITS (min 15 games vs each quality tier)
       var vsAbove=gs.filter(function(g){ return g.opponentRecord&&g.opponentRecord.wins>g.opponentRecord.losses; });
       var vsBelow=gs.filter(function(g){ return g.opponentRecord&&g.opponentRecord.wins<=g.opponentRecord.losses; });
-      if(vsAbove.length>=15&&vsBelow.length>=15){
+      if(vsAbove.length>=12&&vsBelow.length>=12){
         var vaRate=vsAbove.filter(function(g){ return g.won; }).length/vsAbove.length;
         var vbRate=vsBelow.filter(function(g){ return g.won; }).length/vsBelow.length;
         if(Math.abs(vaRate-vbRate)>=0.05){
@@ -9362,6 +9362,170 @@ async function calcRoadUnderdogTrends(){
       _game:gameStr,_market:"h2h",_rawLine:null,_rawIsOver:null,teamId:awayId,odds:h2h.awayOdds
     });
   }
+  return trends;
+}
+
+/* === MLB Player Situational Trends (sync) ===
+   Month splits, day-of-week splits, rest-day splits, opponent history — pure game
+   log analysis, no additional API calls. Populates the Situational filter tab. */
+function calcMLBPlayerSituationalTrends(){
+  var trends=[];
+  if(_trendsSport!=="baseball_mlb") return trends;
+  var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var today=new Date();
+  var curMonth=today.getMonth();
+
+  ST.props.forEach(function(p){
+    if(p._market==='batter_rbis') return;
+    if(p._market==='batter_runs_scored') return;
+    if(p.bestOdds!=null&&p.bestOdds<=-200) return;
+    var vals=p._vals,dates=p._dates;
+    if(!vals||!dates||vals.length<12||dates.length<12) return;
+    var line=p.pdLine!=null?p.pdLine:(p.bestLine!=null?p.bestLine:null);
+    if(line==null) return;
+    if(p._market==='batter_total_bases'&&line<=1) return;
+    if(p._market==='batter_hits'&&p.bestOdds!=null&&p.bestOdds<-180) return;
+    var isOver=(p.pdSide||"Over")==="Over";
+    var mktLbl=marketName(p._market||ST.market);
+    var isThresh=isThreshProp(p);
+    var lineLabel=isThresh?threshLabel(line,p._market):fmtLine(line,p.pdSide||"Over");
+    var n=Math.min(vals.length,dates.length,30);
+    // Build per-game enriched list
+    var games=[];
+    for(var i=0;i<n;i++){
+      var ds=dates[i]; if(!ds) continue;
+      var d=new Date(ds); if(isNaN(d.getTime())) continue;
+      games.push({val:vals[i],hit:isOver?vals[i]>line:vals[i]<line,
+        month:d.getMonth(),dow:d.getDay(),date:ds,
+        opp:(p._opponents&&p._opponents[i])||null});
+    }
+    if(games.length<12) return;
+
+    // A. MONTH SPLIT — current month vs rest of season
+    var curMG=games.filter(function(g){return g.month===curMonth;});
+    var othG=games.filter(function(g){return g.month!==curMonth;});
+    if(curMG.length>=6&&othG.length>=8){
+      var cMH=curMG.filter(function(g){return g.hit;}).length;
+      var cMR=cMH/curMG.length;
+      var othH=othG.filter(function(g){return g.hit;}).length;
+      var othR=othH/othG.length;
+      if(cMR>=0.65&&cMR-othR>=0.12){
+        var cMC=trendConf(cMR,curMG.length);
+        if(cMC>=65) trends.push({
+          type:"teamsit",conf:cMC,player:p.player,systemName:"MONTH SPLIT",
+          headline:p.player+" in "+MONTHS[curMonth]+": "+(isOver?"Over":"Under")+" "+lineLabel+" "+mktLbl+" in "+cMH+"/"+curMG.length+" games ("+Math.round(cMR*100)+"%) vs "+Math.round(othR*100)+"% rest of season",
+          title:p.player+" "+MONTHS[curMonth]+" Split",
+          record:cMH+"-"+(curMG.length-cMH)+" in "+MONTHS[curMonth],
+          hitRate:Math.round(cMR*100),recordCls:isOver?"":"under",
+          detail:"Season split: "+MONTHS[curMonth]+" — "+cMH+"/"+curMG.length+" ("+Math.round(cMR*100)+"%) vs "+Math.round(othR*100)+"% rest of season. Based on "+games.length+" games.",
+          source:"ESPN / MLB Game Log",
+          shareText:"PropDesk Trend: "+p.player+" in "+MONTHS[curMonth]+" — "+Math.round(cMR*100)+"% "+lineLabel+" "+mktLbl+" | propdeskhq.netlify.app",
+          _rawVals:vals.slice(0,n),_rawLineNum:line,_rawLine:isThresh?threshLabel(line,p._market):line,
+          _rawIsOver:isOver,_rawMarket:mktLbl,_game:p._game||"",_market:p._market||"",playerId:p._playerId||null
+        });
+      }
+    }
+
+    // B. DAY OF WEEK — weekend (Sat/Sun) vs weekday
+    var wkG=games.filter(function(g){return g.dow===0||g.dow===6;});
+    var wdG=games.filter(function(g){return g.dow>=1&&g.dow<=5;});
+    if(wkG.length>=5&&wdG.length>=6){
+      var wkH=wkG.filter(function(g){return g.hit;}).length;
+      var wkR=wkH/wkG.length;
+      var wdH=wdG.filter(function(g){return g.hit;}).length;
+      var wdR=wdH/wdG.length;
+      var bWk=wkR>=wdR;
+      var bR2=bWk?wkR:wdR,wR2=bWk?wdR:wkR;
+      var bH2=bWk?wkH:wdH,bN2=bWk?wkG.length:wdG.length;
+      if(bR2>=0.70&&bR2-wR2>=0.15){
+        var dC=trendConf(bR2,bN2);
+        if(dC>=65){
+          var bL=bWk?"on weekends":"on weekdays",wL=bWk?"on weekdays":"on weekends";
+          trends.push({
+            type:"teamsit",conf:dC,player:p.player,systemName:"DAY SPLIT",
+            headline:p.player+" "+bL+": "+(isOver?"Over":"Under")+" "+lineLabel+" "+mktLbl+" in "+bH2+"/"+bN2+" games ("+Math.round(bR2*100)+"%) vs "+Math.round(wR2*100)+"% "+wL,
+            title:p.player+" "+(bWk?"Weekend":"Weekday")+" Edge",
+            record:bH2+"-"+(bN2-bH2)+" "+bL,
+            hitRate:Math.round(bR2*100),recordCls:isOver?"":"under",
+            detail:"Day-of-week split: "+bL+" — "+bH2+"/"+bN2+" ("+Math.round(bR2*100)+"%) vs "+Math.round(wR2*100)+"% "+wL+". "+Math.round((bR2-wR2)*100)+"pp gap. L"+games.length+" games.",
+            source:"ESPN / MLB Game Log",
+            shareText:"PropDesk Trend: "+p.player+" "+bL+" — "+Math.round(bR2*100)+"% "+lineLabel+" "+mktLbl+" | propdeskhq.netlify.app",
+            _rawVals:vals.slice(0,n),_rawLineNum:line,_rawLine:isThresh?threshLabel(line,p._market):line,
+            _rawIsOver:isOver,_rawMarket:mktLbl,_game:p._game||"",_market:p._market||"",playerId:p._playerId||null
+          });
+        }
+      }
+    }
+
+    // C. REST SPLIT — 2+ days rest vs back-to-back
+    var rG=[],b2G=[];
+    for(var j=0;j<games.length-1;j++){
+      var cD=new Date(games[j].date),pD=new Date(games[j+1].date);
+      if(isNaN(cD.getTime())||isNaN(pD.getTime())) continue;
+      var gap=Math.round((cD-pD)/864e5);
+      if(gap>=2) rG.push(games[j]);
+      else if(gap===1) b2G.push(games[j]);
+    }
+    if(rG.length>=6&&b2G.length>=5){
+      var rH=rG.filter(function(g){return g.hit;}).length;
+      var rR2=rH/rG.length;
+      var bH3=b2G.filter(function(g){return g.hit;}).length;
+      var bR3=bH3/b2G.length;
+      var rGood=rR2>=bR3;
+      var gR=rGood?rR2:bR3,lR=rGood?bR3:rR2;
+      var gH3=rGood?rH:bH3,gN3=rGood?rG.length:b2G.length;
+      var gL=rGood?"with 2+ days rest":"on back-to-back";
+      var lL=rGood?"on back-to-back":"with 2+ days rest";
+      if(gR>=0.65&&gR-lR>=0.12){
+        var rC=trendConf(gR,gN3);
+        if(rC>=65) trends.push({
+          type:"teamsit",conf:rC,player:p.player,systemName:rGood?"REST BOOST":"B2B FADE",
+          headline:p.player+" "+gL+": "+(isOver?"Over":"Under")+" "+lineLabel+" "+mktLbl+" in "+gH3+"/"+gN3+" games ("+Math.round(gR*100)+"%) vs "+Math.round(lR*100)+"% "+lL,
+          title:p.player+" "+(rGood?"Rest Boost":"Back-to-Back Fade"),
+          record:gH3+"-"+(gN3-gH3)+" "+gL,
+          hitRate:Math.round(gR*100),recordCls:isOver?"":"under",
+          detail:"Rest split: "+gL+" — "+gH3+"/"+gN3+" ("+Math.round(gR*100)+"%) vs "+Math.round(lR*100)+"% "+lL+". "+Math.round((gR-lR)*100)+"pp gap. L"+games.length+" games.",
+          source:"ESPN / MLB Game Log",
+          shareText:"PropDesk Trend: "+p.player+" "+gL+" — "+Math.round(gR*100)+"% "+lineLabel+" "+mktLbl+" | propdeskhq.netlify.app",
+          _rawVals:vals.slice(0,n),_rawLineNum:line,_rawLine:isThresh?threshLabel(line,p._market):line,
+          _rawIsOver:isOver,_rawMarket:mktLbl,_game:p._game||"",_market:p._market||"",playerId:p._playerId||null
+        });
+      }
+    }
+
+    // D. OPPONENT HISTORY — best recurring matchup vs a specific opponent this season
+    if(p._opponents&&p._opponents.length){
+      var oppMap={};
+      for(var k=0;k<Math.min(games.length,p._opponents.length);k++){
+        var oN=p._opponents[k]; if(!oN) continue;
+        if(!oppMap[oN]) oppMap[oN]=[];
+        oppMap[oN].push(games[k]);
+      }
+      var bOK=null,bOR=0,bOH=0,bON=0;
+      Object.keys(oppMap).forEach(function(oN2){
+        var og=oppMap[oN2];
+        if(og.length<5) return;
+        var oh=og.filter(function(g){return g.hit;}).length;
+        var or2=oh/og.length;
+        if(or2>bOR&&or2>=0.75){bOR=or2;bOK=oN2;bOH=oh;bON=og.length;}
+      });
+      if(bOK){
+        var oC=trendConf(bOR,bON);
+        if(oC>=68) trends.push({
+          type:"teamsit",conf:oC,player:p.player,systemName:"OPP HISTORY",
+          headline:p.player+" vs "+bOK+": "+(isOver?"Over":"Under")+" "+lineLabel+" "+mktLbl+" in "+bOH+"/"+bON+" matchups ("+Math.round(bOR*100)+"%)",
+          title:p.player+" vs "+bOK,
+          record:bOH+"-"+(bON-bOH)+" vs "+bOK,
+          hitRate:Math.round(bOR*100),recordCls:isOver?"":"under",
+          detail:"Opponent-specific history: "+bOH+"/"+bON+" games vs "+bOK+" ("+Math.round(bOR*100)+"%) this season. L"+games.length+" total games.",
+          source:"ESPN / MLB Game Log",
+          shareText:"PropDesk Trend: "+p.player+" vs "+bOK+" — "+Math.round(bOR*100)+"% "+lineLabel+" "+mktLbl+" | propdeskhq.netlify.app",
+          _rawVals:vals.slice(0,n),_rawLineNum:line,_rawLine:isThresh?threshLabel(line,p._market):line,
+          _rawIsOver:isOver,_rawMarket:mktLbl,_game:p._game||"",_market:p._market||"",playerId:p._playerId||null
+        });
+      }
+    }
+  });
   return trends;
 }
 
@@ -10920,6 +11084,12 @@ async function trendsFetchAndLoad(){
         });
         var _wIds=await Promise.all(_wNames.map(mlbTeamId));
         await Promise.all(_wIds.filter(Boolean).map(mlbTeamRecentGames));
+
+        // Sync MLB situational trends (no API calls — runs immediately)
+        try{
+          var _mlbSitSync=calcMLBPlayerSituationalTrends();
+          if(_mlbSitSync.length){ trends=trends.concat(_mlbSitSync); _trendsData=trends.slice(); renderTrends(_trendsData); }
+        }catch(e){ console.warn("[PropDesk] mlb_sit_sync error:",e); }
 
         var _mlbSystems=[
           {fn:calcPlayerMatchupTrends,   label:"matchup"},
