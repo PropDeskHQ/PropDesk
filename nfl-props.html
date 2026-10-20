@@ -9513,7 +9513,9 @@ function renderTrendCard(t, sigCls, sigLabel, alreadyTracked){
     t.type==="nfl_bounce_back"?"BOUNCE-BACK":t.type==="nfl_target_vacuum"?"TARGET VACUUM":
     t.type==="nfl_short_week"?"SHORT WEEK":t.type==="nfl_dome_split"?"VENUE SPLIT":
     t.type==="nfl_underdog_volume"?"UNDERDOG VOLUME":t.type==="nfl_post_bye"?"POST-BYE BOOST":
-    t.type==="nfl_ascending"?"RISING TREND":"GAME TOTAL";
+    t.type==="nfl_ascending"?"RISING TREND":t.type==="nfl_hot_hand"?"HOT HAND":
+    t.type==="nfl_value_line"?"VALUE LINE":t.type==="nfl_td_streak"?"TD STREAK":
+    t.type==="nfl_fade_spot"?"FADE SPOT":"GAME TOTAL";
   var title=_trendCardTitle(t);
   var action=_trendActionLine(t);
   var systemName=t.systemName?'<div class="tc-system-name">'+esc(t.systemName)+'</div>':'';
@@ -9876,7 +9878,9 @@ function renderTrends(trends){
           t.type==="nfl_bounce_back"?"BOUNCE-BACK":t.type==="nfl_target_vacuum"?"TARGET VACUUM":
           t.type==="nfl_short_week"?"SHORT WEEK":t.type==="nfl_dome_split"?"VENUE SPLIT":
           t.type==="nfl_underdog_volume"?"UNDERDOG VOLUME":t.type==="nfl_post_bye"?"POST-BYE BOOST":
-          t.type==="nfl_ascending"?"RISING TREND":"GAME TOTAL";
+          t.type==="nfl_ascending"?"RISING TREND":t.type==="nfl_hot_hand"?"HOT HAND":
+          t.type==="nfl_value_line"?"VALUE LINE":t.type==="nfl_td_streak"?"TD STREAK":
+          t.type==="nfl_fade_spot"?"FADE SPOT":"GAME TOTAL";
         var mkt=t._market||'';
         var tLine=t._rawLine!=null?String(t._rawLine):'';
         if(_isBetDuplicate(t.player||t.team||'',mkt,tLine,today,h)) return;
@@ -9918,7 +9922,9 @@ function renderTrends(trends){
         t.type==="nfl_bounce_back"?"BOUNCE-BACK":t.type==="nfl_target_vacuum"?"TARGET VACUUM":
         t.type==="nfl_short_week"?"SHORT WEEK":t.type==="nfl_dome_split"?"VENUE SPLIT":
         t.type==="nfl_underdog_volume"?"UNDERDOG VOLUME":t.type==="nfl_post_bye"?"POST-BYE BOOST":
-        t.type==="nfl_ascending"?"RISING TREND":"GAME TOTAL";
+        t.type==="nfl_ascending"?"RISING TREND":t.type==="nfl_hot_hand"?"HOT HAND":
+        t.type==="nfl_value_line"?"VALUE LINE":t.type==="nfl_td_streak"?"TD STREAK":
+        t.type==="nfl_fade_spot"?"FADE SPOT":"GAME TOTAL";
       var _trPts=(t.record||'').match(/^(\d+)-(\d+)/);
       var _trSamp=_trPts?(parseInt(_trPts[1])+parseInt(_trPts[2])):null;
       var _trSpMap={'americanfootball_nfl':'NFL','basketball_nba':'NBA','icehockey_nhl':'NHL','baseball_mlb':'MLB'};
@@ -10750,6 +10756,112 @@ function calcNFLAscendingTrends(){
   return results;
 }
 
+function calcNFLHotHandTrends(){
+  var results=[];
+  var candidates=ST.props.filter(function(p){return p._vals&&p._vals.length>=3;});
+  candidates.forEach(function(p){
+    var vals=p._vals||[];
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<3) return;
+    var last3=vals.slice(0,3);
+    if(!last3.every(function(v){return v>line;})) return;
+    var hits=vals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.55) return;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) return;
+    var l3avg=Math.round(last3.reduce(function(a,b){return a+b;},0)/3);
+    results.push({
+      type:"nfl_hot_hand",player:p.player,_market:p._market,_rawMarket:marketName(p._market||""),
+      _game:p._game,_sport:"americanfootball_nfl",record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),conf:conf,odds:p.bestOdds,_rawLine:line,_rawLineNum:line,
+      _rawIsOver:true,_rawVals:vals,recordCls:"over",
+      headline:"3 straight OVER — averaging "+l3avg+" "+marketName(p._market)+" last 3 weeks",
+      systemName:"HOT HAND",playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
+function calcNFLValueLineTrends(){
+  var results=[];
+  var candidates=ST.props.filter(function(p){return p._vals&&p._vals.length>=4;});
+  candidates.forEach(function(p){
+    var vals=p._vals||[];
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<4) return;
+    var avg=vals.reduce(function(a,b){return a+b;},0)/vals.length;
+    if(avg<line*1.20) return;
+    var hits=vals.filter(function(v){return v>line;}).length;
+    var hitRate=hits/vals.length;
+    if(hitRate<0.60) return;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<65) return;
+    results.push({
+      type:"nfl_value_line",player:p.player,_market:p._market,_rawMarket:marketName(p._market||""),
+      _game:p._game,_sport:"americanfootball_nfl",record:hits+"-"+(vals.length-hits)+" this season",
+      hitRate:Math.round(hitRate*100),conf:conf,odds:p.bestOdds,_rawLine:line,_rawLineNum:line,
+      _rawIsOver:true,_rawVals:vals,recordCls:"over",
+      headline:"Season avg "+Math.round(avg)+" "+marketName(p._market)+" vs "+line+" line — underpriced",
+      systemName:"VALUE LINE",playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
+function calcNFLTDStreakTrends(){
+  var results=[];
+  var candidates=ST.props.filter(function(p){return p._vals&&p._vals.length>=4&&p._market==="player_anytime_td";});
+  candidates.forEach(function(p){
+    var vals=p._vals||[];
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line) return;
+    var last6=vals.slice(0,Math.min(6,vals.length));
+    var tdGames=last6.filter(function(v){return v>0;}).length;
+    if(tdGames<4) return;
+    var hitRate=tdGames/last6.length;
+    var conf=trendConf(hitRate,last6.length);
+    if(conf<60) return;
+    results.push({
+      type:"nfl_td_streak",player:p.player,_market:p._market,_rawMarket:marketName(p._market||""),
+      _game:p._game,_sport:"americanfootball_nfl",record:tdGames+"-"+(last6.length-tdGames)+" L"+last6.length,
+      hitRate:Math.round(hitRate*100),conf:conf,odds:p.bestOdds,_rawLine:line,_rawLineNum:line,
+      _rawIsOver:true,_rawVals:vals,recordCls:"over",
+      headline:"Scored TD in "+tdGames+" of last "+last6.length+" games — active red zone role",
+      systemName:"TD STREAK",playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
+function calcNFLFadeTrends(){
+  var results=[];
+  var candidates=ST.props.filter(function(p){return p._vals&&p._vals.length>=5;});
+  candidates.forEach(function(p){
+    var vals=p._vals||[];
+    var line=p.consensus!=null?p.consensus:p.bestLine;
+    if(!line||vals.length<5) return;
+    var last5=vals.slice(0,5);
+    var underCount=last5.filter(function(v){return v<line;}).length;
+    if(underCount<4) return;
+    var underHits=vals.filter(function(v){return v<line;}).length;
+    var hitRate=underHits/vals.length;
+    if(hitRate<0.55) return;
+    var conf=trendConf(hitRate,vals.length);
+    if(conf<60) return;
+    var l5avg=Math.round(last5.reduce(function(a,b){return a+b;},0)/5);
+    results.push({
+      type:"nfl_fade_spot",player:p.player,_market:p._market,_rawMarket:marketName(p._market||""),
+      _game:p._game,_sport:"americanfootball_nfl",record:underHits+"-"+(vals.length-underHits)+" under this season",
+      hitRate:Math.round(hitRate*100),conf:conf,odds:p.bestOdds,_rawLine:line,_rawLineNum:line,
+      _rawIsOver:false,_rawVals:vals,recordCls:"under",
+      headline:"Under in "+underCount+" of last 5 — avg "+l5avg+" vs "+line+" line",
+      systemName:"FADE SPOT",playerId:p.playerId||null
+    });
+  });
+  return results;
+}
+
 async function trendsFetchAndLoad(){
   var mount=$("trendsMount"); if(!mount) return;
   if(!_trendsEvents.length){
@@ -10862,7 +10974,8 @@ async function trendsFetchAndLoad(){
         // Sync trends (pure math, no API calls)
         try{
           var _nflSync=[].concat(calcNFLBounceBackTrends(),calcNFLShortWeekTrends(),
-            calcNFLVenueSplitTrends(),calcNFLPostByeTrends(),calcNFLAscendingTrends());
+            calcNFLVenueSplitTrends(),calcNFLPostByeTrends(),calcNFLAscendingTrends(),
+            calcNFLHotHandTrends(),calcNFLValueLineTrends(),calcNFLTDStreakTrends(),calcNFLFadeTrends());
           if(_nflSync.length){ trends=trends.concat(_nflSync); _trendsData=trends.slice(); renderTrends(_trendsData); }
         }catch(e){ console.warn("[PropDesk] nfl_sync trends error:",e); }
         // Async trends (require API calls)
