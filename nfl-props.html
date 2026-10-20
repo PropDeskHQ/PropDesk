@@ -6993,7 +6993,7 @@ async function renderPlayHistory(){
     Promise.all(mlbTrends.map(function(e){return resolvePlayerStatTrend(e);}).concat(
       mlbTotals.map(function(e){return resolveTotalsTrend(e);}).concat(
       mlbProps.map(function(e){return resolvePlayAutomatically(e);}).concat(
-      nflTrendPend.map(function(e){return resolveNFLPlayerStatTrend(e);})))).then(function(){
+      nflTrendPend.map(function(e){return resolveNFLPlayerStatTrend(e);}))))).then(function(){
       var h=loadPlayHist(), today=new Date().toISOString().slice(0,10);
       var still=h.filter(function(e){return e.result==="pending"&&e.date<today;});
       renderPlayHistory();
